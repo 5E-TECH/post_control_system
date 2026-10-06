@@ -30,7 +30,7 @@ const CourierSidebar = () => {
     {
       to: '/my-extra-cost',
       icon: <Receipt />,
-      label: "Qo'shimcha xarajat",
+      label: t("extra_cost"),
       badge: extraCostBadge,
     },
     { to: '/my-region', icon: <MapPinned />, label: t('myRegion') },

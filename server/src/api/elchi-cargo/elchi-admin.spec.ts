@@ -25,6 +25,8 @@ function buildSvc(
     rawSums?: [number, number, number];
     /** Elchi ushlagan tarif yig'indisi (audit M2). */
     rawFee?: number;
+    /** Kuryer haqqi (extra_cost) yig'indisi (ShM3oBjJ). */
+    rawExtra?: number;
     /** Yangi pul maydonlari yo'q posilkalar soni. */
     rawUnreported?: number;
     /** To'liq nazorat kerak bo'lganda — xom javoblar ketma-ketligi. */
@@ -50,6 +52,7 @@ function buildSvc(
     {
       collected: String(sums[1] ?? 0),
       fee: String(over.rawFee ?? 0),
+      extra: String(over.rawExtra ?? 0),
       cnt: '0',
     },
     { sum: String(sums[2] ?? 0), cnt: '0' },
@@ -180,6 +183,24 @@ describe('ElchiAdminService — hisob-kitob (pul)', () => {
     expect(money.paid_by_elchi).toBe(400_000);
     // 900 000 yig'ildi − 30 000 tarif − 400 000 to'langan = 470 000
     expect(money.debt).toBe(470_000);
+  });
+
+  it('⭐ qarz KURYER HAQQINI (extra_cost) ham ayiradi (ShM3oBjJ)', async () => {
+    /**
+     * extra_cost asosiy kassaga tegmaydi — marketdan yechilib kuryerga ketadi.
+     * Yig'ilgan naqdning bu qismi kuryerga extra_cost sifatida beriladi, ya'ni
+     * Elchi bizga qarzini KAMAYTIRADI. Ilgari formula uni umuman hisobga
+     * olmasdi va qarz extra_cost miqdoricha OSHIB ko'rinardi.
+     */
+    const { svc } = buildSvc({
+      rawSums: [1_000_000, 900_000, 100_000],
+      rawFee: 30_000,
+      rawExtra: 50_000,
+    });
+    const money = await svc.sumMoney();
+    expect(money.extra_cost).toBe(50_000);
+    // 900 000 − 30 000 tarif − 50 000 kuryer haqqi − 100 000 to'langan = 720 000
+    expect(money.debt).toBe(720_000);
   });
 
   it("⭐ qarz MANFIY chiqmaydi — eski xatoning regressiya qo'riqchisi", async () => {

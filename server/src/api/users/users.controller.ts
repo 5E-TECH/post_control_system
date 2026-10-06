@@ -11,6 +11,7 @@ import {
   UseGuards,
   SetMetadata,
   Query,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -886,14 +887,93 @@ export class UsersController {
     return this.userService.profile(user);
   }
 
+  /**
+   * Market Telegram tokenini qayta yaratish.
+   *
+   * ⚠️ `@Body` YO'Q — ataylab. Yangi qiymatni server o'zi yaratadi,
+   * tashqaridan qabul qilinmaydi (users.service.ts izohiga qarang).
+   *
+   * ⚠️ Marshrut `@Get(':id')` dan OLDIN turibdi va POST — `market` segmenti
+   * aniq, shuning uchun to'qnashuv yo'q.
+   */
+  @ApiOperation({ summary: 'Regenerate market telegram token' })
+  @ApiParam({ name: 'id', description: 'Market ID' })
+  @ApiResponse({ status: 200, description: 'Token regenerated' })
+  @ApiBearerAuth()
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Post('market/:id/regenerate-token')
+  regenerateMarketToken(
+    /**
+     * ⚠️ `ParseUUIDPipe` SHART. Usiz noto'g'ri `id` to'g'ridan-to'g'ri
+     * Postgres'ga borib `22P02 invalid input syntax for type uuid`
+     * beradi, `catchError` esa uni `InternalServerErrorException` ga
+     * o'rab, XOM Postgres matnini 500 bilan mijozga uzatadi.
+     * Naqsh: extra-cost.controller.ts:159.
+     */
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.userService.regenerateMarketToken(id, user);
+  }
+
+  /**
+   * Marketning Telegram holati — operatorlar va ulangan guruhlar.
+   *
+   * ⚠️ Marshrut `@Get(':id')` dan OLDIN e'lon qilinadi. Segment soni
+   * har xil bo'lgani uchun to'qnashuv bo'lmasligi kerak, lekin NestJS
+   * marshrutlarni E'LON TARTIBIDA moslashtiradi — bu yerdagi tartib
+   * `operators/selectable` bilan bir xil ehtiyotkorlik (users.controller.ts
+   * dagi o'sha izohga qarang).
+   */
+  @ApiOperation({ summary: 'Market telegram holati (operatorlar + guruhlar)' })
+  @ApiParam({ name: 'id', description: 'Market ID' })
+  @ApiBearerAuth()
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('market/:id/telegram')
+  marketTelegramOverview(@Param('id', ParseUUIDPipe) id: string) {
+    return this.userService.marketTelegramOverview(id);
+  }
+
+  /**
+   * Telegram guruh ulanishini uzish.
+   *
+   * ⚠️ IKKI id ham talab qilinadi: `id` (market) va `connectionId`.
+   * Faqat `connectionId` bo'yicha o'chirish boshqa marketning
+   * ulanishini o'chirish imkonini berardi.
+   *
+   * ⚠️ Bu QAYTARIB BO'LMAYDIGAN amal (jadvalda soft-delete yo'q) —
+   * o'chirilgan qator audit logga yoziladi.
+   */
+  @ApiOperation({ summary: 'Telegram guruh ulanishini uzish' })
+  @ApiParam({ name: 'id', description: 'Market ID' })
+  @ApiParam({ name: 'connectionId', description: 'Ulanish ID' })
+  @ApiBearerAuth()
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Delete('market/:id/telegram/:connectionId')
+  disconnectMarketTelegram(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('connectionId', ParseUUIDPipe) connectionId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.userService.disconnectMarketTelegram(id, connectionId, user);
+  }
+
   @ApiOperation({ summary: 'Get user by id' })
   @ApiParam({ name: 'id', description: 'User ID' })
   @ApiResponse({ status: 200, description: 'User retrieved successfully' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.userService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    /**
+     * ⚠️ `user` so'rovchining rolini xizmatga uzatadi: market kartochkasida
+     * `market_tg_token` FAQAT SUPERADMIN/ADMIN uchun qo'shiladi
+     * (users.service.ts:findOne izohiga qarang).
+     */
+    return this.userService.findOne(id, user);
   }
 
   @ApiOperation({ summary: 'Update admin user' })

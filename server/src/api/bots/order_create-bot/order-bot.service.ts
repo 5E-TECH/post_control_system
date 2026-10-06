@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { Context, Telegraf } from 'telegraf';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
@@ -23,6 +24,7 @@ import { MyContext } from './session.interface';
 import { Group_type, Order_status, Roles, Status } from 'src/common/enums';
 import { roleUz, orderStatusUz } from 'src/common/utils/status-label.util';
 import config from 'src/config';
+import { muteBotOutbound } from 'src/common/utils/bot-mute.util';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
@@ -36,7 +38,7 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_ATTEMPTS = 5;
 
 @Injectable()
-export class OrderBotService {
+export class OrderBotService implements OnModuleInit {
   private readonly tokenAttempts = new Map<number, number[]>();
 
   constructor(
@@ -56,6 +58,20 @@ export class OrderBotService {
     private readonly bcrypt: BcryptEncryption,
     private readonly logger: MyLogger,
   ) {}
+
+  /**
+   * ⚠️ BOTLAR O'CHIRILGANDA CHIQUVCHI CHAQIRUVLAR HAM TO'XTAYDI.
+   *
+   * `launchOptions: false` faqat POLLINGni to'xtatadi — bot obyekti
+   * baribir yaratiladi va `sendMessage` Telegram'ga ketaverardi. Lokal
+   * bazadagi `group_id` lar haqiqiy guruhlarga ishora qilishi mumkin,
+   * shuning uchun chiquvchi tomon ham yopiladi.
+   */
+  onModuleInit(): void {
+    if (!config.BOTS_ENABLED) {
+      muteBotOutbound(this.bot, 'order-bot');
+    }
+  }
 
   private escapeMarkdown(value: unknown): string {
     if (value === null || value === undefined) return '-';

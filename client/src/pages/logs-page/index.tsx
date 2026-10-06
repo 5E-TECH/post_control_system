@@ -14,6 +14,7 @@ import {
   CheckCircle,
   RotateCcw,
   Trash2,
+  Unlink,
   AlertTriangle,
   Search,
   X,
@@ -85,6 +86,13 @@ const ACTION_CONFIG: Record<string, ActionCfg> = {
   rollback: { icon: RotateCcw, tone: "amber", label: "Orqaga qaytarildi", category: "order" },
   courier_changed: { icon: Truck, tone: "indigo", label: "Kuryer o'zgartirildi", category: "order" },
   status_change: { icon: ArrowRight, tone: "purple", label: "Holat o'zgardi", category: "order" },
+  // Bekor qaytarish zanjiri — bu amallar STATUSNI o'zgartirmaydi, shuning
+  // uchun tarixda bo'lmasa "kuryerdan qachon olingani" ko'rinmasdi.
+  center_received: { icon: ArrowRight, tone: "blue", label: "Viloyatdan markazga qabul qilindi", category: "order" },
+  market_handover: { icon: ArrowRight, tone: "gray", label: "Marketga topshirildi", category: "order" },
+  handover_escalated: { icon: ArrowRight, tone: "red", label: "Market olib ketmadi — eskalatsiya", category: "order" },
+  handover_authorized: { icon: ArrowRight, tone: "green", label: "Market ruxsati ochildi", category: "order" },
+  handover_consent_flag: { icon: ArrowRight, tone: "purple", label: "Market ruxsati majburiyligi o'zgardi", category: "user" },
   return_requested: { icon: AlertTriangle, tone: "orange", label: "Qaytarish so'rovi", category: "order" },
   return_approved: { icon: CheckCircle, tone: "green", label: "Qaytarish tasdiqlandi", category: "order" },
   return_rejected: { icon: XCircle, tone: "red", label: "Qaytarish rad etildi", category: "order" },
@@ -123,6 +131,12 @@ const ACTION_CONFIG: Record<string, ActionCfg> = {
   assigned: { icon: Send, tone: "purple", label: "Tayinlandi", category: "other" },
   sync_retry: { icon: RotateCcw, tone: "amber", label: "Sinxron qayta urinish", category: "other" },
   sync_deleted: { icon: Trash2, tone: "rose", label: "Sinxron o'chirildi", category: "other" },
+  /**
+   * ⚠️ `deleted` DAN ATAYLAB AJRATILGAN. Bu yerda market TIRIK qoladi —
+   * faqat Telegram guruh bog'lanishi uziladi. `deleted` ishlatilsa
+   * loglarda tirik market "O'chirildi" nishoni bilan chiqardi.
+   */
+  telegram_disconnected: { icon: Unlink, tone: "amber", label: "Telegram guruh uzildi", category: "other" },
 };
 
 const DEFAULT_ACTION: ActionCfg = { icon: Clock, tone: "gray", label: "Harakat", category: "other" };
@@ -157,11 +171,11 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Bekor qilingan",
   paid: "To'langan",
   partly_paid: "Qisman to'langan",
-  "cancelled (sent)": "Bekor (yuborilgan)",
+  "cancelled (sent)": "Bekor (qaytish yo'lida)",
   closed: "Yopilgan",
   // Eski/normalizatsiyalangan loglar uchun ehtiyot variantlar:
   on_the_road: "Yo'lda",
-  cancelled_sent: "Bekor (yuborilgan)",
+  cancelled_sent: "Bekor (qaytish yo'lida)",
 };
 
 // Pochta statuslari (server/src/common/enums/index.ts -> Post_status)

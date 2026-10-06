@@ -85,7 +85,6 @@
   },
   "tuman": "tuman",
   "telefon_nomer": "Telefon nomer",
-
   "delivery": {
     "center": "Markazga",
     "address": "Uygacha"
@@ -142,5 +141,6 @@
     "notStartedWarning": "Kassadan pul yechish yoki kiritish uchun avval smenani boshlashingiz kerak. Smena boshlangandan so'ng barcha operatsiyalar qayd etiladi.",
     "opening": "Ochilmoqda...",
     "startAndContinue": "Smenani boshlash"
-  }
+  },
+  "sotuv": "Sotuv"
 }

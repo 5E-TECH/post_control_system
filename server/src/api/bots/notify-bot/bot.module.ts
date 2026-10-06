@@ -14,9 +14,15 @@ import config from 'src/config';
       useFactory: () => ({
         token: config.BOT_TOKEN,
         include: [BotModule],
-        launchOptions: {
-          dropPendingUpdates: true,
-        },
+        /**
+         * ⚠️ `false` bo'lsa `bot.launch()` CHAQIRILMAYDI — polling
+         * boshlanmaydi va lokal nusxa Telegram'dan kelayotgan xabarlarni
+         * o'ziga tortib olmaydi. Chiquvchi tomon `muteBotOutbound` bilan
+         * yopiladi (src/common/utils/bot-mute.util.ts).
+         */
+        launchOptions: config.BOTS_ENABLED
+          ? { dropPendingUpdates: true }
+          : false,
         options: {
           handlerTimeout: 90_000,
           telegram: {

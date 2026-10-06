@@ -24,6 +24,7 @@ import { DataSource, EntityManager, In, IsNull, QueryRunner } from 'typeorm';
 import { OrderItemEntity } from 'src/core/entity/order-item.entity';
 import { OrderItemRepository } from 'src/core/repository/order-item.repository';
 import {
+  CancelReturnStage,
   Cashbox_type,
   Group_type,
   Operation_type,
@@ -36,6 +37,7 @@ import {
   Status,
   Where_deliver,
 } from 'src/common/enums';
+import { cancelReturnStage } from 'src/common/utils/cancel-return.util';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { applyCashboxDelta } from 'src/common/database/cashbox-delta.util';
 import { MarketplaceSyncService } from '../marketplace/marketplace-sync.service';
@@ -76,6 +78,10 @@ import { OrderGateaway } from '../socket/order.gateaway';
 import { PostRepository } from 'src/core/repository/post.repository';
 import { MyLogger } from 'src/logger/logger.service';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
+import {
+  findMarketGroup,
+  findMarketGroups,
+} from 'src/common/utils/telegram-group.util';
 import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
 import { BotService } from '../bots/notify-bot/bot.service';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
@@ -313,7 +319,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       return successRes(
         {
-          data,
+          /**
+           * Har qatorga bekor qaytarish bosqichi (hosila) qo'shiladi:
+           * kuryerda / markazda / marketda. Kuryer o'z bekor qilgan
+           * posilkasining markazga yetib kelganini, market esa o'z
+           * qaytarishining markazda turganini SHU maydondan ko'radi —
+           * `cancelled (sent)` statusi o'zi buni aytib bermaydi.
+           */
+          data: data.map((order) => ({
+            ...order,
+            return_stage: cancelReturnStage(order),
+          })),
           total,
           page,
           limit,
@@ -531,11 +547,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         // (ataylab tekshirilmaydi) — masalan mijoz boshqa raqam bilan buyurtma
         // bergan yoki almashtirish boshqa mijoz buyurtmasi o'rniga ketadi.
         // Faqat shu MARKET va yetkazilgan (sotilgan) bo'lishi shart.
+        /**
+         * ⚠️ CLOSED RO'YXATDAN OLIB TASHLANDI.
+         *
+         * CLOSED buyurtma — bekor qilinib marketga qaytarilgan posilka,
+         * ya'ni mijozga HECH QACHON yetkazilmagan. Uni "kafolat almashtirish"
+         * uchun tanlash mumkin bo'lsa, almashtirish oqimi sotilmagan
+         * buyurtmaning pulini muzlatadi — real pul tuzog'i. Ikki bosqichli
+         * topshirishda CLOSED aniq "marketga topshirildi" degani.
+         */
         const DELIVERED_STATUSES: Order_status[] = [
           Order_status.SOLD,
           Order_status.PAID,
           Order_status.PARTLY_PAID,
-          Order_status.CLOSED,
         ];
         if (!DELIVERED_STATUSES.includes(replacedOrder.status)) {
           throw new BadRequestException(
@@ -705,9 +729,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       return 'new' as const;
     };
 
-    const groups = await this.dataSource.manager.find(TelegramEntity, {
-      where: { market_id: order.user_id, group_type: Group_type.CREATE },
-    });
+    /**
+     * ⚠️ Bu CREATE yo'li — zaxira mantig'i BU YERDA ISHLAMAYDI (ataylab).
+     * `findMarketGroups` eski (NULL) qatorlarga FAQAT `cancel` uchun
+     * tushadi; sababi telegram-group.util.ts da batafsil. Qisqasi:
+     * bu yerda guruh topilishi buyurtmani CREATED holatiga qo'yadi va
+     * ✅ tugmasini kutadi, tugma esa qat'iy `group_type: CREATE` talab
+     * qiladi — eski qator bilan buyurtma qotib qolardi.
+     */
+    const groups = await findMarketGroups(
+      this.dataSource.manager,
+      order.user_id,
+      Group_type.CREATE,
+    );
 
     // Guruh yo'q — tasdiq talab qilinmaydi, to'g'ridan NEW.
     if (!groups.length) {
@@ -1337,6 +1371,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         max_courier_tariff_center,
         assigned_courier_tariff_home,
         assigned_courier_tariff_center,
+        /**
+         * Bekor qaytarish bosqichi — HOSILA maydon (DB'da status emas).
+         *
+         * Kuryer, markaz xodimi va market bitta ma'noni ko'rishi uchun
+         * SERVER hisoblaydi: `cancelled (sent)` statusi ikki ma'noli
+         * (kuryerda / markazda) va har ekran uni o'zi hisoblab yursa
+         * muqarrar drift beradi. Yagona manba:
+         * `src/common/utils/cancel-return.util.ts`.
+         */
+        return_stage: cancelReturnStage(newOrder),
       };
 
       if (!canSeeMarketTariff) {
@@ -2091,32 +2135,70 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           status: In([Order_status.NEW, Order_status.CANCELLED_SENT]),
           user_id: orderDto.marketId,
         },
+        // ⚠️ Qatorni QULFLAYMIZ. Avval lock yo'q edi: ikki registrator ayni
+        // posilkani bir vaqtda skanerlasa ikkisi ham status filtridan o'tib,
+        // keyin to'liq-entity `save()` bir-birining yozuvini bosib ketardi.
+        lock: { mode: 'pessimistic_write' },
       });
       if (!order) {
         throw new NotFoundException('Order not in correct status');
       }
       if (order.status === Order_status.CANCELLED_SENT) {
-        order.status = Order_status.CLOSED;
-        await queryRunner.manager.save(order);
+        // ⚠️ BU ENDPOINT POCHTADAN MUSTAQIL "ORQA ESHIK": filtri faqat
+        // qr_code_token + status + market. Avval u bekor qilingan posilkani
+        // BIR URISHDA `CLOSED` qilardi — ya'ni market ruxsati darvozasi
+        // faqat `receiveCanceledPost` ga qo'yilsa, bu yo'l uni butunlay
+        // chetlab o'tardi. Shuning uchun skaner ham IKKI BOSQICHLI.
+        //
+        // Elchi/LDG qaytarishlari (`canceled_post_id` ATAYLAB null, pochta
+        // oqimiga kirmaydi) YAGONA shu yo'ldan o'tadi — shuning uchun
+        // 1-bosqich ular uchun ham shu yerda ishlashi SHART.
+        if (order.center_received_at == null) {
+          const centerReceivedAt = Date.now();
+          // Nishonli `update` — to'liq-entity `save()` EMAS: qolgan ustunlarni
+          // (masalan parallel yozilgan extra_cost) bosib ketmaydi.
+          await queryRunner.manager.update(
+            OrderEntity,
+            { id: order.id, status: Order_status.CANCELLED_SENT },
+            {
+              center_received_at: centerReceivedAt,
+              center_received_by: user?.id ?? null,
+            },
+          );
 
-        await queryRunner.commitTransaction();
+          await queryRunner.commitTransaction();
 
-        this.activityLog.log({
-          entity_type: 'order',
-          entity_id: order.id,
-          action: 'status_change',
-          old_value: { status: Order_status.CANCELLED_SENT },
-          new_value: {
-            order_number: order.order_number,
-            status: Order_status.CLOSED,
-            total_price: order.total_price,
-          },
-          description: `Buyurtma #${order.order_number} QR skaner orqali qabul qilindi va yopildi — ${order.total_price} so'm`,
-          user,
-          metadata: { source: 'scanner' },
-        });
+          this.activityLog.log({
+            entity_type: 'order',
+            entity_id: order.id,
+            action: 'center_received',
+            old_value: { center_received_at: null },
+            new_value: {
+              order_number: order.order_number,
+              status: Order_status.CANCELLED_SENT,
+              center_received_at: centerReceivedAt,
+              return_stage: CancelReturnStage.AT_CENTER,
+            },
+            description: `Buyurtma #${order.order_number} QR skaner orqali markazga qabul qilindi — market ruxsati kutilmoqda`,
+            user,
+            metadata: { source: 'scanner' },
+          });
 
-        return successRes({}, 200, 'Order closed');
+          return successRes(
+            { return_stage: CancelReturnStage.AT_CENTER },
+            200,
+            'Markazga qabul qilindi — market ruxsati kutilmoqda',
+          );
+        }
+
+        // 2-bosqich (marketga topshirish) ATAYLAB bu yerda bajarilmaydi:
+        // u market ruxsat sessiyasini, partiya atomikligini va dalil
+        // ustunlarini talab qiladi — hammasi `market-handover` modulida.
+        // Bitta skaner urishi bilan yopib yuborish aynan tuzatilayotgan
+        // nuqson edi.
+        throw new BadRequestException(
+          `Buyurtma #${order.order_number} allaqachon markazda. Marketga topshirish uchun «Market kutilmoqda» bo'limida market ruxsatini (QR yoki PIN) oling.`,
+        );
       }
       const customer = await queryRunner.manager.findOne(UserEntity, {
         where: { id: order.customer_id, role: Roles.CUSTOMER },
@@ -2593,6 +2675,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       select: ['id', 'external_provider'],
     });
     if (actor?.external_provider === 'ldg') return;
+
+    // Elchi istisno: LDG bilan AYNAN bir xil arxitektura (elchi-cargo.module.ts).
+    // Elchi webhook'lari virtual vakil-kuryer (external_provider='elchi') nomidan
+    // sotuv/bekor qiladi. Buyurtma to'g'ridan-to'g'ri `new`dan dispatch qilinsa
+    // (dispatch-retry) yoki oraliq webhook yo'qolsa, order postsiz bo'lishi mumkin
+    // va yuqoridagi post-egalik tekshiruvidan o'tmaydi. Chaqiruvchi Elchi
+    // vakil-kuryer bo'lsa egalikni o'tkazib yuboramiz — aks holda yetkazilgan
+    // posilka (=pul) PCS'da abadiy sotilmay qolardi.
+    if (actor?.external_provider === 'elchi') return;
 
     throw new ForbiddenException('Bu buyurtma sizga tegishli emas');
   }
@@ -3318,14 +3409,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // market'ning mavjud CANCEL guruhiga yuboramiz.
       if (order.replacement_of_order_id) {
         try {
-          const returnGroup = await this.dataSource
-            .getRepository(TelegramEntity)
-            .findOne({
-              where: {
-                market_id: order.user_id,
-                group_type: Group_type.CANCEL,
-              },
-            });
+          const returnGroup = await findMarketGroup(
+            this.dataSource.manager,
+            order.user_id,
+            Group_type.CANCEL,
+          );
           await this.botService.sendMessageToGroup(
             returnGroup?.group_id || null,
             `*🔄 Almashtirish — mahsulot qaytmoqda!*\n\n` +
@@ -3640,9 +3728,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         relations: ['courier'],
       });
 
-      const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
-        where: { market_id: marketId, group_type: Group_type.CANCEL || null },
-      });
+      // ⚠️ Avval `group_type: Group_type.CANCEL || null` edi — O'LIK shart:
+      // chapdagi qiymat bo'sh bo'lmagan satr, `||` hech qachon o'ngga
+      // o'tmaydi. Niyat eski NULL qatorlarni qamrash edi; endi u
+      // haqiqatan bajariladi (telegram-group.util.ts).
+      const telegramGroup = await findMarketGroup(
+        queryRunner.manager,
+        marketId,
+        Group_type.CANCEL,
+      );
 
       // Bulk amalda har order uchun alohida xabar yuborilmaydi
       if (!options?.skipNotification) {
@@ -4358,9 +4452,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
-        where: { market_id: marketId, group_type: Group_type.CANCEL || null },
-      });
+      // ⚠️ Avval `group_type: Group_type.CANCEL || null` edi — O'LIK shart:
+      // chapdagi qiymat bo'sh bo'lmagan satr, `||` hech qachon o'ngga
+      // o'tmaydi. Niyat eski NULL qatorlarni qamrash edi; endi u
+      // haqiqatan bajariladi (telegram-group.util.ts).
+      const telegramGroup = await findMarketGroup(
+        queryRunner.manager,
+        marketId,
+        Group_type.CANCEL,
+      );
 
       // 🔟 ✅ To‘g‘rilangan cancel order logikasi
       if (totalNewQty < totalOldQty) {
@@ -5155,9 +5255,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       if (targetStatus === RollbackTarget.WAITING) {
         order.status = Order_status.WAITING;
         order.cancelled_at = null;
+        // ⚠️ Bekor pochtasidan AJRATILADI. Avval havola qolib ketardi: WAITING
+        // buyurtma hamon bekor pochta manifestida turar va markazda "qabul
+        // qilindi" deb belgilanishi mumkin edi. Pochta sanoqlari qabul
+        // paytida qayta hisoblanadi (receiveCanceledPost).
+        order.canceled_post_id = null;
       } else if (targetStatus === RollbackTarget.CANCELLED) {
         order.status = Order_status.CANCELLED;
         order.cancelled_at = Date.now();
+        // Yuqoridagi bilan ayni sabab: CANCELLED — "kuryerda", pochtada emas.
+        order.canceled_post_id = null;
       } else if (targetStatus === RollbackTarget.CANCELLED_SENT) {
         // Buyurtmani cancelled pochtaga qo'shish
         if (!order.post?.courier_id) {
@@ -5171,6 +5278,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         if (!assignedCourier) {
           throw new BadRequestException('Kurier topilmadi');
         }
+
+        // ⚠️ KURYER BO'YICHA ADVISORY LOCK — `attachOrdersToCanceledPost`
+        // (post.service.ts) bilan AYNI kalit. Busiz bu shox "bir kuryer =
+        // bitta CANCELED pochta" invariantini buzardi: parallel ikki rollback
+        // (yoki rollback + kuryerning `post/cancel` chaqirig'i) bir kuryerga
+        // IKKI bekor pochta yaratib qo'yardi.
+        await queryRunner.manager.query(
+          'SELECT pg_advisory_xact_lock(hashtext($1))',
+          [`canceled_post:${assignedCourier.id}`],
+        );
 
         // Shu kurier uchun mavjud cancelled pochta bor-yo'qligini tekshirish
         let canceledPost = await queryRunner.manager.findOne(PostEntity, {
@@ -5232,6 +5349,24 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             Number(order.market_net || 0) + (before - order.extra_cost_net);
         }
       }
+
+      /**
+       * ⚠️ BEKOR QAYTARISH DALILLARI TOZALANADI.
+       *
+       * Rollback buyurtmani faol oqimga qaytaradi. Agar `center_received_at`
+       * yoki `market_handover_*` qolib ketsa, buyurtma "markazda" / "marketga
+       * topshirilgan" bo'lib ko'rinadi va QAYTA bekor qilinganda ikkinchi
+       * darvozani (market ruxsatini) butunlay chetlab o'tadi —
+       * `cancelReturnStage()` `market_handover_at` ni hammasidan ustun ko'radi.
+       */
+      order.center_received_at = null;
+      order.center_received_by = null;
+      order.market_handover_at = null;
+      order.market_handover_by = null;
+      order.market_handover_mode = null;
+      order.market_handover_session_id = null;
+      order.handover_notified_at = null;
+      order.handover_escalated_at = null;
 
       await queryRunner.manager.save(order);
 
@@ -5967,7 +6102,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           start,
           end,
           validStatuses,
-          cancelledStatuses: [Order_status.CANCELLED, Order_status.CLOSED],
+          // ⚠️ CANCELLED_SENT ro'yxatda YO'Q edi: kuryer bekor qilib
+          // pochtaga topshirgandan keyin buyurtma uning statistikasidan
+          // BUTUNLAY tushib qolardi. Yangi oqimda bu oyna kunlarga cho'ziladi
+          // (market kelguncha), ya'ni kuryer KPI si jimgina pasayardi.
+          cancelledStatuses: [
+            Order_status.CANCELLED,
+            Order_status.CANCELLED_SENT,
+            Order_status.CLOSED,
+          ],
           addressType: Where_deliver.ADDRESS,
         })
         .getRawOne();
@@ -7216,13 +7359,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
     // ON_THE_ROAD yoki RECEIVED bo'lsa avval WAITING ga o'tkazamiz
     if (
+      order.status === Order_status.CREATED ||
+      order.status === Order_status.NEW ||
       order.status === Order_status.ON_THE_ROAD ||
       order.status === Order_status.RECEIVED
     ) {
       await this.orderRepo.update(
         {
           id: orderId,
-          status: In([Order_status.ON_THE_ROAD, Order_status.RECEIVED]),
+          status: In([
+            Order_status.CREATED,
+            Order_status.NEW,
+            Order_status.ON_THE_ROAD,
+            Order_status.RECEIVED,
+          ]),
         },
         { status: Order_status.WAITING },
       );
@@ -7324,12 +7474,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
    * chaqiriladi. LDG buyurtmani BEKOR QILIB, paketni bizga QAYTARMOQDA — lekin
    * paket hali jismonan yetib kelmagan.
    *
-   * MUHIM: bu yerda buyurtma CLOSED ("Yopilgan") QILINMAYDI. CLOSED — eng yakuniy
-   * status va u FAQAT skaner oqimidan (receiveWithScaner/receiveCanceledPost)
-   * qo'yiladi, chunki "mahsulot jismonan qaytib keldi va skaner bilan tasdiqlandi"
-   * degan invariantni bildiradi. LDG eng ko'pi bilan buyurtmani CANCELLED_SENT
-   * ("Bekor (yuborilgan)" — qaytish yo'lida) holatiga o'tkaza oladi; paket idoraga
-   * yetib kelib registrator uni skanerdan o'tkazgandagina CLOSED bo'ladi.
+   * MUHIM: bu yerda buyurtma CLOSED ("Yopilgan") QILINMAYDI. CLOSED ning ma'nosi
+   * TORAYTIRILDI — endi u "posilka MARKETGA TOPSHIRILDI" degani va faqat
+   * `market-handover` moduli (market QR/PIN ruxsati yoki offline akt) qo'yadi.
+   * LDG eng ko'pi bilan buyurtmani CANCELLED_SENT ("Bekor (yuborilgan)" —
+   * qaytish yo'lida) holatiga o'tkaza oladi. Keyin: paket idoraga yetib kelib
+   * skanerdan o'tadi → `center_received_at` (markazda), market ruxsat beradi →
+   * CLOSED. Ya'ni skaner endi YOPMAYDI, faqat markazga qabul qiladi.
    *
    * Avval (agar hali bekor qilinmagan bo'lsa) `cancelOrder` oqimidan o'tkazamiz
    * (market guruhiga bildirishnoma, tashqi integratsiya sinxron, operator daromadi
@@ -7390,8 +7541,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     // canceled_post_id ATAYLAB tegilmaydi (NULL qoladi) — LDG virtual kuryeri
     // qaytarish-pochtasi oqimida qatnashmaydi; buyurtma global skaner orqali
     // yopiladi (receiveWithScaner CANCELLED_SENT'ni pochtasiz ham qabul qiladi).
+    // ⚠️ `center_received_at IS NULL` ham shartda: markazga ALLAQACHON qabul
+    // qilingan posilkani kechikkan/takroriy webhook ORQAGA (qaytish yo'liga)
+    // qaytarib yubormasin. Skip-guard CANCELLED_SENT'ni allaqachon to'sadi,
+    // bu — ikkinchi devor.
     const res = await this.orderRepo.update(
-      { id: orderId, status: In([Order_status.CANCELLED]) },
+      {
+        id: orderId,
+        status: In([Order_status.CANCELLED]),
+        center_received_at: IsNull(),
+      },
       { status: Order_status.CANCELLED_SENT },
     );
     if ((res.affected ?? 0) === 0) {
@@ -7560,13 +7719,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     // bizda hali `ON_THE_ROAD`/`RECEIVED` bo'lishi mumkin (oraliq statuslar
     // webhookda yo'qolgan bo'lsa) — avval `WAITING`ga o'tkazamiz.
     if (
+      order.status === Order_status.CREATED ||
+      order.status === Order_status.NEW ||
       order.status === Order_status.ON_THE_ROAD ||
       order.status === Order_status.RECEIVED
     ) {
       await this.orderRepo.update(
         {
           id: orderId,
-          status: In([Order_status.ON_THE_ROAD, Order_status.RECEIVED]),
+          status: In([
+            Order_status.CREATED,
+            Order_status.NEW,
+            Order_status.ON_THE_ROAD,
+            Order_status.RECEIVED,
+          ]),
         },
         { status: Order_status.WAITING },
       );
@@ -7584,6 +7750,25 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
      * qanchaga aylandi". Shu bilan operator buyurtmani ochganda sababni
      * ko'radi va kassadagi summa nega boshqacha ekani tushunarli bo'ladi.
      */
+    /**
+     * NARX PASAYISHI = QISMAN SOTUV EHTIMOLI (vaqtinchalik chora).
+     *
+     * Elchi qisman sotuvda asl buyurtma narxini kamaytirib, qolgan mol uchun
+     * ALOHIDA bola buyurtma ochadi — lekin PCS bola haqida hech narsa
+     * bilmaydi (faqat `total_price` pasayishini ko'radi). Qolgan mol qayerda,
+     * kim javobgar ekani jimgina yo'qolardi.
+     *
+     * To'liq yechim (bola posilka hodisasi + qaytish yozuvi) katta ish.
+     * Hozircha eng muhimi — JIMLIKNI yo'qotish: narx pasaysa sotuv baribir
+     * o'tadi (yig'ilgan pul yoziladi), LEKIN posilkaga NOMUVOFIQLIK belgisi
+     * qo'yiladi (`kind:'mismatch'`), shunda admin "Nomuvofiqlik" filtrida
+     * ko'rinadi va operator qolgan molni qo'lda tekshiradi.
+     */
+    const originalTotal = Number(order.total_price ?? 0);
+    const remoteTotal = Number(remote?.totalPrice ?? NaN);
+    const priceDropped =
+      Number.isFinite(remoteTotal) && remoteTotal < originalTotal - 0.01;
+
     const priceNote = await this.acceptElchiPriceChange(
       orderId,
       remote?.totalPrice,
@@ -7613,6 +7798,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         { comment: sellComment, extraCost: remoteExtra },
         { bypassControlGuard: true },
       );
+      // Sotuv o'tdi. Narx PASAYGAN bo'lsa — qisman sotuv ehtimoli: posilkani
+      // nomuvofiqlik deb belgilaymiz (chaqiruvchi shipment.mismatch_at qo'yadi),
+      // jimgina o'tib ketmasin.
+      if (priceDropped) {
+        const gap = Math.round(originalTotal - remoteTotal);
+        const reason =
+          `Elchi narxni pasaytirdi: ${originalTotal} -> ${remoteTotal} so'm ` +
+          `(qisman sotuv ehtimoli). Qolgan ~${gap} so'mlik mol kuzatilmagan — ` +
+          `qo'lda tekshiring.`;
+        this.logger.error(`ELCHI PARTIAL? order=${orderId} — ${reason}`);
+        return { kind: 'mismatch', reason };
+      }
       return { kind: 'applied' };
     } catch (err) {
       /**
@@ -7702,13 +7899,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
 
     if (
+      order.status === Order_status.CREATED ||
+      order.status === Order_status.NEW ||
       order.status === Order_status.ON_THE_ROAD ||
       order.status === Order_status.RECEIVED
     ) {
       await this.orderRepo.update(
         {
           id: orderId,
-          status: In([Order_status.ON_THE_ROAD, Order_status.RECEIVED]),
+          status: In([
+            Order_status.CREATED,
+            Order_status.NEW,
+            Order_status.ON_THE_ROAD,
+            Order_status.RECEIVED,
+          ]),
         },
         { status: Order_status.WAITING },
       );
@@ -7829,8 +8033,34 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       return { kind: 'skipped', reason: 'order_not_found' };
     }
 
+    /**
+     * ⚠️ `CANCELLED` BU DARVOZADA EMAS — LDG BILAN SIMMETRIYA
+     * (memory: pcs-elchi-ldg-simmetriya).
+     *
+     * NOSOZLIK: Elchi ikki terminal webhook YUBORADI — avval `cancelled`
+     * (mapper: terminal_action 'cancel'), keyin `cancelled (sent)` yoki
+     * `returned_to_market` (terminal_action 'return'); webhook servisida
+     * shipment darajasida terminal-gate yo'q, ya'ni ikkinchisi ham
+     * dispatch qilinadi. Birinchi webhook buyurtmani CANCELLED qiladi,
+     * ikkinchisi esa shu darvozada SKIP bo'lib ketardi va pastdagi
+     * CANCELLED → CANCELLED_SENT ko'tarishga YETIB BORMASDI. Natijada:
+     *   · status CANCELLED, `canceled_post_id` NULL (Elchi virtual
+     *     kuryeri qaytarish-pochtasi oqimida qatnashmaydi) →
+     *     `receiveCanceledPost` uni olmaydi;
+     *   · `receiveWithScaner` filtri In([NEW, CANCELLED_SENT]) → rad etadi.
+     * Ya'ni jismonan omborga kelgan posilkaga `center_received_at`
+     * yozilmaydi, u «Markazda — market kutilmoqda» navbatida ko'rinmaydi
+     * va cron eskalatsiyasi ham ko'rmaydi.
+     *
+     * `markReturnedByLdg` (7505) aynan shu holatni TO'G'RI ishlaydi:
+     * darvozada faqat CLOSED + CANCELLED_SENT, CANCELLED esa o'tib
+     * ketib CANCELLED_SENT ga ko'tariladi.
+     *
+     * ⚠️ `cancelOrder` ni shartli chaqirish SHART: uning
+     * `NON_CANCELLABLE_STATUSES` ro'yxatida CANCELLED ham bor (3489) va
+     * ikkinchi marta chaqirilsa BadRequest tashlardi.
+     */
     if (
-      order.status === Order_status.CANCELLED ||
       order.status === Order_status.CANCELLED_SENT ||
       order.status === Order_status.CLOSED
     ) {
@@ -7849,24 +8079,81 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
 
     if (
+      order.status === Order_status.CREATED ||
+      order.status === Order_status.NEW ||
       order.status === Order_status.ON_THE_ROAD ||
       order.status === Order_status.RECEIVED
     ) {
       await this.orderRepo.update(
         {
           id: orderId,
-          status: In([Order_status.ON_THE_ROAD, Order_status.RECEIVED]),
+          status: In([
+            Order_status.CREATED,
+            Order_status.NEW,
+            Order_status.ON_THE_ROAD,
+            Order_status.RECEIVED,
+          ]),
         },
         { status: Order_status.WAITING },
       );
     }
 
-    await this.cancelOrder(
-      this.elchiActor(elchiCourierUserId),
-      orderId,
-      { comment: 'Elchi posilkani qaytardi', extraCost: 0 },
-      { bypassControlGuard: true },
+    // Allaqachon CANCELLED bo'lsa ikkinchi marta bekor qilinmaydi —
+    // `cancelOrder` BadRequest tashlardi (LDG'dagi 7530 naqshi).
+    if (order.status !== Order_status.CANCELLED) {
+      await this.cancelOrder(
+        this.elchiActor(elchiCourierUserId),
+        orderId,
+        { comment: 'Elchi posilkani qaytardi', extraCost: 0 },
+        { bypassControlGuard: true },
+      );
+    }
+
+    // ⚠️ LDG BILAN SIMMETRIYA (memory: pcs-elchi-ldg-simmetriya).
+    //
+    // Avval bu metod `cancelOrder` dan keyin TO'XTAB qolardi, ya'ni buyurtma
+    // CANCELLED da qolardi — holbuki `elchi-status.mapper.ts` uni
+    // CANCELLED_SENT deb da'vo qiladi va `markReturnedByLdg` aynan shunday
+    // yozadi. Natijada Elchi qaytargan posilkalar HECH QACHON yakunlanmasdi:
+    //   · pochtada yo'q (canceled_post_id NULL) → `receiveCanceledPost` olmaydi;
+    //   · status CANCELLED → skaner filtri (NEW | CANCELLED_SENT) ko'rmaydi.
+    // Shuning uchun ular CANCELLED da oylab qotib qolardi.
+    //
+    // Endi LDG'dagidek ATOMIK + status-guard bilan CANCELLED_SENT ga
+    // o'tkazamiz. `canceled_post_id` ATAYLAB null qoladi (Elchi virtual
+    // kuryeri qaytarish-pochtasi oqimida qatnashmaydi) — posilka markazga
+    // yetib kelganda skaner `center_received_at` yozadi, keyin market
+    // ruxsati bilan CLOSED bo'ladi.
+    const res = await this.orderRepo.update(
+      {
+        id: orderId,
+        status: In([Order_status.CANCELLED]),
+        center_received_at: IsNull(),
+      },
+      { status: Order_status.CANCELLED_SENT },
     );
+    if ((res.affected ?? 0) === 0) {
+      const fresh = await this.orderRepo.findOne({ where: { id: orderId } });
+      return {
+        kind: 'skipped',
+        reason: `race: now ${fresh?.status ?? 'unknown'}`,
+      };
+    }
+
+    this.activityLog.log({
+      entity_type: 'order',
+      entity_id: orderId,
+      action: 'elchi_returned',
+      old_value: { status: Order_status.CANCELLED },
+      new_value: {
+        order_number: order.order_number,
+        status: Order_status.CANCELLED_SENT,
+      },
+      description: `Buyurtma #${order.order_number} — Elchi bekor qilib qaytardi (qaytish yo'lida, markazga qabul kutilmoqda)`,
+      user: this.elchiActor(elchiCourierUserId),
+      metadata: { source: 'elchi', elchi_action: 'returned' },
+    });
+
     return { kind: 'applied' };
   }
 
@@ -7992,11 +8279,23 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       const limit = Math.min(Number(query.limit) || 30, 50);
+      /**
+       * ⚠️ `createOrder` DAGI RO'YXAT BILAN AYNI BO'LISHI SHART (559-563).
+       *
+       * CLOSED shu ro'yxatda qolib ketgan edi, validatordan esa olib
+       * tashlangan — natijada picker CLOSED buyurtmani TAKLIF qilardi,
+       * «Almashtirish» bosilganda esa «Faqat yetkazib berilgan
+       * (sotilgan) buyurtmani almashtirish mumkin» xatosi chiqardi.
+       * Foydalanuvchi boshi berk ko'chaga kirardi va sababi ko'rinmasdi.
+       *
+       * CLOSED — bekor zanjirining OXIRI: mahsulot mijozga yetib
+       * bormagan, u MARKETGA qaytarilgan. Yetib bormagan mahsulotni
+       * almashtirish ma'nosiz, shuning uchun ikki joydan ham chiqarildi.
+       */
       const DELIVERED: Order_status[] = [
         Order_status.SOLD,
         Order_status.PAID,
         Order_status.PARTLY_PAID,
-        Order_status.CLOSED,
       ];
 
       const qb = this.orderRepo
@@ -8188,6 +8487,27 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
+      /**
+       * ⚠️ MARKET RUXSATI DARVOZASI — IKKINCHI ESHIK YOPILDI.
+       *
+       * Bu endpoint "eski mahsulot marketga qaytarildi" dalilini yozadi VA
+       * marketga Telegram xabarini yuboradi, lekin market hech narsani
+       * tasdiqlamaydi. Bekor qaytarish oqimi market ruxsati ortiga olingach
+       * bu yo'l PARALLEL BYPASS bo'lib qolardi: bitta tugma bilan ruxsatsiz
+       * «topshirildi» yozish mumkin edi (o'z UI sahifasi ham bor).
+       *
+       * Almashtirish qatorlari ham endi `market-handover` oqimidan o'tadi:
+       * markazga qabul (`center_received_at`) → market QR/PIN yoki offline
+       * akt → `market_handover_at` + `OLD_RETURNED`. Shuning uchun bu yerda
+       * ruxsatsiz belgilash RAD ETILADI; metod faqat allaqachon topshirilgan
+       * qatorni tasdiqlash/tuzatish uchun qoladi.
+       */
+      if (oldOrder.market_handover_at == null) {
+        throw new BadRequestException(
+          "Eski mahsulotni marketga topshirish uchun «Market kutilmoqda» bo'limida market ruxsatini (QR yoki PIN) oling — bu yerdan ruxsatsiz belgilab bo'lmaydi",
+        );
+      }
+
       oldOrder.replacement_state = Replacement_state.OLD_RETURNED;
       if (!oldOrder.old_product_returned_at) {
         oldOrder.old_product_returned_at = Date.now();
@@ -8208,14 +8528,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       // Market Telegram xabari (commit'dan keyin — xato sotuvga ta'sir qilmaydi)
       try {
-        const returnGroup = await this.dataSource
-          .getRepository(TelegramEntity)
-          .findOne({
-            where: {
-              market_id: oldOrder.user_id,
-              group_type: Group_type.CANCEL,
-            },
-          });
+        const returnGroup = await findMarketGroup(
+          this.dataSource.manager,
+          oldOrder.user_id,
+          Group_type.CANCEL,
+        );
         await this.botService.sendMessageToGroup(
           returnGroup?.group_id || null,
           `*✅ Almashtirish — mahsulot qaytarildi!*\n\n` +

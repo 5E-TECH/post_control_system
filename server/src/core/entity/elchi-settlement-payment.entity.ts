@@ -42,4 +42,19 @@ export class ElchiSettlementPaymentEntity extends BaseEntity {
   /** Kim kiritdi (audit uchun; foydalanuvchi o'chirilsa yozuv qoladi). */
   @Column({ type: 'uuid', nullable: true })
   created_by: string | null;
+
+  /**
+   * ELCHI TOMONIDAGI TO'LOV ID'si — avtomatik (webhook) yozuvlar uchun
+   * DEDUP KALITI.
+   *
+   * Elchi `settlement.payment` webhookini yuborganda o'zining to'lov/kassa
+   * harakati id'sini shu yerga yozamiz. Qisman noyob indeks (NULL emaslar
+   * uchun) ayni to'lov ikki marta kelsa ikkinchi yozuvni to'sadi —
+   * webhook outbox retry qilsa ham daftar bittagina yozuvdan iborat qoladi.
+   *
+   * Qo'lda kiritilgan yozuvlarda NULL bo'ladi (ular uchun dedup shart emas).
+   */
+  @Index('UQ_ELCHI_SETTLEMENT_EXTERNAL_PAYMENT', { unique: true })
+  @Column({ type: 'text', nullable: true })
+  external_payment_id: string | null;
 }

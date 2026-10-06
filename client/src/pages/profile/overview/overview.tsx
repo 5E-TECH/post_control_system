@@ -13,6 +13,9 @@ import {
   Home,
   Edit3,
   Wallet,
+  Key,
+  Copy,
+  Check,
 } from "lucide-react";
 import { AvatarDisplay } from "../../../shared/components/AvatarSelector";
 import AvatarSelectorModal from "../../../shared/components/AvatarSelector";
@@ -24,6 +27,7 @@ const Overview = () => {
   const { data, isLoading, refetch } = getUser();
   const [open, setOpen] = useState(false);
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   // Maosh progress hisoblash
   const salaryProgress = useMemo(() => {
@@ -279,6 +283,75 @@ const Overview = () => {
                     {user.tariff_home?.toLocaleString()} so'm
                   </p>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/*
+            TELEGRAM TOKEN — MARKET O'ZI KO'RADI.
+
+            ⚠️ NEGA QO'SHILDI. Token market yaratilganda beriladi
+            (server users.service.ts:530) va har ishlatilgandan keyin
+            ALMASHADI (order-bot.service.ts:214). Ya'ni u bir martalik.
+            Ilgari uni ko'rsatadigan yagona ekran admin kartochkasi edi
+            (user-profile/index.tsx:681), shu bois market har guruh
+            ulash uchun adminga qo'ng'iroq qilardi — va token aylangach
+            yana qo'ng'iroq qilardi.
+
+            ⚠️ Backend buni ALLAQACHON yuboradi: `profile()` FAQAT
+            `role === MARKET` uchun tokenni javobga qo'shadi
+            (users.service.ts profile()). Bu yerda hech qanday yangi
+            oshkoralik YO'Q — maydon shundoq ham brauzerga kelib
+            turgan edi, faqat ekranga chizilmagan edi. Boshqa rollarda
+            maydon umuman kelmaydi, shuning uchun karta ham chiqmaydi.
+          */}
+          {user?.market_tg_token && (
+            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800 md:col-span-2 lg:col-span-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                <div className="flex items-center gap-4 flex-1 min-w-0">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500/10 to-violet-500/10 flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
+                    <Key className="w-6 h-6 text-indigo-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                      Telegram Token
+                    </p>
+                    <p className="text-base font-semibold text-gray-800 dark:text-white mt-0.5 font-mono truncate">
+                      {user.market_tg_token}
+                    </p>
+                    {/*
+                      ⚠️ Bu eslatma SHART: token bir martalik. Buni
+                      yozmasak market eski tokenni qayta yuborib
+                      "ishlamayapti" deb o'ylaydi.
+                    */}
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      Botga yuborilgandan keyin token almashadi — keyingi
+                      guruhni ulashda shu sahifani yangilab, yangi tokenni oling.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(user.market_tg_token);
+                    setTokenCopied(true);
+                    setTimeout(() => setTokenCopied(false), 2000);
+                  }}
+                  className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 flex-shrink-0 ${
+                    tokenCopied
+                      ? "bg-green-500/10 text-green-600"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  {tokenCopied ? (
+                    <Check className="w-5 h-5" />
+                  ) : (
+                    <Copy className="w-5 h-5" />
+                  )}
+                  <span className="text-sm font-medium">
+                    {tokenCopied ? "Nusxalandi!" : "Nusxalash"}
+                  </span>
+                </button>
               </div>
             </div>
           )}

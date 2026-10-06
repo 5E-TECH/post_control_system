@@ -31,6 +31,43 @@ export default class Application {
       );
     }
 
+    /**
+     * ⚠️ PRODDA BOTLAR JIMGINA O'CHIB QOLMASIN — yuqoridagilar bilan
+     * bir xil sabab: jimgina noto'g'ri ishlashdan ko'ra umuman
+     * ko'tarilmagan yaxshi.
+     *
+     * `BOTS_ENABLED=false` LOKAL uchun (`.env.example`), lekin prodda u
+     * buyurtma oqimini to'xtatadi va HECH QANDAY XATO BERMAYDI:
+     *   · polling boshlanmaydi (`launchOptions: false`);
+     *   · chiquvchi chaqiruvlar xato otadi, mavjud `try/catch` lar esa
+     *     ularni tarmoq uzilishi deb YUTADI.
+     * Ya'ni ilova "active", deploy yashil, botlar jim. Buni sezish uchun
+     * hozircha yagona signal — bitta `logger.warn`.
+     *
+     * Xavf real: `.env.example` da bu satr `false` bilan turadi (lokal
+     * onboarding uchun ataylab), va `cp .env.example .env` server qayta
+     * qurilganda odatiy harakat.
+     *
+     * ⚠️ ATAYLAB O'CHIRISH YO'LI QOLDIRILDI. Telegram tomonidagi incident
+     * vaqtida botlarni vaqtincha o'chirish kerak bo'lishi mumkin — buning
+     * uchun IKKINCHI, ongli kalit: `BOTS_DISABLED_ACK=i-know`. Tasodifan
+     * yozilmaydigan qiymat.
+     */
+    if (
+      !config.BOTS_ENABLED &&
+      process.env.NODE_ENV === 'production' &&
+      process.env.BOTS_DISABLED_ACK !== 'i-know'
+    ) {
+      console.error(
+        "❌ FATAL: PRODDA BOTS_ENABLED=false — Telegram botlar O'CHIRILGAN " +
+          "bo'lardi (buyurtma oqimi to'xtaydi, xato esa chiqmaydi).\n" +
+          "   · Tasodifan bo'lsa: server/.env dan BOTS_ENABLED satrini " +
+          "OLIB TASHLANG (default = YOQILGAN).\n" +
+          "   · Ataylab bo'lsa: BOTS_DISABLED_ACK=i-know qo'shing.",
+      );
+      process.exit(1);
+    }
+
     // ⚠️ ISBOT SAQLASH JOYI — yuqoridagi bilan bir xil sabab: jimgina noto'g'ri
     // ishlashdan ko'ra umuman ko'tarilmagan yaxshi. Qo'shimcha xarajat isboti
     // pul nizosining yagona dalili; u deploy papkasi ichiga yozilsa, har

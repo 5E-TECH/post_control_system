@@ -124,7 +124,16 @@ export class UserEntity extends BaseEntity {
    * ⚠️ QIDIRISH ishlashda davom etadi — `select: false` faqat SELECT
    * ro'yxatiga ta'sir qiladi, WHERE ga emas (bot `where: { market_tg_token }`
    * bilan qidiradi). YOZISH ham tegilmaydi (`save()` / `update()`).
-   * Egasiga ko'rsatish uchun `profile()` da ATAYLAB `addSelect` bor.
+   *
+   * ⚠️ IKKI joyda ATAYLAB qayta tanlanadi — IKKALASI ham kerak:
+   *   · `users.service.ts` `profile()`  — market O'Z tokenini ko'radi;
+   *   · `users.service.ts` `findOne()`  — admin market KARTOCHKASIDA ko'radi
+   *     (`user-profile/index.tsx:681`), order-botni ishga tushirish uchun.
+   *
+   * Dastlab faqat birinchisi qo'shilgan edi va karta 2026-09-21 dan
+   * 2026-09-24 gacha jimgina yo'qolib turdi — chunki karta `profile()` dan
+   * emas, `findOne()` dan oziqlanadi. Yangi endpoint qo'shsangiz, uning
+   * qaysi biridan o'qishini TEKSHIRING.
    */
   @Column({ type: 'varchar', nullable: true, select: false })
   market_tg_token: string;
@@ -185,6 +194,25 @@ export class UserEntity extends BaseEntity {
    */
   @Column({ type: 'bigint', default: 0, transformer: bigintTransformerNonNull })
   extra_cost_auto_approve_under: number;
+
+  /**
+   * Market uchun: BEKOR QAYTARISHNI TOPSHIRISHDA MARKET RUXSATI MAJBURIYMI.
+   *
+   * `false` (default) — ruxsat QAYD ETILADI, lekin MAJBURLANMAYDI: xodim
+   * market QR'isiz ham offline akt bilan topshira oladi (kim topshirgani va
+   * qanday rejimda — `order.market_handover_mode` da qoladi).
+   *
+   * `true` — topshirish uchun market QR/PIN sessiyasi SHART; offline akt
+   * faqat ADMIN/SUPERADMIN uchun qoladi.
+   *
+   * ⚠️ Default ATAYLAB `false`: BeePost'da panelga UMUMAN kirmaydigan
+   * marketlar bor (parolsiz akkauntlar, marketplace vakil-akkauntlari).
+   * Majburiy qilinsa birinchi kundan ularning posilkalari omborda qotardi.
+   * Bayroqni market onboarding'dan o'tgach ADMIN yoqadi — bu
+   * `extra_cost_proof_required` bilan ayni naqsh.
+   */
+  @Column({ type: 'boolean', default: false })
+  cancel_handover_consent_required: boolean;
 
   // Operator uchun komissiya sozlamalari
   @Column({ type: 'enum', enum: Commission_type, nullable: true })

@@ -22,6 +22,7 @@ import {
   XCircle,
   Package,
   RotateCcw,
+  Warehouse,
 } from "lucide-react";
 import { memo, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
@@ -40,6 +41,10 @@ import ReplacementBadge from "../../../../../shared/components/replacement-badge
 import ExtraCostProofField, {
   type ProofFieldValue,
 } from "../../../../../shared/components/ExtraCostProofField";
+import {
+  formatMoment,
+  returnStageDisplay,
+} from "../../../../../shared/lib/returnStage";
 
 const statusConfig: Record<
   string,
@@ -447,6 +452,13 @@ const AllOrders = () => {
     return `${config.bg} ${config.text} ${config.darkBg} ${config.darkText}`;
   };
 
+  /**
+   * Bekor-qaytarish zanjirida XOM status yarim haqiqat: `cancelled (sent)`
+   * "yo'lda" degan ma'noni beradi, holbuki posilka markazda bo'lishi mumkin.
+   * Kuryer o'z posilkasining markazga yetib kelganini SHU yorliqdan ko'radi.
+   */
+  const stageOf = (order: unknown) => returnStageDisplay(order as never);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -476,12 +488,13 @@ const AllOrders = () => {
             {/* Header: Status + Index */}
             <div className="flex items-center justify-between mb-3">
               <span
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${getStatusStyle(
-                  item.status,
-                )}`}
+                title={(() => { const sg = stageOf(item); return sg ? st(sg.titleKey) : undefined; })()}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${
+                  stageOf(item)?.tone ?? getStatusStyle(item.status)
+                }`}
               >
                 <Package className="w-3.5 h-3.5" />
-                {st(`${item.status}`)}
+                {(() => { const sg = stageOf(item); return sg ? st(sg.labelKey) : st(`${item.status}`); })()}
               </span>
               <span className="text-xs text-gray-400">
                 #{(page - 1) * limit + index + 1}
@@ -508,6 +521,21 @@ const AllOrders = () => {
                 </a>
               </div>
             </div>
+
+            {/*
+              MARKAZ QABUL QILGANI — KURYER UCHUN JAVOB.
+              ⚠️ Bekor qilingan posilkaning statusi markazga topshirilgandan
+              keyin ham `cancelled (sent)` da qoladi. Kuryerda "men bergandim,
+              nega hali ham bekor-jo'natilgan?" degan savol tug'ilmasligi uchun
+              yorliq «Markazda» deydi, bu qator esa QACHON qabul qilinganini
+              aniq ko'rsatadi — ya'ni kuryerning javobgarligi yopilgan.
+            */}
+            {item?.center_received_at && (
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700 dark:bg-sky-900/20 dark:text-sky-300">
+                <Warehouse className="h-3.5 w-3.5" />
+                Markaz qabul qildi: {formatMoment(item.center_received_at)}
+              </div>
+            )}
 
             {/* Info Row */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs mb-3">
@@ -660,11 +688,12 @@ const AllOrders = () => {
                 </td>
                 <td className="px-3 py-3">
                   <span
-                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${getStatusStyle(
-                      item.status,
-                    )}`}
+                    title={(() => { const sg = stageOf(item); return sg ? st(sg.titleKey) : undefined; })()}
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${
+                      stageOf(item)?.tone ?? getStatusStyle(item.status)
+                    }`}
                   >
-                    {st(`${item.status}`)}
+                    {(() => { const sg = stageOf(item); return sg ? st(sg.labelKey) : st(`${item.status}`); })()}
                   </span>
                 </td>
                 <td className="px-3 py-3 text-right">

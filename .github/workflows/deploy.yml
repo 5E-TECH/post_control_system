@@ -16,9 +16,13 @@ jobs:
   # 🛡️ Faza 0 — xavfsizlik gate'i. Deploy'dan OLDIN ishlaydi.
   #   • audit:roles + guard testi — BLOKLOVCHI (yashil): RolesGuard fail-closed
   #     invariantini muhofaza qiladi (himoyalangan endpoint @AcceptRoles'siz qolmasin).
-  #   • To'liq `npm test` — hozircha INFORMATSION (continue-on-error): 3 ta suite
-  #     oldindan qizil (order-bot / courier-scanner / post.service). O'shalar
-  #     tuzatilgach `continue-on-error`ni olib tashlab, to'liq testni bloklovchi qiling.
+  #   • bekor-qaytarish darvozasi testlari — BLOKLOVCHI (yashil): bekor posilka
+  #     market ruxsatisiz CLOSED bo'lmasligi invariantini muhofaza qiladi.
+  #   • To'liq `npm test` — hozircha INFORMATSION (continue-on-error).
+  #     ⚠️ 2026-10-05 holati: to'liq to'plam YASHIL (84 suite / 1080 test).
+  #     Avvalgi izohdagi "3 ta suite oldindan qizil" ESKIRGAN edi. Bloklovchi
+  #     qilish uchun yagona to'siq — boshqa branchlarning holati; qaror
+  #     jamoada kelishilgach `continue-on-error`ni olib tashlang.
   verify:
     runs-on: ubuntu-latest
     steps:
@@ -49,7 +53,11 @@ jobs:
         working-directory: server
         run: npx jest src/common/guards src/api/investor --ci
 
-      - name: 🧪 To'liq test to'plami (informatsion — oldindan mavjud xatolar)
+      - name: 🔒 Bekor-qaytarish darvozasi testlari (BLOKLOVCHI)
+        working-directory: server
+        run: npx jest src/api/market-handover src/common/utils/cancel-return.util.spec.ts src/api/order/cancel-return-two-stage.spec.ts src/api/post/post.service.spec.ts --ci
+
+      - name: 🧪 To'liq test to'plami (informatsion)
         working-directory: server
         continue-on-error: true
         run: npm test
@@ -154,6 +162,12 @@ jobs:
               rm -rf client/dist client/build
               cd client
               npm ci --prefer-offline --legacy-peer-deps
+              # 🔒 Klient testlari — BLOKLOVCHI (2026-10-05 da qo'shildi).
+              # Vitest + RTL; hozircha bekor-qaytarish ekranlarining
+              # invariantlarini qo'riqlaydi (QR taymeri, qo'lda belgilashda
+              # sabab majburiyligi). Qizil bo'lsa dist YIG'ILMAYDI — ya'ni
+              # buzuq frontend prodga chiqmaydi.
+              npm run test
               NODE_OPTIONS='--max-old-space-size=1024' npm run build
               cd ..
               # Qurilgan dist QAYSI commitdan ekanini belgilab qo'yamiz.
@@ -268,11 +282,50 @@ jobs:
                 echo '    Tuzatish: sudo apt-get install -y ffmpeg'
               fi
 
+              # ----- 🔖 BUILD SHTAMPI (restart darvozasi uchun) -----
+              #
+              # Shtamp AYNAN SHU YERDA, barcha invariantlardan KEYIN
+              # yoziladi: u 'dist qurildi' degani emas, 'dist qurildi VA
+              # migratsiya qo'llandi VA invariantlar toza' degani.
+              # Migratsiya yoki invariant yiqilsa set -e bu satrgacha
+              # YETIB KELMAYDI va shtamp eski commitda qoladi.
+              git rev-parse HEAD > dist/.built-sha
+
               cd ..
             fi
 
             # ===== Restart backend if needed =====
-            if [[ '$CHANGED_DIRS' == *'server'* ]] || [[ '$CHANGED_DIRS' == *'client'* ]]; then
+            #
+            # ⚠️ SHART CHANGED_DIRS EMAS, SHTAMP — frontend nashridagi
+            # naqshning aynan o'zi, VA AYNI SABABGA KO'RA.
+            #
+            # Avval shart '$CHANGED_DIRS == *server* || *client*' edi,
+            # holbuki server build va migratsiya FAQAT *server* ostida
+            # ishlaydi. server/dist esa gitignore'da va 'git reset --hard'
+            # dan omon qoladi. Shundan quyidagi ssenariy chiqardi:
+            #   push #1 (client+server) -> 'npm run build' dist ga YANGI
+            #     kodni yozdi -> migratsiya darvozasida yiqildi (bu fayl
+            #     izohining o'zi 2026-09-21 da db:backup S3 kaliti tufayli
+            #     aynan shunday yiqilganini yozadi). Prod hali eski
+            #     protsessda — zarar yo'q.
+            #   push #2 (faqat client) -> server bloki O'TKAZIB
+            #     YUBORILADI, ya'ni migration:run ISHLAMAYDI, LEKIN eski
+            #     shart rost bo'lib nestapp RESTART qilinadi va push #1
+            #     da qurilgan YANGI kod ko'tariladi.
+            # synchronize:false bo'lgani uchun app muvaffaqiyatli
+            # ko'tariladi va is-active O'TADI — deploy YASHIL, lekin
+            # bazada center_received_at ustuni yo'q va HAR 'order' SELECT
+            # 'column does not exist' bilan 500 beradi: buyurtmalar,
+            # pochta qabuli, kassa — hammasi.
+            #
+            # Yechim: qaror 'shu pushda nima o'zgardi' dan emas, 'dist
+            # haqiqatan qurilib migratsiyadan o'tdimi' dan chiqariladi.
+            # Client-only push backendni restart QILMAYDI — unga hojat
+            # ham yo'q edi (SPA ni nginx beradi).
+            #
+            # cmp va [[ ]] da $ yo'q — ikkalasi ham serverda bajariladi.
+            git rev-parse HEAD > /tmp/pcs-head-sha
+            if [[ -f server/dist/.built-sha ]] && cmp -s server/dist/.built-sha /tmp/pcs-head-sha; then
               echo '🔁 Restarting backend systemd service...'
               sudo systemctl restart nestapp.service
               sleep 3
@@ -284,6 +337,31 @@ jobs:
                 exit 1
               fi
               echo '✅ nestapp.service ishga tushdi.'
+            else
+              # ----- 🚨 QO'LLANMAGAN MIGRATSIYA SIGNALI -----
+              #
+              # Restart o'tkazib yuborildi. Ko'p holatda bu NORMAL
+              # (client-only push). LEKIN agar bazada qo'llanmagan
+              # migratsiya bo'lsa, demak oldingi deploy yarim yo'lda
+              # yiqilgan: dist yangi, baza esa eski. Bu holat JIMGINA
+              # o'tib ketmasligi kerak — keyingi server pushiga qadar
+              # hech kim bilmay qolardi.
+              #
+              # ⚠️ exit 1 EMAS: shu deploy hech narsani buzmadi (restart
+              # bo'lmadi, ya'ni prod hamon eski ishlaydigan kodda).
+              # Yiqitish hujjat-only pushlarni ham to'xtatib qo'yardi.
+              echo '⏭️  Backend restart QILINMADI (server/dist shtampi HEAD bilan mos emas).'
+              cd server
+              if npm run migration:show 2>/dev/null | grep -qF '[ ]'; then
+                echo '🚨 DIQQAT: bazada QO'\''LLANMAGAN migratsiya bor!'
+                echo '   Demak oldingi deploy migratsiyagacha yetmagan.'
+                echo '   Prod hamon eski kodda ishlayapti (xavfsiz), LEKIN'
+                echo '   tuzatish uchun server katalogiga tegadigan push kerak'
+                echo '   yoki qo'\''lda: cd server && npm run migration:run'
+              else
+                echo '✅ Qo'\''llanmagan migratsiya yo'\''q — baza joyida.'
+              fi
+              cd ..
             fi
 
             # ===== Frontend NASHRI — eng oxirida =====

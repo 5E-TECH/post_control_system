@@ -4,6 +4,10 @@ import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { useDispatch, useSelector } from "react-redux";
 import { Pagination, type PaginationProps, Empty } from "antd";
 import { useParamsHook } from "../../../../shared/hooks/useParams";
+import {
+  returnStageDisplay,
+  type ReturnStageSource,
+} from "../../../../shared/lib/returnStage";
 import { useTranslation } from "react-i18next";
 import type { RootState } from "../../../../app/store";
 import { exportToExcel } from "../../../../shared/helpers/export-download-excel";
@@ -127,8 +131,36 @@ const formatPhone = (phone: string) => {
 };
 
 // Status Badge Component
-const StatusBadge = ({ status }: { status: string }) => {
+/**
+ * ⚠️ BEKOR QAYTARISH ZANJIRI UCHUN YORLIQ ALMASHTIRILADI.
+ *
+ * Markazga qabul qilingan posilkaning statusi `cancelled (sent)` da QOLADI
+ * (yangi `Order_status` qiymati qo'shilmadi), lekin xom yorliq «Bekor
+ * (yuborilgan)» — bu YO'LDA degan ma'noni beradi va "kuryerdan olganmizmi?"
+ * degan savolni tug'diradi. Shuning uchun bu qatorlarda bosqich yorlig'i
+ * ko'rsatiladi: Kuryerda / Markazda / Marketga topshirildi.
+ */
+const StatusBadge = ({
+  status,
+  order,
+}: {
+  status: string;
+  order?: ReturnStageSource;
+}) => {
   const { t: st } = useTranslation("status");
+  const stage = returnStageDisplay(order ?? { status });
+
+  if (stage) {
+    return (
+      <span
+        title={st(stage.titleKey)}
+        className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-semibold ${stage.tone}`}
+      >
+        {st(stage.labelKey)}
+      </span>
+    );
+  }
+
   const config = statusConfig[status] || statusConfig.new;
 
   return (
@@ -162,7 +194,7 @@ const OrderCard = ({
     >
       {/* Header: Status + Order number */}
       <div className="flex items-center justify-between mb-3">
-        <StatusBadge status={item?.status} />
+        <StatusBadge status={item?.status} order={item} />
         <span className="text-xs font-bold text-indigo-600 dark:text-indigo-300">
           {item?.order_number != null ? `#${item.order_number}` : `#${index + 1}`}
         </span>
@@ -287,6 +319,8 @@ const TableRowSkeleton = () => (
 
 const OrderView = () => {
   const { t } = useTranslation("orderList");
+  // Bosqich yorliqlari `status` namespace'ida (uz/ru/en).
+  const { t: st } = useTranslation("status");
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { getOrders } = useOrder();
@@ -416,10 +450,29 @@ const OrderView = () => {
             ?.map((item: any) => item.product?.name)
             ?.filter(Boolean)
             ?.join(", "),
+          /**
+           * ⚠️ `Mijoz` ustuni telefon raqamидан OLDIN turishi kerak.
+           *
+           * Boshqa uchala buyurtma/pochta eksportida bu ustun allaqachon
+           * shu tartibda edi (`export-post-orders-excel.ts:17`,
+           * `mail-detail/index.tsx:428` va `:569`) — faqat buyurtmalar
+           * sahifasi tushib qolgan edi, ya'ni eksportda mijoz ismi
+           * umuman ko'rinmasdi.
+           *
+           * Kalit nomi va `|| ""` zaxirasi o'sha uchtasi bilan AYNAN
+           * bir xil qoldirildi: helper ustunlarni nom bo'yicha topadi
+           * (`export-download-excel.ts:38`), shuning uchun nomlar
+           * ajralib ketmasligi kerak.
+           */
+          Mijoz: order?.customer?.name || "",
           "Telefon raqam": order?.customer?.phone_number,
           Narxi: Number((order?.total_price ?? 0) / 1000),
           Kuryer: order?.post?.courier?.name || "-",
-          Holati: statusLabels[order?.status],
+          Holati:
+            (() => {
+              const stage = returnStageDisplay(order);
+              return stage ? st(stage.labelKey) : statusLabels[order?.status];
+            })(),
           Sana: new Date(Number(order?.created_at)).toLocaleString("uz-UZ", {
             year: "numeric",
             month: "2-digit",
@@ -591,7 +644,7 @@ const OrderView = () => {
                       <span className="truncate block">{item?.market?.name}</span>
                     </td>
                     <td className="px-4 py-4">
-                      <StatusBadge status={item?.status} />
+                      <StatusBadge status={item?.status} order={item} />
                     </td>
                     <td className="px-4 py-4 text-right">
                       <span className="font-semibold text-gray-800 dark:text-white">

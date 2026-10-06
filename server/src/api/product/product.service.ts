@@ -103,9 +103,31 @@ export class ProductService {
         throw new ConflictException('Product name already exists');
       }
 
-      const telegramGroup = await this.telegramRepo.findOne({
+      /**
+       * ⚠️ GURUH TANLASH ANIQ BO'LISHI SHART.
+       *
+       * Avval bu `findOne({ where: { market_id } })` edi — `group_type`
+       * ham, `order` ham yo'q. Postgres `Seq Scan + LIMIT 1` qiladi,
+       * ya'ni qaysi qator kelishi HEAP TARTIBIGA bog'liq va u
+       * o'chirish/yangilanishdan keyin o'zgarib ketadi.
+       *
+       * Bu endi haqiqiy xavf: `disconnectMarketTelegram` (users.service.ts)
+       * bilan admin ulanishni uza oladi, va o'shanda tanlov ko'chib,
+       * mahsulot xabari SHAXSIY CHATGA tushishi mumkin edi — bazada
+       * shunday qator bor (8810, group_id 1320841140).
+       *
+       * Yechim: musbat id'li qatorlar (shaxsiy chat) BUTUNLAY chetlab
+       * o'tiladi, qolganidan eng ESKISI olinadi — bu hozirgi xatti-
+       * harakatni saqlaydi va natijani barqaror qiladi.
+       */
+      const marketGroups = await this.telegramRepo.find({
         where: { market_id },
       });
+      const telegramGroup =
+        marketGroups
+          .filter((g) => Number(g.group_id) < 0)
+          .sort((a, b) => Number(a.created_at) - Number(b.created_at))[0] ??
+        null;
 
       let imageFileName: string | null = null;
       if (file) {

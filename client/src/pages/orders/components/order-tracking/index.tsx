@@ -15,6 +15,8 @@ import {
   Edit3,
   DollarSign,
   ShieldCheck,
+  Warehouse,
+  PackageCheck,
 } from "lucide-react";
 
 const actionConfig: Record<string, { icon: any; color: string; ringColor: string; label: string }> = {
@@ -29,6 +31,30 @@ const actionConfig: Record<string, { icon: any; color: string; ringColor: string
     color: "text-purple-500 bg-purple-100 dark:bg-purple-900/30",
     ringColor: "ring-purple-200 dark:ring-purple-900/50",
     label: "Holat o'zgardi",
+  },
+  /*
+    BEKOR QAYTARISH ZANJIRI.
+    ⚠️ Bu uch amal STATUSNI o'zgartirmaydi (yoki faqat oxirgisi yopadi),
+    shuning uchun tarixda ular bo'lmasa "kuryerdan qachon olingani" HECH
+    QAYERDA ko'rinmasdi — foydalanuvchi aynan shuni so'radi.
+  */
+  center_received: {
+    icon: Warehouse,
+    color: "text-sky-500 bg-sky-100 dark:bg-sky-900/30",
+    ringColor: "ring-sky-200 dark:ring-sky-900/50",
+    label: "Viloyatdan markazga qabul qilindi",
+  },
+  market_handover: {
+    icon: PackageCheck,
+    color: "text-zinc-500 bg-zinc-100 dark:bg-zinc-800",
+    ringColor: "ring-zinc-200 dark:ring-zinc-800",
+    label: "Marketga topshirildi",
+  },
+  handover_escalated: {
+    icon: AlertTriangle,
+    color: "text-red-500 bg-red-100 dark:bg-red-900/30",
+    ringColor: "ring-red-200 dark:ring-red-900/50",
+    label: "Market olib ketmadi — eskalatsiya",
   },
   sold: {
     icon: CheckCircle,
@@ -206,9 +232,10 @@ const statusLabels: Record<string, string> = {
   cancelled: "Bekor qilindi",
   paid: "To'langan",
   partly_paid: "Qisman to'langan",
-  cancelled_sent: "Bekor qilingan (pochtada)",
-  "cancelled (sent)": "Bekor qilingan (pochtada)",
-  closed: "Yopilgan",
+  cancelled_sent: "Bekor qilingan (qaytish yo'lida)",
+  "cancelled (sent)": "Bekor qilingan (qaytish yo'lida)",
+  // ⚠️ `closed` ning ma'nosi TORAYDI: endi u "marketga topshirildi" degani.
+  closed: "Marketga topshirildi",
 };
 
 const formatValue = (key: string, value: any): string => {

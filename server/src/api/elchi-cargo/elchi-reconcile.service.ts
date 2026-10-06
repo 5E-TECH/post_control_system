@@ -15,11 +15,20 @@ import { ElchiShipmentStatusResponse } from './dto/elchi-api.dto';
 /**
  * Elchi tomonda BOSHQA O'ZGARMAYDIGAN statuslar — bunday posilkalar
  * so'rovlardan chiqariladi (aks holda CRON abadiy ularni tekshirib yurardi).
+ *
+ * ⚠️ `sold` va `partly_paid` ATAYLAB YO'Q (E2E Andijon P0).
+ *
+ * Elchida buyurtma avval `sold`, keyin pul market kassasiga tushganda `paid`
+ * bo'ladi. Agar `sold`/`partly_paid` terminal hisoblansa, webhooksiz muhitda
+ * reconcile bunday posilkani BOSHQA so'ramaydi va `paid` o'tishini —
+ * demak pul maydonlarini (collected_from_customer, elchi_fee) — HECH QACHON
+ * ko'rmaydi. Ular pul YAKUNLANMAGAN oraliq holat, shuning uchun `paid` yoki
+ * haqiqiy terminal (cancelled/closed) kelgunча qayta so'raladi. `paid`
+ * kelganda posilka pul maydonlari yangilanadi (buyurtma allaqachon SOLD
+ * bo'lsa ham — applyStatusUpdate avval snapshotni yozadi).
  */
-const TERMINAL_ELCHI_STATUSES = [
-  'sold',
+export const TERMINAL_ELCHI_STATUSES = [
   'paid',
-  'partly_paid',
   'cancelled',
   'cancelled (sent)',
   'returned_to_market',
@@ -241,13 +250,41 @@ export class ElchiReconcileService {
       return 'unchanged';
     }
 
-    // Status o'zgarmagan — faqat "tekshirildi" belgisini yangilaymiz.
+    // Status o'zgarmagan — odatda faqat "tekshirildi" belgisini yangilaymiz.
+    //
+    // ⚠️ LEKIN PUL BACKFILL (E2E Andijon P0). Pul maydonlari (collected /
+    // elchi_fee) FAQAT `applyStatusUpdate` ichida yoziladi — u esa status
+    // o'zgargandagina chaqiriladi. Sotilgan posilkada Elchi pul maydonini
+    // KEYIN to'ldirishi mumkin (masalan `sale_collectible_amount` ustuni
+    // posilka sotilgandan keyin qo'shilgan). Status o'zgarmagani uchun bu
+    // qiymat HECH QACHON kelmasdi. Shuning uchun: shipmentda pul maydoni
+    // BO'SH, remote esa BERGAN bo'lsa — early-return QILMAYMIZ, quyidagi
+    // `applyStatusUpdate` orqali faqat pul maydonlarini backfill qilamiz
+    // (status va terminal amal idempotent — allaqachon sotilgan bo'lsa skip).
+    const remoteCollected = remote?.collected_from_customer;
+    const remoteFee = remote?.elchi_fee;
+    const needsMoneyBackfill =
+      (shipment.collected_from_customer_reported == null &&
+        remoteCollected != null &&
+        Number.isFinite(Number(remoteCollected))) ||
+      (shipment.elchi_fee_reported == null &&
+        remoteFee != null &&
+        Number.isFinite(Number(remoteFee)));
+
     if (
       normalizeElchiStatus(remoteStatus) ===
-      normalizeElchiStatus(shipment.elchi_status ?? '')
+        normalizeElchiStatus(shipment.elchi_status ?? '') &&
+      !needsMoneyBackfill
     ) {
       await this.touchSynced(shipment.id);
       return 'unchanged';
+    }
+
+    if (needsMoneyBackfill) {
+      this.logger.log(
+        `Elchi pul backfill: order=${shipment.order_id} status=${remoteStatus} ` +
+          `(status o'zgarmadi, pul maydonlari to'ldirilyapti)`,
+      );
     }
 
     this.logger.log(
@@ -326,8 +363,20 @@ export class ElchiReconcileService {
     }
 
     if (outcome.note && /nomuvofiq/i.test(outcome.message)) return 'mismatch';
-    if (outcome.status === 'success') return 'applied';
-    return 'unchanged';
+
+    /**
+     * ⚠️ YOLG'ON 'unchanged' YO'Q (JdOAAthq).
+     *
+     * Bu yergacha yetdik — demak yuqoridagi erta-return (status TENG VA pul
+     * backfill YO'Q) shartidan O'TDIK, ya'ni status O'ZGARDI yoki pul
+     * maydonlari backfill qilindi. `applyStatusUpdate` posilkani DB'ga
+     * saqladi (status/pul). Terminal amal `skipped` bo'lsa ham (masalan
+     * `sold→paid`da buyurtma allaqachon SOLD → markDeliveredByElchi skip),
+     * REAL o'zgarish bo'lgan — shuni 'applied' deb qaytaramiz. Ilgari bu
+     * yerda `outcome.status !== 'success'` bo'lsa 'unchanged' qaytarilardi va
+     * reconcile "hech narsa o'zgarmadi" deb yolg'on hisobot berardi.
+     */
+    return 'applied';
   }
 
   /**
