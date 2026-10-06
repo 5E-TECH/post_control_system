@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Button, Modal } from "antd";
+import { useTranslation } from "react-i18next";
 import QRCode from "react-qr-code";
 import { Loader2, RefreshCw, ShieldCheck, Sun, Timer } from "lucide-react";
 import {
@@ -82,6 +83,7 @@ function ConsentModal({
   loading,
   onRegenerate,
 }: Props) {
+  const { t } = useTranslation("marketReturns");
   const left = useSecondsCountdown(session?.ttl_seconds, session?.session_id);
   const expired = Boolean(session) && left <= 0;
 
@@ -195,24 +197,24 @@ function ConsentModal({
       title={
         <span className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-emerald-600" />
-          Topshirishga ruxsat
+          {t("consentTitle")}
         </span>
       }
     >
       {loading && !session ? (
-        <div className="flex flex-col items-center gap-3 py-10 text-gray-500">
+        <div className="flex flex-col items-center gap-3 py-10 text-gray-500 dark:text-gray-400">
           <Loader2 className="h-6 w-6 animate-spin" />
-          Ruxsat tayyorlanmoqda…
+          {t("consentPreparing")}
         </div>
       ) : !session ? (
-        <div className="py-8 text-center text-gray-500">
-          Ruxsat yaratilmadi. Qaytadan urinib ko'ring.
+        <div className="py-8 text-center text-gray-500 dark:text-gray-400">
+          {t("consentNotCreated")}
         </div>
       ) : (
         <div className="flex flex-col items-center gap-3 py-1">
           {/* Telefonda balandlik tanqis — tushuntirish faqat kengroq ekranda. */}
           <p className="m-0 hidden text-center text-sm text-gray-600 sm:block dark:text-gray-300">
-            Markaz xodimiga shu QR'ni ko'rsating yoki PIN'ni aytib bering.
+            {t("consentShowToStaff")}
           </p>
 
           <div
@@ -242,7 +244,7 @@ function ConsentModal({
               }`}
             >
               <Sun className="h-3.5 w-3.5 shrink-0" />
-              Ekran yorqinligini oshirsangiz skaner tezroq o'qiydi
+              {t("brightnessHint")}
             </p>
           )}
 
@@ -252,7 +254,7 @@ function ConsentModal({
             }`}
           >
             <div className="text-[11px] uppercase tracking-wider text-gray-500">
-              QR o'qilmasa — PIN
+              {t("pinFallbackLabel")}
             </div>
             <div
               className={`font-mono text-[30px] font-bold leading-tight tracking-[0.25em] ${
@@ -260,7 +262,7 @@ function ConsentModal({
                   ? "text-gray-400 line-through"
                   : showingQr
                     ? "text-gray-900"
-                    : "text-gray-900 dark:text-gray-100"
+                    : "text-gray-800 dark:text-white"
               }`}
             >
               {session.pin}
@@ -270,7 +272,7 @@ function ConsentModal({
           {expired ? (
             <div className="flex w-full flex-col items-center gap-2">
               <span className="text-sm font-semibold text-red-600">
-                Muddati tugadi — yangi ruxsat kerak
+                {t("consentExpired")}
               </span>
               <Button
                 type="primary"
@@ -280,7 +282,7 @@ function ConsentModal({
                 onClick={handleRegenerate}
                 block
               >
-                Yangi ruxsat
+                {t("consentNew")}
               </Button>
             </div>
           ) : (
@@ -291,8 +293,7 @@ function ConsentModal({
           )}
 
           <p className="m-0 hidden text-center text-xs text-gray-400 sm:block">
-            Ruxsat {session.awaiting_count} ta posilka uchun amal qiladi.
-            Xodim skanerlagach unga 10 daqiqa beriladi.
+            {t("consentValidFor", { count: session.awaiting_count })}
           </p>
         </div>
       )}

@@ -326,10 +326,10 @@ const OrderDetails = () => {
                   yorlig'i ko'rsatiladi. Dalili pastdagi kartada. */}
               {returnStage ? (
                 <span
-                  title={returnStage.title}
+                  title={st(returnStage.titleKey)}
                   className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium ${returnStage.tone}`}
                 >
-                  {returnStage.label}
+                  {st(returnStage.labelKey)}
                 </span>
               ) : (
                 <span

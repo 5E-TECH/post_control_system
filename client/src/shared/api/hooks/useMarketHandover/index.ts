@@ -121,6 +121,25 @@ export const MANUAL_OVERRIDE_REASONS = [
   "QR namlangan yoki xiralashgan",
 ] as const;
 
+/**
+ * Sabab QIYMATI → TARJIMA KALITI.
+ *
+ * ⚠️ NEGA ALOHIDA XARITA. Yuqoridagi qiymatlar serverga AYNAN shu holda
+ * ketadi (`@IsIn`), shuning uchun ularni tarjima qilish MUMKIN EMAS. Lekin
+ * xodim ekranida ruscha/inglizcha interfeys bo'lsa ro'yxat o'zbekcha
+ * qolardi. Yechim: qiymat o'zgarmaydi, FAQAT ko'rinadigan yorliq
+ * tarjima qilinadi — shuning uchun qiymat va kalit ajratilgan.
+ */
+export const MANUAL_OVERRIDE_REASON_KEYS: Record<
+  (typeof MANUAL_OVERRIDE_REASONS)[number],
+  string
+> = {
+  "QR yirtilgan": "reasonQrTorn",
+  "QR o'qilmayapti": "reasonQrUnreadable",
+  "Yorliq yo'qolgan": "reasonLabelLost",
+  "QR namlangan yoki xiralashgan": "reasonQrWet",
+};
+
 export const useMarketHandover = () => {
   const client = useQueryClient();
   const invalidate = () =>
@@ -194,6 +213,27 @@ export const useMarketHandover = () => {
           .then((res) => res.data?.data),
       enabled: enabled && Boolean(marketId),
     });
+
+  /**
+   * SKANERLANGAN YORLIQ sahifadagi ro'yxatda YO'Q bo'lsa — uni qidiradi.
+   *
+   * ⚠️ NEGA KERAK. Navbatda 450+ posilka bo'lishi mumkin, ekranda esa bir
+   * sahifa (20–50). Xodim 3-sahifadagi posilkani skanerlasa `manifest` da
+   * topilmaydi va skaner "noma'lum yorliq" deb beradi. Shu funksiya server
+   * qidiruvi orqali ID ni aniqlaydi, keyin ro'yxat yangilanadi.
+   *
+   * ⚠️ `useQuery` EMAS — skaner ichidan императив chaqiriladi (har o'qishda
+   * yangi token), shuning uchun oddiy funksiya.
+   */
+  const resolveAwaitingByToken = async (
+    marketId: string,
+    token: string,
+  ): Promise<string | null> => {
+    const res = await api.get(`market-handover/awaiting/${marketId}`, {
+      params: { search: token, limit: 1 },
+    });
+    return res?.data?.data?.orders?.[0]?.id ?? null;
+  };
 
   const scan = useMutation<
     HandoverAuthorization,
@@ -274,6 +314,7 @@ export const useMarketHandover = () => {
     createConsent,
     getAwaitingMarkets,
     getAwaitingOrders,
+    resolveAwaitingByToken,
     scan,
     heartbeat,
     complete,

@@ -3,6 +3,7 @@ import {
   formatMoment,
   resolveReturnStage,
   returnStageDisplay,
+  returnAgeTone,
 } from "./returnStage";
 
 /**
@@ -87,27 +88,45 @@ describe("resolveReturnStage", () => {
   });
 });
 
-describe("returnStageDisplay — yorliq matni", () => {
-  it("markazda yorlig'i «kuryerdan olindi» ni AYTADI", () => {
+describe("returnStageDisplay — tarjima kalitlari", () => {
+  /**
+   * ⚠️ MATN QAYTARILMAYDI, KALIT qaytariladi. Avval bu yerda o'zbekcha matn
+   * qotib turgan edi va ekranlar ru/en tillarida ham o'zbekcha ko'rsatardi.
+   * Kalitlar `status` namespace'ida — uni status yorlig'i ko'rsatiladigan
+   * ekranlar allaqachon yuklaydi.
+   */
+  it("markazda bosqichi uchun kalitlar", () => {
     const badge = returnStageDisplay({
       status: "cancelled (sent)",
       center_received_at: 1,
     });
-    expect(badge?.label).toBe("Markazda");
-    // Savolning javobi hover izohida ham bo'lishi kerak.
-    expect(badge?.title).toContain("Kuryerdan olindi");
+    expect(badge?.labelKey).toBe("returnStageCenter");
+    expect(badge?.titleKey).toBe("returnStageCenterHint");
   });
 
-  it("kuryerda yorlig'i «yo'lda» ma'nosini beradi", () => {
-    expect(returnStageDisplay({ status: "cancelled (sent)" })?.label).toBe(
-      "Kuryerda",
+  it("kuryerda bosqichi uchun kalitlar", () => {
+    expect(returnStageDisplay({ status: "cancelled (sent)" })?.labelKey).toBe(
+      "returnStageCourier",
     );
   });
 
-  it("topshirilgani aniq aytiladi", () => {
+  it("marketga topshirilgan bosqich uchun kalitlar", () => {
     expect(
-      returnStageDisplay({ status: "closed", market_handover_at: 1 })?.label,
-    ).toBe("Marketga topshirildi");
+      returnStageDisplay({ status: "closed", market_handover_at: 1 })?.labelKey,
+    ).toBe("returnStageMarket");
+  });
+
+  it("qaytarilgan qiymatlarda XOM MATN bo'lmasin (faqat kalit)", () => {
+    for (const src of [
+      { status: "cancelled (sent)" },
+      { status: "cancelled (sent)", center_received_at: 1 },
+      { status: "closed", market_handover_at: 1 },
+    ]) {
+      const b = returnStageDisplay(src)!;
+      // Kalit naqshi: `returnStage…` — bo'sh joy yoki kirill harf bo'lmasin.
+      expect(b.labelKey).toMatch(/^returnStage[A-Za-z]+$/);
+      expect(b.titleKey).toMatch(/^returnStage[A-Za-z]+Hint$/);
+    }
   });
 
   it("zanjirda bo'lmagan buyurtma uchun null (mavjud yorliq ishlatiladi)", () => {
@@ -152,5 +171,41 @@ describe("formatMoment", () => {
 
   it("son bo'lmagan qiymatda chiziqcha", () => {
     expect(formatMoment("allaqanday")).toBe("—");
+  });
+});
+
+describe("returnAgeTone — bitta chegara to'plami", () => {
+  it("14 kundan oshsa qizil, 7 dan to'q sariq, 3 dan sariq, kami neytral", () => {
+    expect(returnAgeTone(14)).toContain("red");
+    expect(returnAgeTone(30)).toContain("red");
+    expect(returnAgeTone(7)).toContain("orange");
+    expect(returnAgeTone(13)).toContain("orange");
+    expect(returnAgeTone(3)).toContain("amber");
+    expect(returnAgeTone(6)).toContain("amber");
+    expect(returnAgeTone(0)).toContain("gray");
+    expect(returnAgeTone(2)).toContain("gray");
+  });
+
+  it("har bosqichda dark variant bor", () => {
+    // Qorong'u rejimda fon o'zgarmasa yorliq o'qilmay qoladi.
+    for (const d of [0, 3, 7, 14]) {
+      expect(returnAgeTone(d)).toMatch(/dark:bg-/);
+      expect(returnAgeTone(d)).toMatch(/dark:text-/);
+    }
+  });
+
+  /**
+   * ⚠️ BU TEST NEGA BOR. Funksiya avval uch faylda nusxalangan va chegaralar
+   * farq qilgan (market 7/3, xodim 14/7/3) — AYNI posilka ikki ekranda
+   * boshqa rangda chiqardi. Nusxa qaytib kelmasligi uchun qulflangan.
+   */
+  it("chegaralar monoton — yosh oshgani sari rang jiddiylashadi", () => {
+    const order = ["gray", "amber", "orange", "red"];
+    let last = -1;
+    for (const d of [0, 1, 2, 3, 5, 6, 7, 10, 13, 14, 40]) {
+      const idx = order.findIndex((c) => returnAgeTone(d).includes(c));
+      expect(idx).toBeGreaterThanOrEqual(last);
+      last = idx;
+    }
   });
 });

@@ -34,6 +34,7 @@ import {
   returnStageDisplay,
   type ReturnStageSource,
 } from "../../shared/lib/returnStage";
+import { useTranslation } from "react-i18next";
 
 const fmt = (val: number) =>
   new Intl.NumberFormat("uz-UZ").format(val || 0);
@@ -80,16 +81,17 @@ const StatusBadge = ({
   status: string;
   order?: ReturnStageSource;
 }) => {
+  const { t: st } = useTranslation("status");
   // Bekor-qaytarish zanjirida XOM status yarim haqiqat («Bekor (yuborilgan)»
   // = yo'lda), shuning uchun bosqich yorlig'i ko'rsatiladi.
   const stage = returnStageDisplay(order ?? { status });
   if (stage) {
     return (
       <span
-        title={stage.title}
+        title={st(stage.titleKey)}
         className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-semibold ${stage.tone}`}
       >
-        {stage.label}
+        {st(stage.labelKey)}
       </span>
     );
   }

@@ -40,17 +40,17 @@ const MarketSidebar = () => {
     {
       to: "/extra-cost",
       icon: <Receipt />,
-      label: "Qo'shimcha xarajat",
+      label: t("extra_cost"),
       badge: Number(extraCostCounts?.open ?? 0),
     },
     {
       to: "/market-returns",
       icon: <PackageCheck />,
-      label: "Qaytarilgan buyurtmalar",
+      label: t("market_returns"),
       badge: Number(returnCounts?.awaiting ?? 0),
     },
-    { to: "/market-operators", icon: <Users />, label: "Operatorlar" },
-    { to: "/ai-balance", icon: <Bot />, label: "AI balans" },
+    { to: "/market-operators", icon: <Users />, label: t("market_operators") },
+    { to: "/ai-balance", icon: <Bot />, label: t("ai_balance") },
   ];
       const sidebarRedux = useSelector((state: RootState) => state.sidebar);
 

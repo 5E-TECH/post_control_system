@@ -488,13 +488,13 @@ const AllOrders = () => {
             {/* Header: Status + Index */}
             <div className="flex items-center justify-between mb-3">
               <span
-                title={stageOf(item)?.title}
+                title={(() => { const sg = stageOf(item); return sg ? st(sg.titleKey) : undefined; })()}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${
                   stageOf(item)?.tone ?? getStatusStyle(item.status)
                 }`}
               >
                 <Package className="w-3.5 h-3.5" />
-                {stageOf(item)?.label ?? st(`${item.status}`)}
+                {(() => { const sg = stageOf(item); return sg ? st(sg.labelKey) : st(`${item.status}`); })()}
               </span>
               <span className="text-xs text-gray-400">
                 #{(page - 1) * limit + index + 1}
@@ -688,12 +688,12 @@ const AllOrders = () => {
                 </td>
                 <td className="px-3 py-3">
                   <span
-                    title={stageOf(item)?.title}
+                    title={(() => { const sg = stageOf(item); return sg ? st(sg.titleKey) : undefined; })()}
                     className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${
                       stageOf(item)?.tone ?? getStatusStyle(item.status)
                     }`}
                   >
-                    {stageOf(item)?.label ?? st(`${item.status}`)}
+                    {(() => { const sg = stageOf(item); return sg ? st(sg.labelKey) : st(`${item.status}`); })()}
                   </span>
                 </td>
                 <td className="px-3 py-3 text-right">

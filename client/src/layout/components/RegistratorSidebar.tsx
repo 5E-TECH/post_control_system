@@ -24,12 +24,12 @@ const RegistratorSidebar = () => {
     {
       to: "/marketplace-intake",
       icon: <ScanLine />,
-      label: "Marketplace qabuli",
+      label: t("marketplace_intake"),
     },
     {
       to: "/awaiting-market",
       icon: <Warehouse />,
-      label: "Market kutilmoqda",
+      label: t("awaiting_market"),
     },
     { to: "/products", icon: <Apple />, label: t("products") },
   ];

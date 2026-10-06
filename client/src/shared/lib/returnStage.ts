@@ -10,9 +10,12 @@
  *
  * Shuning uchun status ko'rsatiladigan HAR JOYDA yorliq shu yerdan olinadi:
  *
- *   kuryerda → «Kuryerda»            (bekor qilindi, markazga kelmoqda)
- *   markazda → «Markazda»            (kuryerdan OLINDI, market kutilmoqda)
- *   marketda → «Marketga topshirildi» (zanjir yopildi)
+ *   kuryerda → `returnStageCourier`  (bekor qilindi, markazga kelmoqda)
+ *   markazda → `returnStageCenter`   (kuryerdan OLINDI, market kutilmoqda)
+ *   marketda → `returnStageMarket`   (zanjir yopildi)
+ *
+ * ⚠️ Yorliq MATNI emas, `status` namespace'idagi KALIT qaytariladi —
+ * chaqiruvchi uni `t()` orqali tarjima qiladi (uz/ru/en).
  *
  * Server javobida `return_stage` keladi; kelmasa dalil ustunlaridan
  * hisoblanadi (zaxira) — shunda eski/boshqa endpointlarda ham to'g'ri
@@ -60,28 +63,37 @@ export function resolveReturnStage(
 }
 
 export interface ReturnStageBadge {
-  label: string;
+  /**
+   * `status` NAMESPACE'idagi tarjima kaliti.
+   *
+   * ⚠️ MATN QAYTARILMAYDI — faqat KALIT. Avval bu yerda o'zbekcha matn
+   * qotib turgan edi va ekranlar ru/en tillarida ham o'zbekcha ko'rsatardi.
+   * Kalitlar `status` namespace'ida, chunki uni status yorlig'i
+   * ko'rsatiladigan ekranlar allaqachon yuklaydi
+   * (`useTranslation("status")`).
+   */
+  labelKey: string;
+  /** Hover izohi kaliti — xodimga ma'noni to'liq aytadi. */
+  titleKey: string;
   /** Tailwind sinflari — LITERAL (shablondan sinf yasab bo'lmaydi). */
   tone: string;
-  /** Hover izohi — xodimga ma'noni to'liq aytadi. */
-  title: string;
 }
 
 const BADGES: Record<ReturnStage, ReturnStageBadge> = {
   courier: {
-    label: "Kuryerda",
+    labelKey: "returnStageCourier",
+    titleKey: "returnStageCourierHint",
     tone: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
-    title: "Bekor qilindi — kuryer markazga olib kelmoqda",
   },
   center: {
-    label: "Markazda",
+    labelKey: "returnStageCenter",
+    titleKey: "returnStageCenterHint",
     tone: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
-    title: "Kuryerdan olindi va markazda turibdi — market olib ketishi kutilmoqda",
   },
   market: {
-    label: "Marketga topshirildi",
+    labelKey: "returnStageMarket",
+    titleKey: "returnStageMarketHint",
     tone: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-    title: "Market ruxsati bilan egasiga topshirildi — zanjir yopildi",
   },
 };
 
@@ -92,11 +104,10 @@ export function returnStageBadge(
 }
 
 /**
- * Buyurtma uchun KO'RSATILADIGAN status yorlig'i.
+ * Buyurtma uchun KO'RSATILADIGAN bosqich yorlig'i (kalitlar bilan).
  *
- * Bekor-qaytarish zanjiridagi qator uchun bosqich yorlig'ini qaytaradi,
- * qolganlari uchun `null` — chaqiruvchi o'zining mavjud xaritasidan
- * foydalanadi.
+ * Bekor-qaytarish zanjiridagi qator uchun bosqichni qaytaradi, qolganlari
+ * uchun `null` — chaqiruvchi o'zining mavjud status xaritasidan foydalanadi.
  */
 export function returnStageDisplay(
   order: ReturnStageSource | null | undefined,
@@ -116,4 +127,26 @@ export function formatMoment(ts?: number | string | null): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/**
+ * POSILKA YOSHI RANGI — bitta chegara to'plami.
+ *
+ * ⚠️ NEGA SHARED. Bu funksiya avval uchta faylda (market sahifasi, navbat
+ * sahifasi, topshirish sahifasi) QO'LDA takrorlangan va chegaralar BOSHQACHA
+ * edi: market ekranida 7/3, xodim ekranlarida 14/7/3. Natijada AYNI posilka
+ * marketda QIZIL, xodimda esa SARIQ ko'rinardi — ikki tomon bir xil narsaga
+ * boshqacha shoshilinchlik bilan qarardi. Chegara bitta joyda turadi.
+ *
+ * 14 kun — qizil (market javob bermayapti, eskalatsiya), 7 — to'q sariq,
+ * 3 — sariq, undan kami — neytral.
+ */
+export function returnAgeTone(days: number): string {
+  if (days >= 14)
+    return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+  if (days >= 7)
+    return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300";
+  if (days >= 3)
+    return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+  return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
 }

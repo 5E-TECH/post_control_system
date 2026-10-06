@@ -22,7 +22,7 @@ const OperatorSidebar = () => {
     {
       to: "/my-orders",
       icon: <ClipboardList />,
-      label: "Mening buyurtmalarim",
+      label: t("my_orders"),
     },
     {
       to: "/order/markets/new-orders",
@@ -30,9 +30,9 @@ const OperatorSidebar = () => {
       label: t("new_orders"),
     },
     { to: "/products", icon: <Apple />, label: t("products") },
-    { to: "/ai-balance", icon: <Bot />, label: "AI balans" },
+    { to: "/ai-balance", icon: <Bot />, label: t("ai_balance") },
     ...(showEarnings
-      ? [{ to: "/my-earnings", icon: <Wallet />, label: "Daromadlarim" }]
+      ? [{ to: "/my-earnings", icon: <Wallet />, label: t("my_earnings") }]
       : []),
   ];
 

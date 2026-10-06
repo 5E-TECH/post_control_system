@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button, Checkbox, Input, Modal, Select } from "antd";
+import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -21,14 +22,12 @@ import {
   PackageCheck,
   ShieldCheck,
   Timer,
-  Calendar,
   MapPin,
   Phone,
   QrCode,
-  Truck,
-  Warehouse,
 } from "lucide-react";
 import {
+  MANUAL_OVERRIDE_REASON_KEYS,
   MANUAL_OVERRIDE_REASONS,
   releaseHandoverBeacon,
   useMarketHandover,
@@ -37,14 +36,17 @@ import {
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useManifestScanner } from "../../../../../shared/hooks/useManifestScanner";
 import { useMarketQrScanner } from "../../../../../shared/hooks/useMarketQrScanner";
+import { formatPhone } from "../../../../../shared/helpers/formatPhone";
 import { normalizeQrToken } from "../../../../../shared/helpers/normalizeQrToken";
-import { api } from "../../../../../shared/api";
 import { BASE_URL } from "../../../../../shared/const";
 import {
   formatMmSs,
   useSecondsCountdown,
 } from "../../../../../shared/hooks/useSecondsCountdown";
-import { formatMoment } from "../../../../../shared/lib/returnStage";
+import {
+  formatMoment,
+  returnAgeTone,
+} from "../../../../../shared/lib/returnStage";
 import ReplacementBadge from "../../../../../shared/components/replacement-badge";
 import {
   buildManualOverrides,
@@ -67,14 +69,32 @@ const money = (n?: number | null) =>
   `${Number(n ?? 0).toLocaleString("uz-UZ")} so'm`;
 
 /** Yosh bo'yicha rang. Sinflar LITERAL (Tailwind shablondan sinf yasamaydi). */
-const ageTone = (days: number) =>
-  days >= 14
-    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-    : days >= 7
-      ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
-      : days >= 3
-        ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-        : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
+/** Desktop skeleton — `order-view` dagi naqsh. */
+const TableRowSkeleton = () => (
+  <tr className="animate-pulse">
+    {[...Array(7)].map((_, i) => (
+      <td key={i} className="px-4 py-4">
+        <div className="h-4 w-full rounded bg-gray-200 dark:bg-gray-700" />
+      </td>
+    ))}
+  </tr>
+);
+
+/** Mobil skeleton. */
+const MobileCardSkeleton = () => (
+  <div className="animate-pulse rounded-xl bg-white p-3 dark:bg-[#2A263D]">
+    <div className="mb-2 flex items-center gap-2">
+      <div className="h-5 w-5 rounded bg-gray-200 dark:bg-gray-700" />
+      <div className="h-4 w-20 rounded bg-gray-200 dark:bg-gray-700" />
+      <div className="h-4 flex-1 rounded bg-gray-200 dark:bg-gray-700" />
+    </div>
+    <div className="grid grid-cols-2 gap-2">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="h-3 rounded bg-gray-200 dark:bg-gray-700" />
+      ))}
+    </div>
+  </div>
+);
 
 /**
  * MARKETGA TOPSHIRISH SESSIYASI.
@@ -98,9 +118,11 @@ const ageTone = (days: number) =>
 function HandoverSession() {
   const { marketId = "" } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation("marketReturns");
   const { handleApiError, handleSuccess, handleWarning } = useApiNotification();
   const {
     getAwaitingOrders,
+    resolveAwaitingByToken,
     scan,
     heartbeat,
     complete,
@@ -137,10 +159,7 @@ function HandoverSession() {
   useEffect(() => {
     if (auth && left <= 0) {
       setAuth(null);
-      handleWarning(
-        "Ruxsat tugadi",
-        "10 daqiqalik oyna tugadi — market yangi QR ko'rsatsin",
-      );
+      handleWarning(t("toastExpiredTitle"), t("toastExpiredBody"));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth, left]);
@@ -187,9 +206,9 @@ function HandoverSession() {
             setAuth(res);
             setPin("");
             setHandedInSession(0);
-            handleSuccess("Ruxsat ochildi", "Posilkalarni skanerlang");
+            handleSuccess(t("toastConsentOpened"), t("toastScanParcels"));
           },
-          onError: (err) => handleApiError(err, "Ruxsat ochilmadi"),
+          onError: (err) => handleApiError(err, t("toastConsentFailedScan")),
         },
       );
     },
@@ -205,10 +224,7 @@ function HandoverSession() {
     enabled: !auth && !scan.isPending,
     onMarketToken: (token) => authorize({ qr_token: token }),
     onForeignToken: () =>
-      handleWarning(
-        "Bu market QR'i emas",
-        "Avval market kabinetidagi ruxsat QR'ini o'qiting",
-      ),
+      handleWarning(t("toastNotMarketQrTitle"), t("toastNotMarketQrBody")),
   });
 
   // ─────────────────────── Posilka skaneri ───────────────────────
@@ -247,14 +263,10 @@ function HandoverSession() {
     }
   }, []);
 
+  // ⚠️ So'rov QATLAMI hookda — sahifa `api` ni to'g'ridan-to'g'ri chaqirmaydi.
   const resolveMiss = useCallback(
-    async (token: string): Promise<string | null> => {
-      const res = await api.get(`market-handover/awaiting/${marketId}`, {
-        params: { search: token, limit: 1 },
-      });
-      return res?.data?.data?.orders?.[0]?.id ?? null;
-    },
-    [marketId],
+    (token: string) => resolveAwaitingByToken(marketId, token),
+    [resolveAwaitingByToken, marketId],
   );
 
   const { visualFeedback } = useManifestScanner({
@@ -305,14 +317,14 @@ function HandoverSession() {
       {
         onSuccess: (res) => {
           handleSuccess(
-            "Topshirildi",
-            `${res.handed_over} ta posilka marketga topshirildi`,
+            t("toastHandedTitle"),
+            t("toastHandedBody", { count: res.handed_over }),
           );
           setHandedInSession((n) => n + Number(res.handed_over ?? 0));
           clearSelection();
           void refetch();
         },
-        onError: (err) => handleApiError(err, "Topshirib bo'lmadi"),
+        onError: (err) => handleApiError(err, t("toastHandoverFailed")),
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -325,10 +337,10 @@ function HandoverSession() {
         setAuth(null);
         clearSelection();
         handleSuccess(
-          "Yakunlandi",
+          t("toastFinishedTitle"),
           handedInSession > 0
-            ? `${handedInSession} ta posilka topshirildi`
-            : "Sessiya yopildi",
+            ? t("toastFinishedBody", { count: handedInSession })
+            : t("toastSessionClosed"),
         );
       },
       onError: () => setAuth(null),
@@ -343,8 +355,8 @@ function HandoverSession() {
       {
         onSuccess: (res) => {
           handleSuccess(
-            "Offline akt bilan topshirildi",
-            `${res.handed_over} ta posilka`,
+            t("toastOfflineTitle"),
+            t("parcelsCount", { count: res.handed_over }),
           );
           setOfflineOpen(false);
           clearSelection();
@@ -355,7 +367,7 @@ function HandoverSession() {
           });
           void refetch();
         },
-        onError: (err) => handleApiError(err, "Offline akt yozilmadi"),
+        onError: (err) => handleApiError(err, t("toastOfflineFailed")),
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -379,14 +391,16 @@ function HandoverSession() {
           onClick={() => navigate("/awaiting-market")}
         />
         <div className="min-w-0">
-          <h1 className="truncate text-xl font-bold text-gray-900 dark:text-gray-100">
-            Marketga topshirish
+          <h1 className="truncate text-xl font-bold text-gray-800 dark:text-white">
+            {t("handoverTitle")}
           </h1>
-          <p className="text-sm text-gray-500">
-            Markazda {total} ta posilka
-            {total > MANIFEST_LIMIT ? ` · ekranda ${MANIFEST_LIMIT} tasi` : ""}
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {t("atCenterParcels", { count: total })}
+            {total > MANIFEST_LIMIT
+              ? ` · ${t("onScreenLimit", { count: MANIFEST_LIMIT })}`
+              : ""}
             {handedInSession > 0
-              ? ` · bu sessiyada ${handedInSession} ta topshirildi`
+              ? ` · ${t("handedThisSession", { count: handedInSession })}`
               : ""}
           </p>
         </div>
@@ -397,12 +411,10 @@ function HandoverSession() {
           disabled={selectedIds.length === 0 || Boolean(auth)}
           onClick={() => setOfflineOpen(true)}
           title={
-            auth
-              ? "Ruxsat ochiq — oddiy topshirishdan foydalaning"
-              : "Market panelga kira olmasa: vakil akti bilan topshirish"
+            auth ? t("offlineActDisabledHint") : t("offlineActHint")
           }
         >
-          Offline akt
+          {t("offlineAct")}
         </Button>
       </div>
 
@@ -421,7 +433,7 @@ function HandoverSession() {
               <QrCode className="relative h-4 w-4 text-amber-700 dark:text-amber-400" />
             </span>
             <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
-              Skaner tayyor — market QR'ini o'qiting
+              {t("scannerReadyMarketQr")}
             </span>
             {scan.isPending && (
               <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-700" />
@@ -432,7 +444,7 @@ function HandoverSession() {
 
           <span className="inline-flex items-center gap-2">
             <span className="text-xs text-amber-700/80 dark:text-amber-300/70">
-              yoki PIN
+              {t("orPin")}
             </span>
             <Input
               size="small"
@@ -452,12 +464,12 @@ function HandoverSession() {
               disabled={pin.length !== 6}
               onClick={() => authorize({ pin })}
             >
-              Tasdiqlash
+              {t("confirm")}
             </Button>
           </span>
 
           <span className="ml-auto text-xs text-amber-700/70 dark:text-amber-300/60">
-            Market kabinetida «Topshirishga ruxsat beraman» tugmasini bossin
+            {t("marketShouldPressCta")}
           </span>
         </div>
       ) : (
@@ -468,7 +480,7 @@ function HandoverSession() {
               <QrCode className="relative h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             </span>
             <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-              Skaner tayyor — posilka yorliqlarini o'qiting
+              {t("scannerReadyParcels")}
             </span>
           </span>
 
@@ -478,7 +490,7 @@ function HandoverSession() {
                 ? "animate-pulse bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
                 : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
             }`}
-            title="Ruxsat shu vaqtdan keyin tugaydi"
+            title={t("expiresInHint")}
           >
             <Timer className="h-3.5 w-3.5" />
             {formatMmSs(left)}
@@ -486,7 +498,7 @@ function HandoverSession() {
 
           {handedInSession > 0 && (
             <span className="text-xs text-emerald-700/80 dark:text-emerald-300/70">
-              {handedInSession} ta topshirildi
+              {t("handedThisSession", { count: handedInSession })}
             </span>
           )}
 
@@ -496,7 +508,7 @@ function HandoverSession() {
             onClick={finishSession}
             loading={finish.isPending}
           >
-            Yakunlash
+            {t("finish")}
           </Button>
         </div>
       )}
@@ -516,21 +528,21 @@ function HandoverSession() {
       )}
 
       {/* ─────── Ro'yxat sarlavhasi ─────── */}
-      <div className="mb-2 flex flex-wrap items-center gap-3 text-sm text-gray-500">
+      <div className="mb-2 flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
         <span className="inline-flex items-center gap-1.5">
           <Package className="h-4 w-4" />
-          {orders.length} ta posilka
+          {t("parcelsCount", { count: orders.length })}
         </span>
         {selectedIds.length > 0 && (
           <>
             <span className="inline-flex items-center gap-1.5 text-emerald-600">
               <PackageCheck className="h-4 w-4" />
-              {scannedCount} skanerlandi
+              {t("scannedCount", { count: scannedCount })}
             </span>
             {manualIds.length > 0 && (
               <span className="inline-flex items-center gap-1.5 text-orange-600">
                 <AlertTriangle className="h-4 w-4" />
-                {manualIds.length} qo'lda
+                {t("manualCount", { count: manualIds.length })}
               </span>
             )}
             <button
@@ -538,28 +550,35 @@ function HandoverSession() {
               className="ml-auto text-gray-400 underline hover:text-gray-600"
               onClick={clearSelection}
             >
-              Tanlovni tozalash
+              {t("clearSelection")}
             </button>
           </>
         )}
       </div>
 
       {/* ─────── Posilkalar ─────── */}
-      {isLoading ? (
-        <div className="flex items-center justify-center gap-2 py-16 text-gray-500">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          Yuklanmoqda…
-        </div>
-      ) : orders.length === 0 ? (
-        <div className="rounded-2xl border border-gray-100 bg-white py-12 text-center dark:border-gray-800 dark:bg-gray-900">
-          <ShieldCheck className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
-          <p className="m-0 font-semibold text-gray-700 dark:text-gray-200">
-            Bu marketda topshiriladigan posilka qolmadi
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {orders.map((o) => {
+      {/*
+        Ko'rinish loyihaning ro'yxat naqshini ko'chiradi: mobilda karta
+        (`block lg:hidden`), desktopda jadval (`hidden lg:block`, gradient
+        sarlavha, skeleton, antd `Empty`).
+
+        ⚠️ IKKI KO'RINISH BIR XIL TANLOV HOLATINI boshqaradi (`selectedIds`)
+        — skaner qaysi ko'rinishda ishlayotganidan qat'i nazar.
+      */}
+
+      {/* Mobil: karta */}
+      <div className="block space-y-2 lg:hidden">
+        {isLoading ? (
+          [...Array(4)].map((_, i) => <MobileCardSkeleton key={i} />)
+        ) : orders.length === 0 ? (
+          <div className="rounded-xl bg-white py-12 text-center dark:bg-[#2A263D]">
+            <ShieldCheck className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
+            <p className="m-0 font-semibold text-gray-700 dark:text-gray-200">
+              {t("noneLeft")}
+            </p>
+          </div>
+        ) : (
+          orders.map((o) => {
             const checked = selectedIds.includes(o.id);
             const manual = checked && !scannedIds.has(o.id);
             return (
@@ -579,11 +598,10 @@ function HandoverSession() {
                     ? "border-orange-300 bg-orange-50/60 dark:border-orange-800 dark:bg-orange-900/10"
                     : checked
                       ? "border-emerald-300 bg-emerald-50/60 dark:border-emerald-800 dark:bg-emerald-900/10"
-                      : "border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
+                      : "border-gray-100 bg-white dark:border-gray-800 dark:bg-[#2A263D]"
                 }`}
               >
-                {/* ── 1-qator: kim, nima, holati ── */}
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   <span
                     className="-m-2 p-2"
                     onClick={(e) => e.stopPropagation()}
@@ -594,75 +612,31 @@ function HandoverSession() {
                       disabled={!auth}
                     />
                   </span>
-                  <span className="text-base font-bold tabular-nums text-gray-900 dark:text-gray-100">
+                  <span className="text-base font-bold tabular-nums text-gray-900 dark:text-white">
                     #{o.order_number}
                   </span>
-
-                  {/*
-                    ⚠️ MIJOZ ISMI — raqamdan muhimroq. Xodim 150 posilka
-                    orasidan qaysi birini topshirayotganini yorliq raqamiga
-                    emas, odamga qarab ham tekshiradi (pochta ichidagi
-                    buyurtma kartasi bilan bir xil to'plam).
-                  */}
                   <span className="min-w-0 flex-1 truncate font-semibold text-gray-800 dark:text-gray-200">
                     {o.customer_name || "—"}
                   </span>
-
                   <ReplacementBadge order={o} />
-
                   <span
-                    className={`rounded-md px-2 py-0.5 text-[11px] font-semibold tabular-nums ${ageTone(o.age_days)}`}
-                    title="Markazda qancha turgani"
+                    className={`rounded-md px-2 py-0.5 text-[11px] font-semibold tabular-nums ${returnAgeTone(o.age_days)}`}
+                    title={t("ageHint")}
                   >
-                    {o.age_days} kun
+                    {t("days", { count: o.age_days })}
                   </span>
-
-                  {o.escalated && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">
-                      <AlertTriangle className="h-3 w-3" />
-                      Muddati o'tdi
-                    </span>
-                  )}
-
-                  {checked && !manual && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Skanerlandi
-                    </span>
-                  )}
-
-                  {manual && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-md bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
-                        <AlertTriangle className="h-3 w-3" />
-                        Skanerlanmadi
-                      </span>
-                      <Select
-                        onClick={(e) => e.stopPropagation()}
-                        size="small"
-                        placeholder="Sababni tanlang"
-                        value={reasons[o.id]}
-                        onChange={(v) =>
-                          setReasons((r) => ({ ...r, [o.id]: v as string }))
-                        }
-                        className="min-w-[210px]"
-                        status={reasons[o.id] ? undefined : "error"}
-                        options={MANUAL_OVERRIDE_REASONS.map((r) => ({
-                          value: r,
-                          label: r,
-                        }))}
-                      />
-                    </div>
-                  )}
                 </div>
 
-                {/* ── 2-qator: posilka tafsilotlari ── */}
-                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gray-100 pt-2 text-xs text-gray-600 dark:border-gray-800 dark:text-gray-300">
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gray-100 pt-2 text-xs text-gray-600 dark:border-gray-700 dark:text-gray-300">
                   {o.customer_phone && (
-                    <span className="inline-flex items-center gap-1">
-                      <Phone className="h-3 w-3 text-gray-400" />
-                      {o.customer_phone}
-                    </span>
+                    <a
+                      href={`tel:${o.customer_phone}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 py-1"
+                    >
+                      <Phone className="h-3 w-3 text-emerald-500" />
+                      {formatPhone(o.customer_phone)}
+                    </a>
                   )}
                   {o.district_name && (
                     <span className="inline-flex items-center gap-1">
@@ -670,48 +644,216 @@ function HandoverSession() {
                       {o.district_name}
                     </span>
                   )}
-                  {o.where_deliver && (
-                    <span className="inline-flex items-center gap-1">
-                      <Truck className="h-3 w-3 text-gray-400" />
-                      {o.where_deliver === "center" ? "Markazga" : "Manzilga"}
-                    </span>
-                  )}
-                  <span className="inline-flex items-center gap-1 font-semibold text-gray-800 tabular-nums dark:text-gray-200">
+                  <span className="inline-flex items-center gap-1 font-semibold tabular-nums text-gray-800 dark:text-gray-200">
                     {money(o.total_price)}
                   </span>
                   <span className="inline-flex items-center gap-1 tabular-nums">
                     <Package className="h-3 w-3 text-gray-400" />
-                    {Number(o.product_quantity ?? 0)} dona
+                    {t("pcs", { count: Number(o.product_quantity ?? 0) })}
                   </span>
-                  <span className="inline-flex items-center gap-1 tabular-nums">
-                    <Calendar className="h-3 w-3 text-gray-400" />
-                    {formatMoment(o.created_at)}
-                  </span>
-                  <span
-                    className="inline-flex items-center gap-1 text-sky-700 dark:text-sky-300"
-                    title="Viloyatdan markazga qabul qilingan vaqt"
-                  >
-                    <Warehouse className="h-3 w-3" />
-                    {formatMoment(o.center_received_at)}
-                  </span>
-                  {o.comment && (
-                    <span
-                      className="min-w-0 max-w-[280px] truncate italic text-gray-500"
-                      title={o.comment}
-                    >
-                      «{o.comment}»
+                </div>
+
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {o.escalated && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                      <AlertTriangle className="h-3 w-3" />
+                      {t("overdue")}
                     </span>
                   )}
-                  <span className="ml-auto font-mono text-[11px] text-gray-400">
-                    {o.qr_code_token}
-                  </span>
+                  {checked && !manual && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                      <CheckCircle2 className="h-3 w-3" />
+                      {t("scanned")}
+                    </span>
+                  )}
+                  {manual && (
+                    <>
+                      <span className="inline-flex items-center gap-1 rounded-md bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+                        <AlertTriangle className="h-3 w-3" />
+                        {t("notScanned")}
+                      </span>
+                      <Select
+                        onClick={(e) => e.stopPropagation()}
+                        size="small"
+                        placeholder={t("chooseReason")}
+                        value={reasons[o.id]}
+                        onChange={(v) =>
+                          setReasons((r) => ({ ...r, [o.id]: v as string }))
+                        }
+                        className="min-w-[200px]"
+                        status={reasons[o.id] ? undefined : "error"}
+                        options={MANUAL_OVERRIDE_REASONS.map((r) => ({
+                          // ⚠️ `value` TARJIMA QILINMAYDI — server `@IsIn`.
+                          value: r,
+                          label: t(MANUAL_OVERRIDE_REASON_KEYS[r]),
+                        }))}
+                      />
+                    </>
+                  )}
                 </div>
               </div>
             );
-          })}
-        </div>
-      )}
+          })
+        )}
+      </div>
 
+      {/* Desktop: jadval */}
+      <div className="hidden overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm lg:block dark:border-gray-800 dark:bg-[#2A263D]">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
+                <th className="w-12 px-4 py-4" />
+                <th className="w-24 px-4 py-4 text-left text-sm font-semibold">
+                  {t("colOrder")}
+                </th>
+                <th className="min-w-[180px] px-4 py-4 text-left text-sm font-semibold">
+                  {t("colCustomer")}
+                </th>
+                <th className="min-w-[120px] px-4 py-4 text-left text-sm font-semibold">
+                  {t("colDistrict")}
+                </th>
+                <th className="whitespace-nowrap px-4 py-4 text-right text-sm font-semibold">
+                  {t("colPrice")}
+                </th>
+                <th className="whitespace-nowrap px-4 py-4 text-left text-sm font-semibold">
+                  {t("colReceived")}
+                </th>
+                <th className="min-w-[260px] px-4 py-4 text-left text-sm font-semibold">
+                  {t("colScanStatus")}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+              {isLoading ? (
+                [...Array(8)].map((_, i) => <TableRowSkeleton key={i} />)
+              ) : orders.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center">
+                    <ShieldCheck className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
+                    <p className="m-0 font-semibold text-gray-700 dark:text-gray-200">
+                      {t("noneLeft")}
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                orders.map((o) => {
+                  const checked = selectedIds.includes(o.id);
+                  const manual = checked && !scannedIds.has(o.id);
+                  return (
+                    <tr
+                      key={o.id}
+                      onClick={() => auth && toggle(o.id)}
+                      className={`transition-colors ${auth ? "cursor-pointer" : ""} ${
+                        manual
+                          ? "bg-orange-50/60 dark:bg-orange-900/10"
+                          : checked
+                            ? "bg-emerald-50/60 dark:bg-emerald-900/10"
+                            : "hover:bg-purple-50 dark:hover:bg-[#3d3759]"
+                      }`}
+                    >
+                      <td
+                        className="px-4 py-4"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onChange={() => toggle(o.id)}
+                          disabled={!auth}
+                        />
+                      </td>
+                      <td className="px-4 py-4 text-sm font-bold tabular-nums text-gray-800 dark:text-white">
+                        #{o.order_number}
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="min-w-0">
+                          <span className="block truncate font-medium text-gray-800 dark:text-white">
+                            {o.customer_name || "—"}
+                          </span>
+                          {o.customer_phone && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {formatPhone(o.customer_phone)}
+                            </span>
+                          )}
+                          <ReplacementBadge order={o} className="mt-0.5" />
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
+                        <div>{o.district_name || "—"}</div>
+                        <div className="text-xs text-gray-400">
+                          {o.where_deliver === "center"
+                            ? t("deliverCenter")
+                            : t("deliverAddress")}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-right text-sm font-semibold tabular-nums text-gray-800 dark:text-white">
+                        <div>{money(o.total_price)}</div>
+                        <div className="text-xs font-normal text-gray-400">
+                          {t("pcs", {
+                            count: Number(o.product_quantity ?? 0),
+                          })}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-sm tabular-nums text-gray-600 dark:text-gray-300">
+                        {formatMoment(o.center_received_at)}
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={`rounded-md px-2 py-0.5 text-[11px] font-semibold tabular-nums ${returnAgeTone(o.age_days)}`}
+                            title={t("ageHint")}
+                          >
+                            {t("days", { count: o.age_days })}
+                          </span>
+                          {o.escalated && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                              <AlertTriangle className="h-3 w-3" />
+                              {t("overdue")}
+                            </span>
+                          )}
+                          {checked && !manual && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                              <CheckCircle2 className="h-3 w-3" />
+                              {t("scanned")}
+                            </span>
+                          )}
+                          {manual && (
+                            <>
+                              <span className="inline-flex items-center gap-1 rounded-md bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+                                <AlertTriangle className="h-3 w-3" />
+                                {t("notScanned")}
+                              </span>
+                              <Select
+                                onClick={(e) => e.stopPropagation()}
+                                size="small"
+                                placeholder={t("chooseReason")}
+                                value={reasons[o.id]}
+                                onChange={(v) =>
+                                  setReasons((r) => ({
+                                    ...r,
+                                    [o.id]: v as string,
+                                  }))
+                                }
+                                className="min-w-[200px]"
+                                status={reasons[o.id] ? undefined : "error"}
+                                options={MANUAL_OVERRIDE_REASONS.map((r) => ({
+                                  // ⚠️ `value` TARJIMA QILINMAYDI.
+                                  value: r,
+                                  label: t(MANUAL_OVERRIDE_REASON_KEYS[r]),
+                                }))}
+                              />
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
       {/* ─────── Pastdagi yopishqoq panel ─────── */}
       {selectedIds.length > 0 && (
         /*
@@ -721,20 +863,20 @@ function HandoverSession() {
           BOSILMAYDI. Loyihadagi to'g'ri naqsh: `max-[650px]:bottom-20`
           (courier-bulk, AiFinanceChat).
         */
-        <div className="fixed bottom-0 left-0 right-0 z-[60] border-t border-gray-200 bg-white/95 py-3 backdrop-blur max-[650px]:bottom-20 max-[650px]:rounded-t-2xl max-[650px]:border dark:border-gray-800 dark:bg-gray-900/95">
+        <div className="fixed bottom-0 left-0 right-0 z-[60] border-t border-gray-200 bg-white/95 py-3 backdrop-blur max-[650px]:bottom-20 max-[650px]:rounded-t-2xl max-[650px]:border dark:border-gray-800 dark:bg-[#2A263D]/95">
           <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center gap-3 px-4 sm:px-6 lg:px-8">
-            <span className="text-base font-bold tabular-nums text-gray-800 dark:text-gray-100">
-              {selectedIds.length} ta tanlandi
+            <span className="text-base font-bold tabular-nums text-gray-800 dark:text-white">
+              {t("selectedCount", { count: selectedIds.length })}
             </span>
             {missingReasons.length > 0 && (
               <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-600">
                 <AlertTriangle className="h-4 w-4" />
-                {missingReasons.length} ta posilka uchun sabab kerak
+                {t("reasonNeededCount", { count: missingReasons.length })}
               </span>
             )}
             {!auth && (
               <span className="text-sm text-amber-700">
-                Market ruxsati kutilmoqda
+                {t("waitingConsent")}
               </span>
             )}
             <Button
@@ -745,7 +887,7 @@ function HandoverSession() {
               loading={complete.isPending}
               onClick={submitBatch}
             >
-              Marketga topshirish ({selectedIds.length})
+              {t("submitHandover", { count: selectedIds.length })}
             </Button>
           </div>
         </div>
@@ -756,7 +898,7 @@ function HandoverSession() {
         open={offlineOpen}
         onCancel={() => setOfflineOpen(false)}
         onOk={submitOffline}
-        okText="Akt bilan topshirish"
+        okText={t("offlineSubmit")}
         confirmLoading={offlineHandover.isPending}
         okButtonProps={{
           disabled:
@@ -764,15 +906,14 @@ function HandoverSession() {
             offlineForm.representative_phone.trim().length < 7 ||
             offlineForm.reason.trim().length < 5,
         }}
-        title="Offline akt — market QR'siz topshirish"
+        title={t("offlineModalTitle")}
       >
-        <p className="mb-3 text-sm text-gray-500">
-          Market panelga kira olmasa ishlatiladi. Hisobotda market tasdig'idan
-          AJRATIB ko'rsatiladi, shuning uchun vakil ma'lumoti majburiy.
+        <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+          {t("offlineModalHint")}
         </p>
         <div className="flex flex-col gap-2">
           <Input
-            placeholder="Vakilning ismi"
+            placeholder={t("repName")}
             value={offlineForm.representative_name}
             onChange={(e) =>
               setOfflineForm((f) => ({
@@ -782,7 +923,7 @@ function HandoverSession() {
             }
           />
           <Input
-            placeholder="Vakilning telefoni"
+            placeholder={t("repPhone")}
             value={offlineForm.representative_phone}
             onChange={(e) =>
               setOfflineForm((f) => ({
@@ -793,14 +934,14 @@ function HandoverSession() {
           />
           <Input.TextArea
             rows={2}
-            placeholder="Nega QR'siz topshirilmoqda"
+            placeholder={t("offlineReason")}
             value={offlineForm.reason}
             onChange={(e) =>
               setOfflineForm((f) => ({ ...f, reason: e.target.value }))
             }
           />
           <div className="text-xs text-gray-400">
-            {selectedIds.length} ta posilka topshiriladi
+            {t("offlineWillHand", { count: selectedIds.length })}
           </div>
         </div>
       </Modal>

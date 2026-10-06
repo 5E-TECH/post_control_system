@@ -153,10 +153,10 @@ const StatusBadge = ({
   if (stage) {
     return (
       <span
-        title={stage.title}
+        title={st(stage.titleKey)}
         className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-semibold ${stage.tone}`}
       >
-        {stage.label}
+        {st(stage.labelKey)}
       </span>
     );
   }
@@ -319,6 +319,8 @@ const TableRowSkeleton = () => (
 
 const OrderView = () => {
   const { t } = useTranslation("orderList");
+  // Bosqich yorliqlari `status` namespace'ida (uz/ru/en).
+  const { t: st } = useTranslation("status");
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { getOrders } = useOrder();
@@ -467,7 +469,10 @@ const OrderView = () => {
           Narxi: Number((order?.total_price ?? 0) / 1000),
           Kuryer: order?.post?.courier?.name || "-",
           Holati:
-            returnStageDisplay(order)?.label ?? statusLabels[order?.status],
+            (() => {
+              const stage = returnStageDisplay(order);
+              return stage ? st(stage.labelKey) : statusLabels[order?.status];
+            })(),
           Sana: new Date(Number(order?.created_at)).toLocaleString("uz-UZ", {
             year: "numeric",
             month: "2-digit",

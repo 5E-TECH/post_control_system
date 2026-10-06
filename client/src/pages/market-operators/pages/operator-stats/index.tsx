@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { returnStageDisplay } from "../../../../shared/lib/returnStage";
+import { useTranslation } from "react-i18next";
 
 const statusColors: Record<string, string> = {
   sold: "bg-green-500",
@@ -85,6 +86,7 @@ const StatCard = ({
 );
 
 const OperatorStats = () => {
+  const { t: st } = useTranslation("status");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { getOperatorStats, getOperatorBalance, payOperator } = useUser();
@@ -456,9 +458,12 @@ const OperatorStats = () => {
                       <span className="text-sm text-gray-700 dark:text-gray-200 font-medium">
                         {/* Bekor-qaytarish zanjirida XOM yorliq yarim
                             haqiqat — bosqich yorlig'i ustun turadi. */}
-                        {returnStageDisplay(order)?.label ??
-                          statusLabels[order.status] ??
-                          order.status}
+                        {(() => {
+                          const sg = returnStageDisplay(order);
+                          return sg
+                            ? st(sg.labelKey)
+                            : (statusLabels[order.status] ?? order.status);
+                        })()}
                       </span>
                     </div>
                     <div className="flex items-center gap-4">

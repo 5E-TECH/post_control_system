@@ -2,6 +2,7 @@ import { Button } from "antd";
 import { returnStageDisplay } from "../../../../shared/lib/returnStage";
 import { AlertCircle } from "lucide-react";
 import { memo, type FC } from "react";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   data: any[];
@@ -21,6 +22,7 @@ const statusColors: Record<string, string> = {
 };
 
 const OrderTableComp: FC<Props> = ({ data }) => {
+  const { t: st } = useTranslation("status");
   return (
     <div>
       <table className="w-full">
@@ -110,10 +112,10 @@ const OrderTableComp: FC<Props> = ({ data }) => {
                   const stage = returnStageDisplay(item);
                   return stage ? (
                     <span
-                      title={stage.title}
+                      title={st(stage.titleKey)}
                       className={`rounded-2xl px-3 py-2 text-[13px] font-semibold ${stage.tone}`}
                     >
-                      {stage.label}
+                      {st(stage.labelKey)}
                     </span>
                   ) : (
                     <span
