@@ -1,5 +1,7 @@
 import { memo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../app/store";
 import { Empty } from "antd";
 import { useTranslation } from "react-i18next";
 import {
@@ -41,6 +43,35 @@ const RowSkeleton = () => (
 function BatchDetail() {
   const { sessionId = "" } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const role =
+    useSelector((s: RootState) => s.roleSlice.role) ||
+    localStorage.getItem("role") ||
+    "";
+
+  /**
+   * ORQAGA — tarix bo'lsa tarix bo'yicha, bo'lmasa O'Z ro'yxatiga.
+   *
+   * ⚠️ `navigate(-1)` YOLG'IZ YETARLI EMAS. Partiya havolasi to'g'ridan
+   * to'g'ri ochilsa (yangi tab, xabardagi havola, sahifa yangilansa)
+   * tarixda oldingi yozuv YO'Q va `-1` foydalanuvchini ILOVADAN
+   * CHIQARIB yuborardi.
+   *
+   * React Router birinchi yozuvni `key: "default"` bilan belgilaydi —
+   * shu bo'lsa, rolga mos ro'yxatga va AYNAN «topshirilganlar» tabiga
+   * qaytamiz (tab endi URL da, shuning uchun tiklanadi).
+   */
+  const goBack = () => {
+    if (location.key !== "default") {
+      navigate(-1);
+      return;
+    }
+    const isMarketSide = role === "market" || role === "operator";
+    navigate(
+      isMarketSide ? "/market-returns?tab=history" : "/awaiting-market?tab=handed",
+      { replace: true },
+    );
+  };
   const { t } = useTranslation("marketReturns");
   const { getHandoverBatch } = useMarketHandover();
   const { data, isLoading } = getHandoverBatch(sessionId);
@@ -61,7 +92,7 @@ function BatchDetail() {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={goBack}
           className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 transition-all hover:bg-gray-50 dark:border-gray-700 dark:bg-[#2A263D] dark:text-gray-300 dark:hover:bg-[#352F4A]"
         >
           <ArrowLeft className="h-4 w-4" />

@@ -1,4 +1,5 @@
 import { memo, useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button, Empty, Pagination, type PaginationProps } from "antd";
 import { useTranslation } from "react-i18next";
 import {
@@ -87,8 +88,29 @@ function MarketReturns() {
    * ⚠️ Alohida sahifa EMAS, tab: market uchun bu ikkisi BITTA ish —
    * «nima kutyapti» va «nima oldim». Ikki menyu bandi qo'shsak
    * telefonda (7 ta ikonka) joy yetmasdi.
+   *
+   * ⚠️ HOLAT URL DA, `useState` da EMAS. Partiya ichiga kirib
+   * «Orqaga» bosilganda komponent QAYTA MOUNT bo'ladi va mahalliy
+   * holat boshlang'ich qiymatga qaytardi — ya'ni «Olganlarim» dan
+   * kirgan odam «Markazda» tabiga tushib qolardi. URL da bo'lsa
+   * brauzer uni tarix bilan birga tiklaydi.
+   *
+   * ⚠️ `replace: true` — tab almashtirish tarixga YANGI yozuv
+   * qo'shmaydi, aks holda «Orqaga» avval tabni qaytarib, keyingina
+   * sahifadan chiqardi.
    */
-  const [tab, setTab] = useState<"awaiting" | "history">("awaiting");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab: "awaiting" | "history" =
+    searchParams.get("tab") === "history" ? "history" : "awaiting";
+  const setTab = useCallback(
+    (next: "awaiting" | "history") => {
+      const params = new URLSearchParams(searchParams);
+      if (next === "awaiting") params.delete("tab");
+      else params.set("tab", next);
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
   const [session, setSession] = useState<ConsentSession | null>(null);
 
   const { getMyReturns, getMyReturnCounts, getConsentStatus, createConsent } =

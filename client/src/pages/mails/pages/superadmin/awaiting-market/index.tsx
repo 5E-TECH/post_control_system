@@ -1,5 +1,5 @@
-import { memo, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { memo, useCallback, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Empty, Pagination, type PaginationProps } from "antd";
 import { useTranslation } from "react-i18next";
 import {
@@ -79,8 +79,22 @@ function AwaitingMarket() {
    * ⚠️ Alohida menyu bandi EMAS: ikkisi bitta ishning ikki tomoni —
    * «kim kutyapti» va «kimga berdik». Yon menyuda alohida band bo'lsa
    * xodim ikki joyni aylanib yurardi; mobil navda esa joy ham yo'q.
+   *
+   * ⚠️ HOLAT URL DA — partiya ichidan «Orqaga» qaytganda tab
+   * tiklanishi uchun (mahalliy holat qayta mountda yo'qolardi).
    */
-  const [tab, setTab] = useState<"queue" | "handed">("queue");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab: "queue" | "handed" =
+    searchParams.get("tab") === "handed" ? "handed" : "queue";
+  const setTab = useCallback(
+    (next: "queue" | "handed") => {
+      const params = new URLSearchParams(searchParams);
+      if (next === "queue") params.delete("tab");
+      else params.set("tab", next);
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
   // ⚠️ Har harfda so'rov ketmasin — loyihadagi qidiruvlar debounce bilan.
   const debouncedSearch = useDebouncedValue(search, 400);
 
