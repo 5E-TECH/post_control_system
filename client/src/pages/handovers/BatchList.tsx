@@ -137,9 +137,17 @@ function BatchList({ mode }: Props) {
       </p>
 
       {/* ─────── Filtr ─────── */}
+      {/*
+        ⚠️ QIDIRUV MINIMAL KENGLIKKA EGA. Avval u `flex-1` edi, ya'ni
+        asosi 0 — sana tanlagich o'z tabiiy kengligini talab qilgani
+        uchun qidiruv qisilib, bir-ikki harf sig'adigan darajaga
+        tushib qolardi. Endi `min-w` bor: joy yetmasa qator O'RALADI
+        va sana tanlagich pastga tushadi, qidiruv esa o'qiladigan
+        kenglikda qoladi.
+      */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <SearchInput
-          className="flex-1 sm:max-w-sm"
+          className="w-full min-w-[220px] flex-1 sm:w-auto sm:max-w-sm"
           value={search}
           onChange={(next) => {
             setSearch(next);
@@ -156,7 +164,8 @@ function BatchList({ mode }: Props) {
           }}
           format="DD.MM.YYYY"
           placeholder={[t("filterFrom"), t("filterTo")]}
-          className="h-10"
+          // Telefonda butun qatorni egallaydi — siqilib ketmasin.
+          className="h-10 w-full min-w-[250px] sm:w-auto"
           // Kelajakdagi kun tanlab bo'lmaydi — partiya hali yo'q.
           disabledDate={(d) => d && d.isAfter(dayjs(), "day")}
         />

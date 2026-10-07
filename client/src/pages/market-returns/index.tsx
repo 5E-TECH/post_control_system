@@ -213,7 +213,9 @@ function MarketReturns() {
       </Button>
 
       {/* ─────── Xulosa ─────── */}
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
+      {/* ⚠️ Uchinchi «Qanday olinadi» plitkasi OLIB TASHLANDI: ko'rsatma
+          har kirganda takrorlanib, asosiy raqamlarni pastga surardi. */}
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3">
         <div className="rounded-xl border border-gray-100 bg-white p-3 sm:p-4 dark:border-gray-800 dark:bg-[#2A263D]">
           <div className="text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
             {t("statAtCenter")}
@@ -233,14 +235,6 @@ function MarketReturns() {
             {oldestDays >= 7 && (
               <AlertTriangle className="h-5 w-5 shrink-0 text-red-500" />
             )}
-          </div>
-        </div>
-        <div className="col-span-2 rounded-xl border border-gray-100 bg-white p-3 sm:p-4 lg:col-span-1 dark:border-gray-800 dark:bg-[#2A263D]">
-          <div className="text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            {t("statHowTo")}
-          </div>
-          <div className="text-sm text-gray-600 dark:text-gray-300">
-            {t("howToSteps")}
           </div>
         </div>
       </div>
