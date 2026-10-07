@@ -84,7 +84,7 @@ async function main() {
   await dataSource.destroy();
 
   // ============================================================
-  // SNAPSHOT REJIMI — baseline yozib qo'yamiz, halt qilmaymiz
+  // FREEZE REJIMI — QO'ZG'ALMAS tayanch bilan solishtiradi
   // ============================================================
   if (freezePath) {
     compareFrozen(
@@ -96,6 +96,9 @@ async function main() {
     process.exit(0);
   }
 
+  // ============================================================
+  // SNAPSHOT REJIMI — baseline yozib qo'yamiz, halt qilmaymiz
+  // ============================================================
   if (snapshotPath) {
     const payload = {
       taken_at: new Date().toISOString(),
@@ -123,9 +126,22 @@ async function main() {
       process.exit(1);
     }
     const snap = JSON.parse(fs.readFileSync(comparePath, 'utf8')) as {
-      items: Array<{ cashbox_id: string; diff: string }>;
+      items: Array<{ cashbox_id?: string; id?: string; diff: string }>;
     };
-    const prevMap = new Map(snap.items.map((it) => [it.cashbox_id, it.diff]));
+    /**
+     * ⚠️ IKKI KALIT SHAKLINI HAM QABUL QILADI.
+     *
+     * `--snapshot` qatorlarni `cashbox_id` bilan yozadi, `--freeze` esa
+     * `id` bilan (muzlatilgan tayanch umumiy `lib/frozen-baseline.ts` dan
+     * o'tadi). Deploy ularni aralashtirmaydi, LEKIN qo'lda
+     * `--compare=.baselines/cb-frozen.json` deb yozilsa, eski kalitlar
+     * topilmay har bir farq «0 → N» ko'rinishida YANGI drift deb
+     * ko'rsatilardi — ya'ni asbob toza bazada ham yolg'on signal berardi
+     * va unga ishonch yo'qolardi.
+     */
+    const prevMap = new Map(
+      snap.items.map((it) => [it.cashbox_id ?? it.id ?? '', it.diff]),
+    );
 
     const newDrifts: Array<{ id: string; before: string; after: string }> = [];
     for (const r of drifted) {

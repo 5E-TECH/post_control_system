@@ -105,6 +105,7 @@ import {
 import { resolveExtraCostPolicy } from './utils/extra-cost-policy.util';
 import { ExtraCostApplierService } from '../extra-cost/extra-cost-applier.service';
 import { ExtraCostRequestService } from '../extra-cost/extra-cost-request.service';
+import { CourierPenaltyService } from '../courier-penalty/courier-penalty.service';
 import { ExtraCostRequestEntity } from 'src/core/entity/extra-cost-request.entity';
 import { ExtraCostAction } from 'src/common/enums';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
@@ -186,6 +187,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     private readonly extraCostApplier: ExtraCostApplierService,
     // Kechiktirilgan xarajat so'rovlarini yaratadi/bekor qiladi.
     private readonly extraCostRequests: ExtraCostRequestService,
+    /**
+     * Kechikkan belgilash uchun shtraf/bonusni DAFTARGA yozadi.
+     *
+     * ⚠️ FAZA 1 — SOYA REJIMI: pulga TEGMAYDI. Yozuv `shadow = true`
+     * bo'lib ketadi, kassa ulanishi Faza 3 da qo'shiladi.
+     */
+    private readonly courierPenalty: CourierPenaltyService,
   ) {
     super(orderRepo);
   }
@@ -3170,6 +3178,23 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.manager.save(order);
 
+      /**
+       * KECHIKKAN BELGILASH — shtraf/bonus daftariga yozuv.
+       *
+       * ⚠️ SOYA REJIMI: pulga TEGMAYDI. Shtraf POCHTA kuryeriga yoziladi,
+       * amal qiluvchiga emas — kechikkan buyurtmani ko'pincha admin kuryer
+       * nomidan belgilaydi.
+       *
+       * Sotuv tranzaksiyasi ICHIDA: sotuv rollback bo'lsa yozuv ham
+       * yo'qolishi shart.
+       */
+      await this.courierPenalty.recordForOrder(queryRunner.manager, {
+        order,
+        markedAt: order.sold_at ?? Date.now(),
+        actorId: user.id,
+      });
+
+
       // === Operator earning hisoblash ===
       if (order.operator_id) {
         const operatorUser = await queryRunner.manager.findOne(UserEntity, {
@@ -3663,6 +3688,23 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         cancelled_at: Date.now(),
       });
       await queryRunner.manager.save(order);
+
+      /**
+       * KECHIKKAN BELGILASH — shtraf/bonus daftariga yozuv.
+       *
+       * ⚠️ SOYA REJIMI: pulga TEGMAYDI. Shtraf POCHTA kuryeriga yoziladi,
+       * amal qiluvchiga emas — kechikkan buyurtmani ko'pincha admin kuryer
+       * nomidan belgilaydi.
+       *
+       * Sotuv tranzaksiyasi ICHIDA: sotuv rollback bo'lsa yozuv ham
+       * yo'qolishi shart.
+       */
+      await this.courierPenalty.recordForOrder(queryRunner.manager, {
+        order,
+        markedAt: order.cancelled_at ?? Date.now(),
+        actorId: currentUser.id,
+      });
+
 
       // === MARKETPLACE: bekor qilish ===
       //
@@ -4270,6 +4312,22 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
       await queryRunner.manager.save(order);
 
+      /**
+       * KECHIKKAN BELGILASH — shtraf/bonus daftariga yozuv (qisman sotuv).
+       *
+       * ⚠️ `sold_at` yuqorida `order.sold_at ?? Date.now()` bilan
+       * qo'yiladi, ya'ni BIRINCHI belgilash vaqti saqlanadi. Shu ataylab:
+       * bir buyurtma bir necha marta qisman sotilsa, kechikish BIRINCHI
+       * harakatga qarab o'lchanadi — keyingi chaqiruvlar
+       * `UQ_CP_ENTRY_ORDER_REASON` indeksiga urilib jim o'tadi.
+       */
+      await this.courierPenalty.recordForOrder(queryRunner.manager, {
+        order,
+        markedAt: order.sold_at ?? Date.now(),
+        actorId: user.id,
+      });
+
+
       // === Operator earning hisoblash (partlySold) ===
       if (order.operator_id) {
         const operatorUserPs = await queryRunner.manager.findOne(UserEntity, {
@@ -4489,6 +4547,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           // 🧮 Eski va yangi total_price farqi — bekor qilingan summa
           const cancelledTotalPrice = oldTotalPrice - Number(price);
 
+          /**
+           * ⚠️ SHTRAF BU YERGA ULANMAYDI — ATAYLAB.
+           *
+           * Bu bola buyurtma qisman sotuvning HISOB BO'LINISHI, kuryerning
+           * alohida harakati EMAS: ayni posilka, ayni pochta, ayni kuryer.
+           * Ota buyurtma yuqorida allaqachon `late_mark` yozuvini oldi.
+           * Bu yerga ham ulansa bitta jismoniy posilka uchun shtraf IKKI
+           * MARTA yozilardi (indeks ham to'smaydi — `order_id` boshqa).
+           */
           const cancelledOrder = queryRunner.manager.create(OrderEntity, {
             user_id: order.user_id,
             customer_id: order.customer_id,

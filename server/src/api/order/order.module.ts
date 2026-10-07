@@ -25,6 +25,7 @@ import { ExternalIntegrationModule } from '../external-integration/external-inte
 import { IntegrationSyncModule } from '../integration-sync/integration-sync.module';
 import { ExtraCostModule } from '../extra-cost/extra-cost.module';
 import { MarketplaceModule } from '../marketplace/marketplace.module';
+import { CourierPenaltyModule } from '../courier-penalty/courier-penalty.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { MarketplaceModule } from '../marketplace/marketplace.module';
     ExternalIntegrationModule,
     IntegrationSyncModule,
     ExtraCostModule,
+    CourierPenaltyModule,
   ],
   controllers: [OrderController],
   providers: [

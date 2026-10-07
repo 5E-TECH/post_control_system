@@ -21,6 +21,7 @@ import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { ExternalIntegrationModule } from '../external-integration/external-integration.module';
 import { IntegrationSyncModule } from '../integration-sync/integration-sync.module';
 import { ExtraCostModule } from '../extra-cost/extra-cost.module';
+import { CourierPenaltyModule } from '../courier-penalty/courier-penalty.module';
 import { MarketplaceModule } from '../marketplace/marketplace.module';
 
 @Module({
@@ -45,6 +46,7 @@ import { MarketplaceModule } from '../marketplace/marketplace.module';
     // konstruktoridagi HAR BIR bog'liqlik shu injectorda ham topilishi kerak.
     // Aks holda NestJS ishga tushishda yiqiladi — typecheck buni ushlamaydi.
     ExtraCostModule,
+    CourierPenaltyModule,
   ],
   controllers: [DashboardController],
   providers: [
