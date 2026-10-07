@@ -13,7 +13,6 @@ import {
   Repeat,
   Megaphone,
   ScanLine,
-  PackageCheck,
   Warehouse,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
@@ -37,11 +36,6 @@ const AdminSidebar = () => {
       to: "/awaiting-market",
       icon: <Warehouse />,
       label: t("awaiting_market"),
-    },
-    {
-      to: "/handovers",
-      icon: <PackageCheck />,
-      label: t("handovers"),
     },
     {
       to: "/replacement-returns",

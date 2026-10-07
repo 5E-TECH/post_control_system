@@ -132,7 +132,6 @@ describe("i18n — koddagi kalitlar namespace'da bor", () => {
     "src/pages/mails/pages/superadmin/awaiting-market/index.tsx",
     "src/pages/mails/pages/superadmin/awaiting-market/HandoverSession.tsx",
     // Topshirilganlar tarixi (partiya ro'yxati va partiya ichi).
-    "src/pages/handovers/index.tsx",
     "src/pages/handovers/BatchList.tsx",
     "src/pages/handovers/BatchDetail.tsx",
   ];

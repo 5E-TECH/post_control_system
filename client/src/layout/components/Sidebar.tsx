@@ -11,7 +11,6 @@ import {
   Calendar1,
   Settings,
   Megaphone,
-  PackageCheck,
   Warehouse,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
@@ -35,11 +34,6 @@ const Sidebar = () => {
       to: "/awaiting-market",
       icon: <Warehouse />,
       label: t("awaiting_market"),
-    },
-    {
-      to: "/handovers",
-      icon: <PackageCheck />,
-      label: t("handovers"),
     },
     { to: "/products", icon: <Apple />, label: t("products") },
     { to: "/all-users", icon: <UserRound />, label: t("users") },

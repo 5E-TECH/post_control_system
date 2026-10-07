@@ -127,7 +127,6 @@
   "noProductName": "Nomi ko'rsatilmagan",
   "tabAwaiting": "Markazda kutilmoqda",
   "tabHistory": "Men olganlarim",
-  "historyTitle": "Topshirilgan qaytarishlar",
   "historySubtitle": "Partiya bo'yicha — market omborga bir kelib hammasini birga oladi",
   "emptyHistory": "Hozircha topshirilgan qaytarish yo'q",
   "emptyHistoryHint": "Posilkalar topshirilgach bu yerda partiya bo'lib ko'rinadi",
@@ -141,5 +140,7 @@
   "filterTo": "Tugash sanasi",
   "filterReset": "Tozalash",
   "searchBatches": "Market nomi yoki buyurtma raqami",
-  "batchOf": "{{count}} ta posilka shu partiyada"
+  "batchOf": "{{count}} ta posilka shu partiyada",
+  "tabQueue": "Market kutilmoqda",
+  "tabHandedOver": "Topshirilganlar"
 }

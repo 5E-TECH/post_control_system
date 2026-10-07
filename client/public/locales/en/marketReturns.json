@@ -127,7 +127,6 @@
   "noProductName": "Name not set",
   "tabAwaiting": "Awaiting at centre",
   "tabHistory": "What I collected",
-  "historyTitle": "Handed-over returns",
   "historySubtitle": "By batch — the market comes once and takes everything together",
   "emptyHistory": "No handed-over returns yet",
   "emptyHistoryHint": "Once parcels are handed over they appear here as batches",
@@ -141,5 +140,7 @@
   "filterTo": "To date",
   "filterReset": "Reset",
   "searchBatches": "Market name or order number",
-  "batchOf": "{{count}} parcels in this batch"
+  "batchOf": "{{count}} parcels in this batch",
+  "tabQueue": "Awaiting market",
+  "tabHandedOver": "Handed over"
 }

@@ -131,6 +131,11 @@ function BatchList({ mode }: Props) {
 
   return (
     <div>
+      {/* Partiya tushunchasi ravshan emas — bir qatorlik izoh qoladi. */}
+      <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+        {t("historySubtitle")}
+      </p>
+
       {/* ─────── Filtr ─────── */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <SearchInput
