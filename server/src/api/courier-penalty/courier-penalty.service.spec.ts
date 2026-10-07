@@ -347,3 +347,227 @@ describe('yoqilgan holat — Faza 3 gacha ogohlantiradi', () => {
     expect(inserted[0].cashbox_history_id).toBeNull();
   });
 });
+
+/**
+ * KURYER MUDDAT HISOBOTI.
+ *
+ * ⚠️ ENG MUHIM QULF: ekran va kassa BIR xil sonni ko'rsatishi kerak.
+ * Hisobot `computeCourierAdjustment` ni qayta chaqiradi — qo'lda
+ * `kun × narx` hisoblamaydi. Agar kimdir «tezlik uchun» uni qo'lda
+ * hisoblashga o'tkazsa, pol/chegara/grandfathering takrorlanib, vaqt o'tib
+ * ekran kassaga qarshi chiqardi: kuryer «menga 12 000 deb turgan edi»
+ * deyib haqli e'tiroz bildirardi.
+ */
+describe('myDeadlines — kuryer sanog‘i', () => {
+  const DEADLINE = 4;
+
+  /** Hisobot uchun kengaytirilgan manager taqlidi (xom SQL qatorlari ham). */
+  function makeReportManager(opts: {
+    rows: Array<Record<string, unknown>>;
+    courier?: Partial<UserEntity> | null;
+    config?: Partial<CourierPenaltyConfigEntity> | null;
+    rules?: Array<Partial<CourierPenaltyRuleEntity>>;
+  }) {
+    const base = makeManager({
+      courier: opts.courier,
+      config: opts.config,
+      rules: opts.rules,
+    });
+    const qb: Record<string, unknown> = {};
+    const chain = () => qb;
+    Object.assign(qb, {
+      select: chain,
+      from: chain,
+      innerJoin: chain,
+      leftJoin: chain,
+      where: chain,
+      andWhere: chain,
+      orderBy: chain,
+      getRawMany: async () => opts.rows,
+      // Yozuv yo'li uchun (bu testlarda ishlatilmaydi)
+      insert: chain,
+      into: chain,
+      values: chain,
+      orIgnore: chain,
+      returning: chain,
+      execute: async () => ({ raw: [] }),
+    });
+    (base.manager as unknown as Record<string, unknown>).createQueryBuilder =
+      () => qb;
+    return base.manager;
+  }
+
+  const row = (dispatchedDaysAgo: number, over: Record<string, unknown> = {}) => ({
+    id: `o-${dispatchedDaysAgo}`,
+    order_number: 100000 + dispatchedDaysAgo,
+    // ⚠️ SATR — xom SQL `bigint` ni shunday qaytaradi.
+    courier_tariff: '20000',
+    where_deliver: 'address',
+    post_created_at: String(T0 - dispatchedDaysAgo * DAY),
+    post_region_id: null,
+    market_name: 'Test market',
+    ...over,
+  });
+
+  it('istisno qilingan kuryerga bo‘sh hisobot', async () => {
+    const manager = makeReportManager({
+      rows: [row(10)],
+      courier: { id: COURIER_ID, penalty_exempt: true, tariff_home: 20000 },
+    });
+    const r = await service.myDeadlines(manager, COURIER_ID, T0);
+    expect(r.module.exempt).toBe(true);
+    expect(r.orders).toHaveLength(0);
+  });
+
+  it('muddat ichidagi buyurtma — qolgan kun, shtraf 0', async () => {
+    const manager = makeReportManager({
+      rows: [row(1)],
+      config: { shadow_since: T0 - 90 * DAY },
+    });
+    const r = await service.myDeadlines(manager, COURIER_ID, T0);
+    expect(r.orders).toHaveLength(1);
+    const o = r.orders[0];
+    expect(o.days_left).toBe(DEADLINE); // 5 kun oyna, 1 kun o'tdi → 4
+    expect(o.late_days).toBe(0);
+    expect(o.penalty_now).toBe(0);
+    expect(o.due_today).toBe(false);
+    // Ertaga ham hali muddat ichida
+    expect(o.penalty_tomorrow).toBe(0);
+  });
+
+  /**
+   * «Bugun muddati tugaydi» — ayni shu holat uchun ogohlantirish chiqadi.
+   * Ertaga bosilsa shtraf BOSHLANADI, shuning uchun `penalty_tomorrow`
+   * musbat bo'lishi SHART — aks holda ogohlantirishning ma'nosi yo'q.
+   */
+  it('bugun oxirgi kun — ertaga shtraf boshlanadi', async () => {
+    const manager = makeReportManager({
+      rows: [row(4)],
+      config: { shadow_since: T0 - 90 * DAY },
+    });
+    const r = await service.myDeadlines(manager, COURIER_ID, T0);
+    const o = r.orders[0];
+    expect(o.due_today).toBe(true);
+    expect(o.penalty_now).toBe(0);
+    expect(o.penalty_tomorrow).toBe(2000);
+    expect(r.summary.due_today).toBe(1);
+    expect(r.summary.penalty_tomorrow).toBe(2000);
+  });
+
+  it('kechikkan buyurtma — hozirgi va ertangi summa', async () => {
+    const manager = makeReportManager({
+      rows: [row(7)],
+      config: { shadow_since: T0 - 90 * DAY },
+    });
+    const r = await service.myDeadlines(manager, COURIER_ID, T0);
+    const o = r.orders[0];
+    expect(o.late_days).toBe(3);
+    expect(o.penalty_now).toBe(6000);
+    expect(o.penalty_tomorrow).toBe(8000);
+    expect(o.days_left).toBeNull();
+    expect(r.summary.overdue).toBe(1);
+  });
+
+  /**
+   * ⚠️ `penalty_max` — POL. Eng yomon holat tarif bilan chegaralangan,
+   * «kun × narx» cheksiz o'smaydi. Kuryerga cheksiz o'sadigan son
+   * ko'rsatilsa, u modulni jazo emas, qarz tuzog'i deb qabul qilardi.
+   */
+  it('eng yomon holat tarif bilan chegaralangan', async () => {
+    const manager = makeReportManager({
+      rows: [row(40)],
+      config: { shadow_since: T0 - 90 * DAY },
+    });
+    const r = await service.myDeadlines(manager, COURIER_ID, T0);
+    expect(r.orders[0].penalty_max).toBe(20000);
+    expect(r.orders[0].penalty_now).toBe(20000);
+    expect(r.orders[0].capped).toBe(true);
+  });
+
+  /**
+   * Grandfathering: modul yoqilishidan oldin jo'natilgan buyurtma
+   * ro'yxatda KO'RINADI (kuryer uni ko'rib turishi kerak), lekin
+   * summalari 0 va `immune` belgisi bor — «nega bunga shtraf yo'q»
+   * savoli tug'ilmasin.
+   */
+  it('modul yoqilishidan oldingi buyurtma — immune, summalar 0', async () => {
+    const manager = makeReportManager({
+      rows: [row(40)],
+      config: { shadow_since: T0 - 10 * DAY },
+    });
+    const r = await service.myDeadlines(manager, COURIER_ID, T0);
+    const o = r.orders[0];
+    expect(o.immune).toBe(true);
+    expect(o.penalty_now).toBe(0);
+    expect(o.penalty_max).toBe(0);
+    // Xulosaga ham kirmaydi
+    expect(r.summary.overdue).toBe(0);
+    expect(r.summary.penalty_max).toBe(0);
+  });
+
+  it('xulosa bir nechta buyurtmani jamlaydi', async () => {
+    const manager = makeReportManager({
+      rows: [row(1), row(4), row(7), row(9)],
+      config: { shadow_since: T0 - 90 * DAY },
+    });
+    const r = await service.myDeadlines(manager, COURIER_ID, T0);
+    expect(r.summary.pending).toBe(4);
+    expect(r.summary.due_today).toBe(1);
+    expect(r.summary.overdue).toBe(2);
+    // 3 kun × 2000 + 5 kun × 2000 = 6000 + 10000
+    expect(r.summary.penalty_now).toBe(16000);
+    // ertaga: 2000 (bugun tugaydigan) + 8000 + 12000
+    expect(r.summary.penalty_tomorrow).toBe(22000);
+  });
+
+  /** Soya rejimi klientga OCHIQ aytiladi — ekran yolg'on gapirmasin. */
+  it('soya rejimi hisobotda ko‘rinadi', async () => {
+    const manager = makeReportManager({
+      rows: [row(7)],
+      config: { is_active: false, shadow_since: T0 - 90 * DAY },
+    });
+    const r = await service.myDeadlines(manager, COURIER_ID, T0);
+    expect(r.module.active).toBe(false);
+  });
+});
+
+/**
+ * ⚠️ XOM SQL SATR TUZOG'I. `bigint`/`numeric` ustunlar `getRawMany()` dan
+ * SATR bo'lib keladi. Loyihada bu nuqson allaqachon bir marta pul
+ * hisobini buzgan — shuning uchun tur bu yerda qulflanadi.
+ */
+describe('xom SQL turlari', () => {
+  it('order_number raqam bo‘lib qaytadi, satr emas', async () => {
+    const base = makeManager({ config: { shadow_since: T0 - 90 * DAY } });
+    const qb: Record<string, unknown> = {};
+    const chain = () => qb;
+    Object.assign(qb, {
+      select: chain,
+      from: chain,
+      innerJoin: chain,
+      leftJoin: chain,
+      where: chain,
+      andWhere: chain,
+      orderBy: chain,
+      getRawMany: async () => [
+        {
+          id: 'o-1',
+          order_number: '100155',
+          courier_tariff: '20000',
+          where_deliver: 'address',
+          post_created_at: String(T0 - 7 * DAY),
+          post_region_id: null,
+          market_name: 'M',
+        },
+      ],
+    });
+    (base.manager as unknown as Record<string, unknown>).createQueryBuilder =
+      () => qb;
+
+    const r = await service.myDeadlines(base.manager, COURIER_ID, T0);
+    expect(typeof r.orders[0].order_number).toBe('number');
+    expect(r.orders[0].order_number).toBe(100155);
+    // Tarif ham raqam — chegara hisobi satr bilan buzilmasin
+    expect(r.orders[0].penalty_max).toBe(20000);
+  });
+});

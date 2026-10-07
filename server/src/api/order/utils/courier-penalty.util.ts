@@ -197,6 +197,61 @@ export function lateDaysOf(
 }
 
 /**
+ * MUDDAT HOLATI — kuryerga ko'rsatiladigan sanoq.
+ *
+ * ⚠️ NEGA ANIQ PAYT, «qolgan kun» EMAS. `lateDaysOf` o'tgan vaqtni
+ * `floor` bilan kunga aylantiradi, ya'ni shtraf AYNI bir onda boshlanadi:
+ * jo'natilgandan `(muddat + 1)` kun o'tganda. Agar kuryerga faqat «3 kun
+ * qoldi» deb ko'rsatilsa, u kunning qaysi soatida chegara o'tishini
+ * BILMASDI va «hali 3 kun bor edi» degan haqli e'tiroz tug'ilardi.
+ * Shuning uchun aniq payt ham qaytariladi — ekranda soat bilan ko'rsatish
+ * uchun.
+ *
+ * Misol (muddat 4 kun): jo'natilgan dushanba 09:00 →
+ * `penaltyStartsAt` = shanba 09:00. Juma kuni kech bosilsa ham shtraf yo'q.
+ */
+export interface DeadlineState {
+  /** Birinchi shtraf kuni AYNI shu paytda boshlanadi. */
+  penaltyStartsAt: number;
+  /** Shu paytgacha qolgan vaqt (ms). Manfiy — muddat o'tgan. */
+  msLeft: number;
+  /** Kechikkan kunlar (muddat ayirilgan). */
+  lateDays: number;
+  /** Muddat tugashiga qolgan to'liq kun; o'tgan bo'lsa `null`. */
+  daysLeft: number | null;
+  /** Bugun oxirgi kun — ya'ni ertaga shtraf boshlanadi. */
+  dueToday: boolean;
+}
+
+export function deadlineStateOf(
+  dispatchedAt: number | null | undefined,
+  now: number,
+  deadlineDays: number,
+): DeadlineState | null {
+  const from = int(dispatchedAt);
+  if (from <= 0) return null;
+
+  const deadline = Math.max(0, int(deadlineDays));
+  /**
+   * `(muddat + 1)` — chunki `lateDaysOf` `floor` ishlatadi: o'tgan vaqt
+   * ayni `muddat` kun bo'lganda kechikish hali 0. Shtraf keyingi kun
+   * to'lgandagina boshlanadi.
+   */
+  const penaltyStartsAt = from + (deadline + 1) * DAY_MS;
+  const msLeft = penaltyStartsAt - int(now);
+  const lateDays = lateDaysOf(from, now, deadline);
+
+  return {
+    penaltyStartsAt,
+    msLeft,
+    lateDays,
+    daysLeft: msLeft > 0 ? Math.floor(msLeft / DAY_MS) : null,
+    // Qolgan vaqt bir kundan kam — bugun bosilmasa ertaga shtraf.
+    dueToday: msLeft > 0 && msLeft <= DAY_MS,
+  };
+}
+
+/**
  * Bitta buyurtma uchun tuzatishni hisoblaydi.
  *
  * ⚠️ Faqat BITTA tuzatish qaytaradi: shtraf VA bonus bir vaqtda bo'la

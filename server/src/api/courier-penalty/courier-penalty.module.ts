@@ -4,13 +4,17 @@ import { CourierPenaltyConfigEntity } from 'src/core/entity/courier-penalty-conf
 import { CourierPenaltyRuleEntity } from 'src/core/entity/courier-penalty-rule.entity';
 import { CourierPenaltyEntryEntity } from 'src/core/entity/courier-penalty-entry.entity';
 import { PostEntity } from 'src/core/entity/post.entity';
+import { UserEntity } from 'src/core/entity/users.entity';
 import { CourierPenaltyService } from './courier-penalty.service';
+import { CourierPenaltyController } from './courier-penalty.controller';
+import { OrderEntity } from 'src/core/entity/order.entity';
 
 /**
  * KURYER SHTRAF / BONUS moduli.
  *
- * Faza 1: faqat `CourierPenaltyService` — belgilash oqimlari (sotuv,
- * qisman sotuv, bekor) uni chaqirib daftarga yozadi, PULGA TEGMAYDI.
+ * Faza 1: `CourierPenaltyService` — belgilash oqimlari (sotuv, qisman
+ * sotuv, bekor) uni chaqirib daftarga yozadi, PULGA TEGMAYDI.
+ * `CourierPenaltyController` — kuryerning O'Z muddat sanog'i.
  *
  * Keyingi fazalarda bu yerga admin kontrolleri (qoidalar CRUD, kechikkanlar
  * ro'yxati, shtrafni bekor qilish) va hisobot qo'shiladi.
@@ -22,8 +26,11 @@ import { CourierPenaltyService } from './courier-penalty.service';
       CourierPenaltyRuleEntity,
       CourierPenaltyEntryEntity,
       PostEntity,
+      OrderEntity,
+      UserEntity,
     ]),
   ],
+  controllers: [CourierPenaltyController],
   providers: [CourierPenaltyService],
   exports: [CourierPenaltyService],
 })

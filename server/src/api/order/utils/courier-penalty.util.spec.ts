@@ -1,5 +1,6 @@
 import {
   computeCourierAdjustment,
+  deadlineStateOf,
   CourierPenaltyCalc,
   CourierPenaltyEvent,
   CourierPenaltyScope,
@@ -312,5 +313,58 @@ describe('bonus — tez belgilash', () => {
     });
     expect(r.amount).toBe(0);
     expect(r.skipReason).toBe('before_activation');
+  });
+});
+
+/**
+ * MUDDAT SANOG'I — kuryer ekrani uchun.
+ *
+ * ⚠️ Bu yerda qulflanayotgan narsa: sanoq SHTRAF HISOBI bilan AYNI
+ * chegarani ko'rsatadi. Agar ekran «1 kun qoldi» deb turib shtraf allaqachon
+ * yozilgan bo'lsa, kuryer tizimga ishonmay qo'yadi va modul ishlamaydi.
+ */
+describe('deadlineStateOf — kuryer sanog‘i', () => {
+  it('langar yo‘q bo‘lsa null', () => {
+    expect(deadlineStateOf(null, T0, 4)).toBeNull();
+  });
+
+  it('shtraf boshlanish payti = jo‘natish + (muddat + 1) kun', () => {
+    const st = deadlineStateOf(T0, T0, 4)!;
+    expect(st.penaltyStartsAt).toBe(T0 + 5 * DAY);
+  });
+
+  /**
+   * ⚠️ ASOSIY QULF: sanoq va hisob BIR chegaradan foydalanadi.
+   * `lateDaysOf` 0 qaytargan paytda sanoq hali «muddat o'tmagan» deyishi
+   * SHART — aks holda ekran bilan kassa bir-biriga qarshi chiqardi.
+   */
+  it('sanoq va lateDaysOf AYNI chegarani ko‘rsatadi', () => {
+    // Bir ms oldin: kechikish 0, muddat hali o'tmagan
+    const before = T0 + 5 * DAY - 1;
+    expect(lateDaysOf(T0, before, 4)).toBe(0);
+    expect(deadlineStateOf(T0, before, 4)!.msLeft).toBeGreaterThan(0);
+
+    // Ayni chegarada: kechikish 1, muddat o'tgan
+    const at = T0 + 5 * DAY;
+    expect(lateDaysOf(T0, at, 4)).toBe(1);
+    expect(deadlineStateOf(T0, at, 4)!.msLeft).toBeLessThanOrEqual(0);
+  });
+
+  it('qolgan to‘liq kunlar', () => {
+    expect(deadlineStateOf(T0, T0, 4)!.daysLeft).toBe(5);
+    expect(deadlineStateOf(T0, T0 + 3 * DAY, 4)!.daysLeft).toBe(2);
+  });
+
+  it('muddat o‘tgan bo‘lsa daysLeft null, lateDays musbat', () => {
+    const st = deadlineStateOf(T0, T0 + 7 * DAY, 4)!;
+    expect(st.daysLeft).toBeNull();
+    expect(st.lateDays).toBe(3);
+  });
+
+  /** «Bugun muddati tugaydi» — oxirgi sutka ichida. */
+  it('dueToday faqat oxirgi sutkada', () => {
+    expect(deadlineStateOf(T0, T0 + 4 * DAY, 4)!.dueToday).toBe(true);
+    expect(deadlineStateOf(T0, T0 + 3 * DAY, 4)!.dueToday).toBe(false);
+    expect(deadlineStateOf(T0, T0 + 6 * DAY, 4)!.dueToday).toBe(false);
   });
 });

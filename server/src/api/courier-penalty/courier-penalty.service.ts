@@ -9,9 +9,17 @@ import { OrderEntity } from 'src/core/entity/order.entity';
 import { Where_deliver } from 'src/common/enums';
 import {
   computeCourierAdjustment,
+  CourierPenaltyEvent,
+  deadlineStateOf,
+  pickRule,
   type PenaltyResult,
   type PenaltyRule,
 } from '../order/utils/courier-penalty.util';
+import { Order_status } from 'src/common/enums';
+import type {
+  CourierDeadlineReport,
+  CourierDeadlineRow,
+} from './courier-penalty.types';
 
 /**
  * KURYER SHTRAF / BONUS — DAFTARGA YOZUVCHI SERVIS.
@@ -164,6 +172,198 @@ export class CourierPenaltyService {
     }
 
     return this.writeEntry(manager, order.id, courier.id, result, params.actorId);
+  }
+
+
+  /**
+   * KURYERNING O'Z MUDDATLARI — ekrandagi sanoq va ogohlantirish.
+   *
+   * ⚠️ NEGA SHTRAF HISOBINI QAYTA CHAQIRADI. «Qancha shtraf bo'lishi
+   * mumkin» sonini bu yerda qo'lda hisoblash (kun × narx) oson edi, lekin
+   * u pol, qoida chegarasi, qamrov aniqligi va grandfathering darvozasini
+   * TAKRORLASHNI talab qilardi. Ikki nusxa vaqt o'tib ajralib ketadi va
+   * ekran kassaga qarshi chiqadi — kuryer «menga 12 000 deb turgan edi»
+   * deb haqli e'tiroz bildirardi. Shuning uchun AYNI
+   * `computeCourierAdjustment` ikki marta chaqiriladi: hozirga va ertaga.
+   *
+   * Qaytaradi: modul holati, umumiy xulosa va har buyurtma uchun sanoq.
+   */
+  async myDeadlines(
+    manager: EntityManager,
+    courierId: string,
+    now = Date.now(),
+  ): Promise<CourierDeadlineReport> {
+    const courier = await manager.findOne(UserEntity, {
+      where: { id: courierId },
+      select: [
+        'id',
+        'external_provider',
+        'penalty_exempt',
+        'region_id',
+        'tariff_center',
+        'tariff_home',
+      ],
+    });
+
+    const exempt = !!courier?.external_provider || !!courier?.penalty_exempt;
+    const [config, rules] = await Promise.all([
+      this.loadConfig(manager),
+      this.loadRules(manager),
+    ]);
+
+    const empty: CourierDeadlineReport = {
+      module: {
+        /** `false` — soya: sanoq ko'rinadi, pul YECHILMAYDI. */
+        active: !!config?.is_active,
+        exempt,
+      },
+      summary: {
+        pending: 0,
+        due_today: 0,
+        overdue: 0,
+        penalty_now: 0,
+        penalty_tomorrow: 0,
+        penalty_max: 0,
+      },
+      orders: [],
+    };
+    if (!courier || exempt) return empty;
+
+    /**
+     * Kuryerning HAL QILINMAGAN buyurtmalari — `allCouriersOrdersCounts`
+     * dagi «waiting» ta'rifi bilan AYNI: o'z pochtalaridagi `waiting`
+     * holatdagilar. Shtraf ham aynan shu holatdan chiqishda yoziladi.
+     *
+     * ⚠️ Pochta QABUL QILINGANI tekshirilmaydi — soat jo'natilganda
+     * boshlanadi (qulflangan qaror). Aks holda kuryer pochtani kech qabul
+     * qilib sanoqni kechiktirardi.
+     */
+    const rows: Array<{
+      id: string;
+      order_number: number | null;
+      courier_tariff: string | null;
+      where_deliver: string;
+      post_created_at: string;
+      post_region_id: string | null;
+      market_name: string | null;
+    }> = await manager
+      .createQueryBuilder()
+      .select([
+        'o.id AS id',
+        'o.order_number AS order_number',
+        'o.courier_tariff AS courier_tariff',
+        'o.where_deliver AS where_deliver',
+        'p.created_at AS post_created_at',
+        'p.region_id AS post_region_id',
+        'm.name AS market_name',
+      ])
+      .from(OrderEntity, 'o')
+      .innerJoin(PostEntity, 'p', 'p.id = o.post_id')
+      .leftJoin(UserEntity, 'm', 'm.id = o.user_id')
+      .where('p.courier_id = :courierId', { courierId })
+      .andWhere('o.status = :st', { st: Order_status.WAITING })
+      .andWhere('o.deleted_at IS NULL')
+      .orderBy('p.created_at', 'ASC')
+      .getRawMany();
+
+    const activatedAt = config?.activated_at ?? config?.shadow_since ?? null;
+    const orders: CourierDeadlineRow[] = [];
+
+    for (const r of rows) {
+      /**
+       * ⚠️ `numeric`/`bigint` xom SQL'dan SATR bo'lib keladi — `Number()`
+       * shart, aks holda `'1790' + 1` = `'17901'` bo'lib sanoq buzilardi.
+       */
+      const dispatchedAt = Number(r.post_created_at);
+      const baseTariff = this.baseTariffOf(
+        {
+          courier_tariff:
+            r.courier_tariff == null ? null : Number(r.courier_tariff),
+          where_deliver: r.where_deliver as never,
+        },
+        courier,
+      );
+      const regionId = r.post_region_id ?? courier.region_id ?? null;
+
+      // Qaysi muddat amal qiladi — qamrov aniqligi bilan (uzoq hudud 7 kun).
+      const rule = pickRule(
+        rules,
+        CourierPenaltyEvent.LATE_MARK,
+        now,
+        courierId,
+        regionId,
+      );
+      const state = deadlineStateOf(
+        dispatchedAt,
+        now,
+        rule?.threshold_days ?? 0,
+      );
+      if (!rule || !state) continue;
+
+      const common = {
+        baseTariff,
+        courierId,
+        regionId,
+        rules,
+        activatedAt,
+        dispatchedAt,
+      };
+      const nowResult = computeCourierAdjustment({ ...common, markedAt: now });
+      const tomorrow = computeCourierAdjustment({
+        ...common,
+        markedAt: now + 86_400_000,
+      });
+
+      /**
+       * Grandfathering darvozasi yopiq bo'lsa (modul yoqilishidan oldin
+       * jo'natilgan) — bu buyurtma umuman shtrafga tushmaydi. Ro'yxatda
+       * ko'rsatamiz, lekin summalari 0 va `immune` belgisi bilan: kuryer
+       * «nega bunga shtraf yo'q» deb hayron bo'lmasin.
+       */
+      const immune = nowResult.skipReason === 'before_activation';
+
+      orders.push({
+        id: r.id,
+        /**
+         * ⚠️ `bigint` xom SQL'dan SATR bo'lib keladi. Klient uni raqam deb
+         * ishlatadi (tartiblash, solishtirish) — satr qolsa `'100155' + 1`
+         * `'1001551'` bo'lib ketardi.
+         */
+        order_number: r.order_number == null ? null : Number(r.order_number),
+        market_name: r.market_name,
+        dispatched_at: dispatchedAt,
+        deadline_at: state.penaltyStartsAt,
+        deadline_days: rule.threshold_days,
+        ms_left: state.msLeft,
+        days_left: state.daysLeft,
+        late_days: state.lateDays,
+        due_today: state.dueToday,
+        penalty_now: nowResult.amount,
+        penalty_tomorrow: tomorrow.amount,
+        // Eng yomon holat — pol: shtraf tarifdan oshmaydi.
+        penalty_max: immune ? 0 : baseTariff,
+        capped: nowResult.cappedByTariff,
+        immune,
+      });
+    }
+
+    return {
+      module: empty.module,
+      summary: {
+        pending: orders.length,
+        due_today: orders.filter((o) => o.due_today && !o.immune).length,
+        overdue: orders.filter((o) => o.late_days > 0 && !o.immune).length,
+        penalty_now: orders.reduce((a, o) => a + o.penalty_now, 0),
+        penalty_tomorrow: orders.reduce((a, o) => a + o.penalty_tomorrow, 0),
+        /**
+         * Eng yomon holat — faqat SHTRAFGA TUSHA OLADIGAN buyurtmalar
+         * tariflari yig'indisi. `immune` lar qo'shilmaydi, aks holda son
+         * hech qachon yetib bo'lmaydigan darajada katta ko'rinardi.
+         */
+        penalty_max: orders.reduce((a, o) => a + o.penalty_max, 0),
+      },
+      orders,
+    };
   }
 
   /**
