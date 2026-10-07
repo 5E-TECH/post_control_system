@@ -125,8 +125,8 @@
   "productsHint": "Какой товар отменён и лежит в центре",
   "moreProducts": "+{{count}}",
   "noProductName": "Название не указано",
-  "tabAwaiting": "Ожидают в центре",
-  "tabHistory": "Мои получения",
+  "tabAwaiting": "В центре",
+  "tabHistory": "Полученные",
   "historySubtitle": "По партиям — маркет приезжает раз и забирает всё сразу",
   "emptyHistory": "Переданных возвратов пока нет",
   "emptyHistoryHint": "После передачи посылки появятся здесь партиями",
@@ -141,6 +141,9 @@
   "filterReset": "Сбросить",
   "searchBatches": "Название маркета или номер заказа",
   "batchOf": "{{count}} посылок в этой партии",
-  "tabQueue": "Ожидает маркет",
-  "tabHandedOver": "Переданные"
+  "tabQueue": "Ожидают",
+  "tabHandedOver": "Переданные",
+  "scannedBlock": "Отсканировано ({{count}})",
+  "scannedBlockHint": "Отсканированные уходят из списка — сразу видно, сколько осталось",
+  "undoScan": "Вернуть"
 }

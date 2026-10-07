@@ -154,7 +154,9 @@ function AwaitingMarket() {
             key={key}
             type="button"
             onClick={() => setTab(key)}
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+            // ⚠️ `whitespace-nowrap` — uzun nom ikkinchi qatorga tushib,
+            // tab paneli qalinlashib ketardi.
+            className={`flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-all ${
               tab === key
                 ? "bg-white text-purple-700 shadow-sm dark:bg-[#3d3759] dark:text-purple-300"
                 : "text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"

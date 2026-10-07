@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
+  ChevronDown,
   FileSignature,
   FileText,
   KeyRound,
@@ -42,6 +43,9 @@ import {
   useMarketQrScanner,
 } from "../../../../../shared/hooks/useMarketQrScanner";
 import { formatPhone } from "../../../../../shared/helpers/formatPhone";
+import ScanFeedback, {
+  type ScanFeedbackState,
+} from "../../../../../shared/components/scan-feedback";
 import { summarizeProducts } from "../../../../../shared/lib/orderProducts";
 import PinInput from "../../../../../shared/components/pin-input";
 import { normalizeQrToken } from "../../../../../shared/helpers/normalizeQrToken";
@@ -159,6 +163,31 @@ function HandoverSession() {
   // va pastdagi `manifest` useMemo'sini har renderda qayta hisoblashga
   // majburlardi (200 posilkada sezilarli).
   const orders = useMemo(() => data?.orders ?? [], [data]);
+
+  /**
+   * RO'YXATDA FAQAT HALI SKANERLANMAGANLAR.
+   *
+   * ⚠️ NEGA. Xodim qo'lida 150 posilka bor va har birini o'qitadi.
+   * Skanerlangani ro'yxatda QOLSA, u har safar «qaysinisini
+   * o'qitdim?» deb butun ro'yxatni ko'zdan kechirishga majbur bo'ladi
+   * — aynan shu sabab posilkalar ikki marta o'qitilardi. `today-orders`
+   * da bu masala allaqachon shunday hal qilingan: topilgani ro'yxatdan
+   * CHIQIB KETADI va qolgani KAMAYIB boradi, ya'ni ro'yxat uzunligi
+   * «yana nechta qoldi» degan javobga aylanadi.
+   *
+   * ⚠️ QO'LDA belgilangan (yorlig'i yirtilgan) qatorlar QOLADI: ularda
+   * sabab tanlash majburiy va u ko'rinib turishi kerak.
+   */
+  const pending = useMemo(
+    () => orders.filter((o) => !scannedIds.has(o.id)),
+    [orders, scannedIds],
+  );
+  const scanned = useMemo(
+    () => orders.filter((o) => scannedIds.has(o.id)),
+    [orders, scannedIds],
+  );
+  /** Skanerlanganlar bloki ochiqmi (tekshirib ko'rish uchun). */
+  const [showScanned, setShowScanned] = useState(false);
   const total = Number(data?.total ?? 0);
 
   // ─────────────────── Ruxsat oynasi va heartbeat ───────────────────
@@ -268,6 +297,7 @@ function HandoverSession() {
             setAuth(res);
             setPin("");
             setHandedInSession(0);
+            flashMarket("info", t("toastConsentOpened"));
             handleSuccess(t("toastConsentOpened"), t("toastScanParcels"));
           },
           onError: (err) => {
@@ -279,6 +309,7 @@ function HandoverSession() {
              * chegarasini bekorga yeyardi.
              */
             setPin("");
+            flashMarket("error", t("toastConsentFailedScan"));
             handleApiError(err, t("toastConsentFailedScan"));
           },
         },
@@ -289,14 +320,35 @@ function HandoverSession() {
   );
 
   /**
+   * MARKET QR SKANERI JAVOBI — KO'K.
+   *
+   * ⚠️ Posilka skanidan RANG bilan ajratiladi: market ruxsati butunlay
+   * BOSHQA turdagi hodisa (sessiya ochiladi), yashil bo'lsa xodim uni
+   * «yana bitta posilka topildi» deb o'qirdi.
+   */
+  const [marketFeedback, setMarketFeedback] = useState<ScanFeedbackState>({
+    show: false,
+    type: "info",
+  });
+  const flashMarket = useCallback(
+    (type: ScanFeedbackState["type"], message: string) => {
+      setMarketFeedback({ show: true, type, message });
+      setTimeout(() => setMarketFeedback({ show: false, type }), 900);
+    },
+    [],
+  );
+
+  /**
    * MARKET QR SKANERI — sahifaga kirgan zahoti aktiv, TUGMA YO'Q.
    * Faqat ruxsat ochilmagan paytda ishlaydi.
    */
   useMarketQrScanner({
     enabled: !auth && !scan.isPending,
     onMarketToken: (token) => authorize({ qr_token: token }),
-    onForeignToken: () =>
-      handleWarning(t("toastNotMarketQrTitle"), t("toastNotMarketQrBody")),
+    onForeignToken: () => {
+      flashMarket("error", t("toastNotMarketQrTitle"));
+      handleWarning(t("toastNotMarketQrTitle"), t("toastNotMarketQrBody"));
+    },
   });
 
   // ─────────────────────── Posilka skaneri ───────────────────────
@@ -598,20 +650,19 @@ function HandoverSession() {
           </Button>
         </div>
       )}
-      {/* ─────── Skaner javobi ─────── */}
-      {visualFeedback.show && (
-        <div
-          className={`mb-3 rounded-lg px-3 py-2 text-sm font-semibold ${
-            visualFeedback.type === "success"
-              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-              : visualFeedback.type === "warning"
-                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-                : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-          }`}
-        >
-          {visualFeedback.message}
-        </div>
-      )}
+      {/*
+        ─────── Skaner javobi — BUTUN EKRANLI ───────
+
+        ⚠️ Avval bu ro'yxat tepasidagi kichik rangli qator edi va xodim
+        uni KO'RMASDI: skanerlaganda ko'z POSILKADA bo'ladi, ekranda
+        emas. Natijada ayni yorliq ikki marta o'qitilardi yoki o'tkazib
+        yuborilardi. `today-orders` / `courier-bulk` naqshi bo'yicha
+        butun ekranli overlay — rang masofadan ham ko'rinadi.
+
+        ko'k = market ruxsati ochildi · yashil = posilka topildi
+        sariq = allaqachon skanerlangan · qizil = topilmadi/xato
+      */}
+      <ScanFeedback state={marketFeedback.show ? marketFeedback : visualFeedback} />
 
       {/* ─────── Ro'yxat sarlavhasi ─────── */}
       <div className="mb-2 flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
@@ -642,6 +693,59 @@ function HandoverSession() {
         )}
       </div>
 
+      {/* ─────── Skanerlanganlar (yig'iladigan) ─────── */}
+      {/*
+        ⚠️ O'CHIRILMAYDI, YASHIRILADI. Xodim topshirishdan oldin
+        «nimani o'qitdim?» deb tekshira olishi kerak va xato skanni
+        qaytara olishi shart — aks holda butun tanlovni tozalashdan
+        boshqa yo'l qolmasdi.
+      */}
+      {scanned.length > 0 && (
+        <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-900/10">
+          <button
+            type="button"
+            onClick={() => setShowScanned((v) => !v)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left"
+            title={t("scannedBlockHint")}
+          >
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+            <span className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+              {t("scannedBlock", { count: scanned.length })}
+            </span>
+            <ChevronDown
+              className={`ml-auto h-4 w-4 text-emerald-700 transition-transform ${
+                showScanned ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+
+          {showScanned && (
+            <ul className="m-0 max-h-56 list-none overflow-y-auto border-t border-emerald-200 px-3 py-2 dark:border-emerald-900/40">
+              {scanned.map((o) => (
+                <li
+                  key={o.id}
+                  className="flex items-center gap-2 py-1 text-sm"
+                >
+                  <span className="tabular-nums text-gray-500 dark:text-gray-400">
+                    #{o.order_number}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-gray-800 dark:text-gray-200">
+                    {o.customer_name || "—"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => toggle(o.id)}
+                    className="shrink-0 text-xs text-gray-400 underline hover:text-red-600"
+                  >
+                    {t("undoScan")}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* ─────── Posilkalar ─────── */}
       {/*
         Ko'rinish loyihaning ro'yxat naqshini ko'chiradi: mobilda karta
@@ -656,7 +760,7 @@ function HandoverSession() {
       <div className="block space-y-2 lg:hidden">
         {isLoading ? (
           [...Array(4)].map((_, i) => <MobileCardSkeleton key={i} />)
-        ) : orders.length === 0 ? (
+        ) : pending.length === 0 ? (
           <div className="rounded-xl bg-white py-12 text-center dark:bg-[#2A263D]">
             <ShieldCheck className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
             <p className="m-0 font-semibold text-gray-700 dark:text-gray-200">
@@ -664,7 +768,7 @@ function HandoverSession() {
             </p>
           </div>
         ) : (
-          orders.map((o) => {
+          pending.map((o) => {
             const checked = selectedIds.includes(o.id);
             const manual = checked && !scannedIds.has(o.id);
             return (
@@ -846,7 +950,7 @@ function HandoverSession() {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {isLoading ? (
                 [...Array(8)].map((_, i) => <TableRowSkeleton key={i} />)
-              ) : orders.length === 0 ? (
+              ) : pending.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-12 text-center">
                     <ShieldCheck className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
@@ -856,7 +960,7 @@ function HandoverSession() {
                   </td>
                 </tr>
               ) : (
-                orders.map((o, index) => {
+                pending.map((o, index) => {
                   const checked = selectedIds.includes(o.id);
                   const manual = checked && !scannedIds.has(o.id);
                   return (

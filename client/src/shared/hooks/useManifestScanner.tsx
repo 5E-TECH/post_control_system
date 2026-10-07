@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { normalizeQrToken } from "../helpers/normalizeQrToken";
 import { isTextEntryTarget } from "../helpers/isTextEntryTarget";
+import type { ScanFeedbackState } from "../components/scan-feedback";
 
 const BASE_URL = import.meta.env.BASE_URL || "/";
 
@@ -68,11 +69,12 @@ const playError = () => {
 };
 
 // ============ TYPES ============
-export interface VisualFeedback {
-  show: boolean;
-  type: "success" | "error" | "warning";
-  message?: string;
-}
+/**
+ * ⚠️ Tip overlay komponentidan OLINADI — ikki joyda alohida e'lon
+ * qilinsa ular ajrab ketardi (`info` toni qo'shilganda aynan shu xavf
+ * bor edi).
+ */
+export type VisualFeedback = ScanFeedbackState;
 
 export interface UseManifestScannerParams {
   /**

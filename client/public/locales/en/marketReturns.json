@@ -125,8 +125,8 @@
   "productsHint": "Which product was cancelled and is at the centre",
   "moreProducts": "+{{count}}",
   "noProductName": "Name not set",
-  "tabAwaiting": "Awaiting at centre",
-  "tabHistory": "What I collected",
+  "tabAwaiting": "At centre",
+  "tabHistory": "Collected",
   "historySubtitle": "By batch — the market comes once and takes everything together",
   "emptyHistory": "No handed-over returns yet",
   "emptyHistoryHint": "Once parcels are handed over they appear here as batches",
@@ -141,6 +141,9 @@
   "filterReset": "Reset",
   "searchBatches": "Market name or order number",
   "batchOf": "{{count}} parcels in this batch",
-  "tabQueue": "Awaiting market",
-  "tabHandedOver": "Handed over"
+  "tabQueue": "Awaiting",
+  "tabHandedOver": "Handed over",
+  "scannedBlock": "Scanned ({{count}})",
+  "scannedBlockHint": "Scanned ones leave the list — what remains is what's left",
+  "undoScan": "Undo"
 }
