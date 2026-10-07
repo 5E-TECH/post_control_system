@@ -134,6 +134,7 @@ describe("i18n — koddagi kalitlar namespace'da bor", () => {
     // Topshirilganlar tarixi (partiya ro'yxati va partiya ichi).
     "src/pages/handovers/BatchList.tsx",
     "src/pages/handovers/BatchDetail.tsx",
+    "src/pages/handovers/OrderEvidenceModal.tsx",
   ];
 
   const marketReturns = read(BASE, "marketReturns.json");
@@ -154,7 +155,12 @@ describe("i18n — koddagi kalitlar namespace'da bor", () => {
    * faqat yorlig'i — `MANUAL_OVERRIDE_REASON_KEYS` xaritasi bilan. Shu
    * fayldagi xom satr kalitlari ham "ishlatilgan" hisoblanadi.
    */
-  const indirect = ["src/shared/api/hooks/useMarketHandover/index.ts"];
+  const indirect = [
+    "src/shared/api/hooks/useMarketHandover/index.ts",
+    // `MODE_KEY` xaritasi orqali: `t(MODE_KEY[mode])` — `t("...")`
+    // shaklida emas, shuning uchun yuqoridagi skan ularni ko'rmaydi.
+    "src/pages/handovers/OrderEvidenceModal.tsx",
+  ];
 
   it("namespace'da ISHLATILMAYDIGAN kalit qolmadi", () => {
     const used = new Set<string>();

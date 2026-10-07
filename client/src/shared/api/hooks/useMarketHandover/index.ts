@@ -186,17 +186,36 @@ export interface HandoverBatchesPage {
   total_batches: number;
 }
 
+/**
+ * Partiya ichidagi posilka — TOPSHIRISH DALILI bilan.
+ *
+ * ⚠️ `market_handover_override_reason` NULL bo'lsa yorliq
+ * SKANERLANGAN; qiymat bo'lsa xodim uni QO'LDA belgilagan (yorliq
+ * o'qilmagan). Bu `mode` dan ALOHIDA fakt: sessiya market QR'i bilan
+ * ochilgan bo'lsa ham ayrim posilkalar yorliqsiz o'tishi mumkin.
+ */
+export interface HandoverBatchOrder extends AwaitingOrder {
+  market_handover_at: number | null;
+  market_handover_mode: string | null;
+  market_handover_override_reason: string | null;
+  market_handover_by: string | null;
+  market_handover_by_name: string | null;
+  center_received_by: string | null;
+  center_received_by_name: string | null;
+}
+
 export interface HandoverBatchDetail {
   session: {
     session_id: string;
     channel: string | null;
+    /** Market QR'ini skanerlagan (sessiyani ochgan) xodim. */
+    opened_by_name: string | null;
+    closed_at: number | null;
     representative_name: string | null;
     representative_phone: string | null;
     override_reason: string | null;
   };
-  orders: Array<
-    AwaitingOrder & { market_handover_at: number | null; market_handover_mode: string | null }
-  >;
+  orders: HandoverBatchOrder[];
   total: number;
   total_price: number;
 }

@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Empty } from "antd";
 import { useTranslation } from "react-i18next";
@@ -15,6 +15,8 @@ import { formatPhone } from "../../shared/helpers/formatPhone";
 import { formatMoment } from "../../shared/lib/returnStage";
 import { summarizeProducts } from "../../shared/lib/orderProducts";
 import ReplacementBadge from "../../shared/components/replacement-badge";
+import OrderEvidenceModal from "./OrderEvidenceModal";
+import type { HandoverBatchOrder } from "../../shared/api/hooks/useMarketHandover";
 
 const money = (n: number) => `${Number(n || 0).toLocaleString()} so'm`;
 
@@ -44,6 +46,14 @@ function BatchDetail() {
   const { data, isLoading } = getHandoverBatch(sessionId);
 
   const orders = data?.orders ?? [];
+  /**
+   * Bosilgan posilka — to'liq DALIL oynasi uchun.
+   *
+   * ⚠️ Qatorga hammasi sig'maydi, lekin bahs chiqqanda aynan shu
+   * savollar so'raladi: QANDAY topshirildi, KIM topshirdi, KIM markazga
+   * qabul qilgan edi.
+   */
+  const [picked, setPicked] = useState<HandoverBatchOrder | null>(null);
   const session = data?.session;
 
   return (
@@ -118,9 +128,11 @@ function BatchDetail() {
           orders.map((o) => {
             const p = summarizeProducts(o.items, o.product_quantity);
             return (
-              <div
+              <button
                 key={o.id}
-                className="rounded-xl bg-white p-4 shadow-sm dark:bg-[#2A263D]"
+                type="button"
+                onClick={() => setPicked(o)}
+                className="w-full rounded-xl bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.99] dark:bg-[#2A263D]"
               >
                 <div className="min-w-0">
                   <div className="truncate text-base font-bold text-gray-800 dark:text-white">
@@ -164,7 +176,7 @@ function BatchDetail() {
                   </span>
                 </div>
                 <ReplacementBadge order={o} className="mt-1.5" />
-              </div>
+              </button>
             );
           })
         )}
@@ -214,7 +226,8 @@ function BatchDetail() {
                   return (
                     <tr
                       key={o.id}
-                      className="transition-colors hover:bg-purple-50 dark:hover:bg-[#3d3759]"
+                      onClick={() => setPicked(o)}
+                      className="cursor-pointer transition-colors hover:bg-purple-50 dark:hover:bg-[#3d3759]"
                     >
                       <td className="px-4 py-4 text-sm tabular-nums text-gray-500 dark:text-gray-400">
                         {index + 1}
@@ -230,7 +243,10 @@ function BatchDetail() {
                           <ReplacementBadge order={o} className="mt-0.5" />
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-4">
+                      <td
+                        className="whitespace-nowrap px-4 py-4"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {o.customer_phone ? (
                           <a
                             href={`tel:${o.customer_phone}`}
@@ -298,6 +314,12 @@ function BatchDetail() {
           </table>
         </div>
       </div>
+
+      <OrderEvidenceModal
+        order={picked}
+        session={session}
+        onClose={() => setPicked(null)}
+      />
     </div>
   );
 }

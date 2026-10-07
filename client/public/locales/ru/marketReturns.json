@@ -143,5 +143,20 @@
   "manualNeedsReason": "Сначала выберите причину",
   "clearSelection": "Сбросить выбор",
   "selectedCount": "выбрано: {{count}}",
-  "reasonNeededCount": "для {{count}} посылок нужна причина"
+  "reasonNeededCount": "для {{count}} посылок нужна причина",
+  "orderDetailTitle": "Данные посылки",
+  "wayLabel": "Как передана",
+  "wayScanned": "Этикетка отсканирована",
+  "wayManual": "Отмечено вручную",
+  "handedBy": "Передал сотрудник",
+  "centerReceivedBy": "Принял в центре",
+  "sessionOpenedBy": "Открыл доступ",
+  "orderComment": "Комментарий",
+  "modeMarketWeb": "Маркет показал QR/PIN",
+  "modeOfflineSigned": "Офлайн-акт (представитель)",
+  "modeAdminOverride": "Решение админа",
+  "modePartnerAuto": "Партнёр автоматически",
+  "productsLabel": "Товары",
+  "representative": "Представитель",
+  "colOrder": "Заказ"
 }

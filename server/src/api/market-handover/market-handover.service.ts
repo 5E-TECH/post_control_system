@@ -729,6 +729,7 @@ export class MarketHandoverService {
           mode: MarketHandoverMode.MARKET_WEB,
           sessionId: session.id,
           actorId: String(user.id),
+          overrideReason: overrides.get(order.id) ?? null,
         });
       }
 
@@ -908,6 +909,8 @@ export class MarketHandoverService {
       mode: MarketHandoverMode;
       sessionId: string;
       actorId: string;
+      /** Yorliq o'qilmagani uchun qo'lda belgilangan bo'lsa — sabab. */
+      overrideReason?: string | null;
     },
   ): Promise<void> {
     const patch: QueryDeepPartialEntity<OrderEntity> = {
@@ -915,6 +918,10 @@ export class MarketHandoverService {
       market_handover_by: ctx.actorId,
       market_handover_mode: ctx.mode,
       market_handover_session_id: ctx.sessionId,
+      // ⚠️ NULL = yorliq skanerlangan. Chetlab o'tish AYNAN shu yerda
+      // qayd etiladi — avval u faqat `activity_log` matnida qolardi va
+      // buyurtmaga qarab bilib bo'lmasdi.
+      market_handover_override_reason: ctx.overrideReason ?? null,
     };
 
     if (order.is_replacement_return) {
@@ -1421,11 +1428,44 @@ export class MarketHandoverService {
     });
     const itemMap = await this.itemsByOrder(orders.map((o) => o.id));
 
+    /**
+     * XODIM ISMLARI — bitta ikkinchi so'rovda.
+     *
+     * ⚠️ `leftJoinAndSelect` ATAYLAB emas: `users` qatori parol hashi va
+     * tokenlarni ham olib kelardi. Bu yerda faqat ISM kerak.
+     *
+     * Uch xil aktyor bo'lishi mumkin: markazga qabul qilgan, marketga
+     * topshirgan va sessiyani ochgan xodim — ular har doim ham bir
+     * odam emas (smena almashishi mumkin).
+     */
+    const actorIds = Array.from(
+      new Set(
+        [
+          ...orders.map((o) => o.center_received_by),
+          ...orders.map((o) => o.market_handover_by),
+          session?.scanned_by_user_id ?? null,
+        ].filter((v): v is string => Boolean(v)),
+      ),
+    );
+    const actorNames = new Map<string, string>();
+    if (actorIds.length) {
+      const rows = await this.userRepo.find({
+        where: { id: In(actorIds) },
+        select: ['id', 'name', 'phone_number'],
+      });
+      for (const u of rows) actorNames.set(String(u.id), u.name ?? '—');
+    }
+
     return successRes(
       {
         session: {
           session_id: sessionId,
           channel: session?.channel ?? null,
+          /** Sessiyani ochgan (market QR'ini skanerlagan) xodim. */
+          opened_by_name: session?.scanned_by_user_id
+            ? (actorNames.get(String(session.scanned_by_user_id)) ?? null)
+            : null,
+          closed_at: session?.closed_at ?? null,
           representative_name: session?.representative_name ?? null,
           representative_phone: session?.representative_phone ?? null,
           override_reason: session?.override_reason ?? null,
@@ -1438,6 +1478,22 @@ export class MarketHandoverService {
           center_received_at: o.center_received_at,
           market_handover_at: o.market_handover_at,
           market_handover_mode: o.market_handover_mode,
+          /**
+           * TOPSHIRISH DALILI — partiya ichidagi oynada to'liq ko'rinadi.
+           *
+           * `override_reason` NULL bo'lsa yorliq SKANERLANGAN; qiymat
+           * bo'lsa xodim uni qo'lda belgilagan (yorliq o'qilmagan).
+           */
+          market_handover_override_reason:
+            o.market_handover_override_reason ?? null,
+          market_handover_by: o.market_handover_by,
+          market_handover_by_name: o.market_handover_by
+            ? (actorNames.get(String(o.market_handover_by)) ?? null)
+            : null,
+          center_received_by: o.center_received_by,
+          center_received_by_name: o.center_received_by
+            ? (actorNames.get(String(o.center_received_by)) ?? null)
+            : null,
           customer_name: o.customer?.name ?? null,
           customer_phone: o.customer?.phone_number ?? null,
           district_name: o.district?.name ?? null,

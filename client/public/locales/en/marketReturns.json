@@ -143,5 +143,20 @@
   "manualNeedsReason": "Pick a reason first",
   "clearSelection": "Clear selection",
   "selectedCount": "{{count}} selected",
-  "reasonNeededCount": "{{count}} parcels need a reason"
+  "reasonNeededCount": "{{count}} parcels need a reason",
+  "orderDetailTitle": "Parcel details",
+  "wayLabel": "How it was handed over",
+  "wayScanned": "Label scanned",
+  "wayManual": "Marked manually",
+  "handedBy": "Handed over by",
+  "centerReceivedBy": "Received at centre by",
+  "sessionOpenedBy": "Authorization opened by",
+  "orderComment": "Comment",
+  "modeMarketWeb": "Market showed QR/PIN",
+  "modeOfflineSigned": "Offline act (representative)",
+  "modeAdminOverride": "Admin decision",
+  "modePartnerAuto": "Partner automatic",
+  "productsLabel": "Products",
+  "representative": "Representative",
+  "colOrder": "Order"
 }

@@ -143,5 +143,20 @@
   "manualNeedsReason": "Avval sababni tanlang",
   "clearSelection": "Tanlovni tozalash",
   "selectedCount": "{{count}} ta tanlandi",
-  "reasonNeededCount": "{{count}} ta posilka uchun sabab kerak"
+  "reasonNeededCount": "{{count}} ta posilka uchun sabab kerak",
+  "orderDetailTitle": "Posilka ma'lumoti",
+  "wayLabel": "Qanday topshirildi",
+  "wayScanned": "Yorliq skanerlandi",
+  "wayManual": "Qo'lda belgilangan",
+  "handedBy": "Topshirgan xodim",
+  "centerReceivedBy": "Markazga qabul qilgan",
+  "sessionOpenedBy": "Ruxsatni ochgan",
+  "orderComment": "Izoh",
+  "modeMarketWeb": "Market QR/PIN ko'rsatdi",
+  "modeOfflineSigned": "Offline akt (vakil)",
+  "modeAdminOverride": "Admin qarori",
+  "modePartnerAuto": "Hamkor avtomatik",
+  "productsLabel": "Mahsulotlar",
+  "representative": "Vakil",
+  "colOrder": "Buyurtma"
 }

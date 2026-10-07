@@ -302,6 +302,17 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   market_handover_session_id: string | null;
 
+  /**
+   * Yorliq o'qilmagani uchun QO'LDA belgilangan bo'lsa — YOPIQ
+   * ro'yxatdan sabab («QR yirtilgan» va h.k.).
+   *
+   * ⚠️ `NULL` = yorliq SKANERLANGAN (odatdagi yo'l). Bu `mode` dan
+   * ALOHIDA fakt: sessiya market QR'i bilan ochilgan bo'lsa ham ayrim
+   * posilkalar yorliqsiz o'tishi mumkin.
+   */
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  market_handover_override_reason: string | null;
+
   /** Marketga "olib keting" eslatmasi yuborilgan vaqt — cron idempotentligi. */
   @Column({
     type: 'bigint',
