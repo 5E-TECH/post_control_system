@@ -32,6 +32,8 @@ import {
 import {
   MANUAL_OVERRIDE_REASON_KEYS,
   MANUAL_OVERRIDE_REASONS,
+  type AwaitingOrder,
+  type ManualOverride,
   releaseHandoverBeacon,
   useMarketHandover,
   type HandoverAuthorization,
@@ -61,8 +63,7 @@ import {
 import ReplacementBadge from "../../../../../shared/components/replacement-badge";
 import {
   buildManualOverrides,
-  canSubmitBatch,
-  manualSelection,
+  canHandOverManual,
   missingReasonIds,
 } from "./handover.logic";
 
@@ -146,7 +147,15 @@ function HandoverSession() {
   const [auth, setAuth] = useState<HandoverAuthorization | null>(null);
   const [pin, setPin] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [scannedIds, setScannedIds] = useState<Set<string>>(new Set());
+  /**
+   * SHU SESSIYADA TOPSHIRILGANLAR.
+   *
+   * ⚠️ «Tanlangan» EMAS, TOPSHIRILGAN: skan serverga darhol yuboriladi
+   * va muvaffaqiyatli javobdan KEYIN shu to'plamga qo'shiladi. Ya'ni
+   * ro'yxatdan chiqqan posilka — haqiqatan yopilgan posilka, ekrandagi
+   * vaqtinchalik belgi emas.
+   */
+  const [handedIds, setHandedIds] = useState<Set<string>>(new Set());
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [handedInSession, setHandedInSession] = useState(0);
   const [offlineOpen, setOfflineOpen] = useState(false);
@@ -179,15 +188,22 @@ function HandoverSession() {
    * sabab tanlash majburiy va u ko'rinib turishi kerak.
    */
   const pending = useMemo(
-    () => orders.filter((o) => !scannedIds.has(o.id)),
-    [orders, scannedIds],
+    () => orders.filter((o) => !handedIds.has(o.id)),
+    [orders, handedIds],
   );
-  const scanned = useMemo(
-    () => orders.filter((o) => scannedIds.has(o.id)),
-    [orders, scannedIds],
-  );
-  /** Skanerlanganlar bloki ochiqmi (tekshirib ko'rish uchun). */
-  const [showScanned, setShowScanned] = useState(false);
+  /**
+   * Topshirilganlar — SNAPSHOT, `orders` dan hosila EMAS.
+   *
+   * ⚠️ NEGA. Ro'yxat qayta so'ralganda (masalan skaner manifestdan
+   * tashqaridagi posilkani topib `refetch` chaqirganda) topshirilgan
+   * qatorlar serverdan KELMAYDI — ular endi navbatda emas. Hosila
+   * ro'yxat o'sha zahoti BO'SHAB qolardi va xodim nimani topshirganini
+   * tekshira olmasdi. Shuning uchun muvaffaqiyatli javobdan keyin
+   * qatorning nusxasi saqlanadi.
+   */
+  const [handed, setHanded] = useState<AwaitingOrder[]>([]);
+  /** Topshirilganlar bloki ochiqmi (tekshirib ko'rish uchun). */
+  const [showHanded, setShowHanded] = useState(false);
   const total = Number(data?.total ?? 0);
 
   // ─────────────────── Ruxsat oynasi va heartbeat ───────────────────
@@ -361,31 +377,93 @@ function HandoverSession() {
     return map;
   }, [orders]);
 
-  const selectedRef = useRef<string[]>([]);
-  selectedRef.current = selectedIds;
+  /** `handOver` ichidan joriy ro'yxatga murojaat — stale closure'siz. */
+  const ordersRef = useRef<AwaitingOrder[]>([]);
+  ordersRef.current = orders;
+  const handedRef = useRef<Set<string>>(new Set());
+  handedRef.current = handedIds;
 
   /**
-   * Skaner tanlagan posilkalarni ALOHIDA belgilab boramiz.
+   * ═════════ SKAN = TOPSHIRISH ═════════
    *
-   * ⚠️ NEGA KERAK: qo'lda belgilangan (skanerlanmagan) posilka uchun YOPIQ
-   * sabab majburiy — "yorliq o'qilmadi" dalili shunda yoziladi. Skanerlangani
-   * sababsiz o'tadi. Bu farqni faqat shu yerda bilib olish mumkin.
+   * ⚠️ PARTIYA TUGMASI YO'Q — VA BU ATAYLAB. Avval skanerlangani
+   * to'planib turardi va xodim oxirida «Marketga topshirish (N)» ni
+   * bosardi. Bu ortiqcha qadam edi: skan qilindi — demak posilka
+   * xodim qo'lida va marketga berildi. Tugma faqat XATOGA joy
+   * qoldirardi: xodim uni bosmasdan sahifadan chiqsa yoki ruxsat
+   * oynasi tugasa, o'nlab skan BEKORGA ketardi va hammasini boshidan
+   * o'qitishga to'g'ri kelardi.
+   *
+   * Loyihada bu naqsh allaqachon bor: yangi buyurtma skanerlanadi va
+   * DARHOL pochtaga biriktirilib ro'yxatdan chiqadi.
+   *
+   * ⚠️ Serverda ketma-ket so'rovlar XAVFSIZ: `resolveActiveSession`
+   * sessiya qatorini `pessimistic_write` bilan qulflaydi, ya'ni
+   * parallel `complete` lar navbatga tushadi va `handed_over_count`
+   * yo'qolgan yangilanish bermaydi.
+   */
+  const handOver = useCallback(
+    (ids: string[], overrides: ManualOverride[] = []) => {
+      const token = authRef.current?.authorization_token;
+      if (!token || ids.length === 0) return;
+      complete.mutate(
+        {
+          market_id: marketId,
+          order_ids: ids,
+          authorization_token: token,
+          manual_overrides: overrides,
+        },
+        {
+          onSuccess: (res) => {
+            // Ro'yxatdan CHIQARISH — server tasdiqlagandan KEYIN.
+            const doneIds = res.order_ids ?? ids;
+            setHandedIds((prev) => {
+              const next = new Set(prev);
+              doneIds.forEach((id) => next.add(id));
+              return next;
+            });
+            // Tekshirish ro'yxati uchun nusxa — refetch'dan omon qoladi.
+            setHanded((prev) => {
+              const known = new Set(prev.map((o) => o.id));
+              const added = ordersRef.current.filter(
+                (o) => doneIds.includes(o.id) && !known.has(o.id),
+              );
+              return added.length ? [...prev, ...added] : prev;
+            });
+            setHandedInSession((n) => n + Number(res.handed_over ?? ids.length));
+            // Qo'lda belgilangani topshirildi — tanlovdan chiqariladi.
+            setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+          },
+          onError: (err) => {
+            // ⚠️ Qator RO'YXATDA QOLADI: topshirilmagan posilka ekrandan
+            // yo'qolsa xodim uni o'tkazib yuborardi.
+            flashMarket("error", t("toastHandoverFailed"));
+            handleApiError(err, t("toastHandoverFailed"));
+          },
+        },
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [marketId],
+  );
+
+  /**
+   * Skaner posilkani topdi — DARHOL topshiramiz.
+   *
+   * ⚠️ Hook `setSelectedIds` shaklidagi setter kutadi; biz undan faqat
+   * QO'SHILGAN id'larni ajratib olamiz va tanlovga yozmasdan to'g'ridan
+   * to'g'ri `handOver` ga uzatamiz.
    */
   const setSelectedFromScanner = useCallback<
     Dispatch<SetStateAction<string[]>>
-  >((updater) => {
-    const prev = selectedRef.current;
-    const next = typeof updater === "function" ? updater(prev) : updater;
-    const added = next.filter((id) => !prev.includes(id));
-    setSelectedIds(next);
-    if (added.length) {
-      setScannedIds((s) => {
-        const n = new Set(s);
-        added.forEach((id) => n.add(id));
-        return n;
-      });
-    }
-  }, []);
+  >(
+    (updater) => {
+      const next = typeof updater === "function" ? updater([]) : updater;
+      const fresh = next.filter((id) => !handedRef.current.has(id));
+      if (fresh.length) handOver(fresh);
+    },
+    [handOver],
+  );
 
   // ⚠️ So'rov QATLAMI hookda — sahifa `api` ni to'g'ridan-to'g'ri chaqirmaydi.
   const resolveMiss = useCallback(
@@ -404,55 +482,31 @@ function HandoverSession() {
 
   // ─────────────────────────── Amallar ───────────────────────────
 
-  const manualIds = useMemo(
-    () => manualSelection(selectedIds, scannedIds),
-    [selectedIds, scannedIds],
-  );
+  /**
+   * QO'LDA belgilanganlar — yorlig'i yirtilgan posilkalar.
+   *
+   * ⚠️ `selectedIds` endi FAQAT shular: skanerlangani tanlovga umuman
+   * tushmaydi, u darhol topshiriladi.
+   */
+  const manualIds = selectedIds;
   const missingReasons = useMemo(
     () => missingReasonIds(manualIds, reasons),
     [manualIds, reasons],
   );
-  const submitEnabled = useMemo(
-    () =>
-      canSubmitBatch({
-        authorized: Boolean(auth),
-        selectedIds,
-        scannedIds,
-        reasons,
-      }),
-    [auth, selectedIds, scannedIds, reasons],
-  );
 
   const clearSelection = useCallback(() => {
     setSelectedIds([]);
-    setScannedIds(new Set());
     setReasons({});
   }, []);
 
-  const submitBatch = useCallback(() => {
-    if (!auth || selectedIds.length === 0) return;
-    complete.mutate(
-      {
-        market_id: marketId,
-        order_ids: selectedIds,
-        authorization_token: auth.authorization_token,
-        manual_overrides: buildManualOverrides(manualIds, reasons),
-      },
-      {
-        onSuccess: (res) => {
-          handleSuccess(
-            t("toastHandedTitle"),
-            t("toastHandedBody", { count: res.handed_over }),
-          );
-          setHandedInSession((n) => n + Number(res.handed_over ?? 0));
-          clearSelection();
-          void refetch();
-        },
-        onError: (err) => handleApiError(err, t("toastHandoverFailed")),
-      },
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth, selectedIds, manualIds, reasons, marketId]);
+  /** Bitta qo'lda belgilangan posilkani sababi bilan topshirish. */
+  const handOverManual = useCallback(
+    (id: string) => {
+      if (!canHandOverManual({ authorized: true, reason: reasons[id] })) return;
+      handOver([id], buildManualOverrides([id], reasons));
+    },
+    [handOver, reasons],
+  );
 
   const finishSession = useCallback(() => {
     if (!auth) return;
@@ -504,7 +558,6 @@ function HandoverSession() {
 
   // ─────────────────────────── Ko'rinish ───────────────────────────
 
-  const scannedCount = selectedIds.filter((id) => scannedIds.has(id)).length;
 
   return (
     <div className="mx-auto w-full max-w-screen-2xl px-4 py-4 pb-28 sm:px-6 lg:px-8">
@@ -670,12 +723,14 @@ function HandoverSession() {
           <Package className="h-4 w-4" />
           {t("parcelsCount", { count: orders.length })}
         </span>
+        {handedInSession > 0 && (
+          <span className="inline-flex items-center gap-1.5 text-emerald-600">
+            <PackageCheck className="h-4 w-4" />
+            {t("handedThisSession", { count: handedInSession })}
+          </span>
+        )}
         {selectedIds.length > 0 && (
           <>
-            <span className="inline-flex items-center gap-1.5 text-emerald-600">
-              <PackageCheck className="h-4 w-4" />
-              {t("scannedCount", { count: scannedCount })}
-            </span>
             {manualIds.length > 0 && (
               <span className="inline-flex items-center gap-1.5 text-orange-600">
                 <AlertTriangle className="h-4 w-4" />
@@ -700,28 +755,28 @@ function HandoverSession() {
         qaytara olishi shart — aks holda butun tanlovni tozalashdan
         boshqa yo'l qolmasdi.
       */}
-      {scanned.length > 0 && (
+      {handed.length > 0 && (
         <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-900/10">
           <button
             type="button"
-            onClick={() => setShowScanned((v) => !v)}
+            onClick={() => setShowHanded((v: boolean) => !v)}
             className="flex w-full items-center gap-2 px-3 py-2 text-left"
-            title={t("scannedBlockHint")}
+            title={t("handedBlockHint")}
           >
             <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
             <span className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
-              {t("scannedBlock", { count: scanned.length })}
+              {t("handedBlock", { count: handed.length })}
             </span>
             <ChevronDown
               className={`ml-auto h-4 w-4 text-emerald-700 transition-transform ${
-                showScanned ? "rotate-180" : ""
+                showHanded ? "rotate-180" : ""
               }`}
             />
           </button>
 
-          {showScanned && (
+          {showHanded && (
             <ul className="m-0 max-h-56 list-none overflow-y-auto border-t border-emerald-200 px-3 py-2 dark:border-emerald-900/40">
-              {scanned.map((o) => (
+              {handed.map((o) => (
                 <li
                   key={o.id}
                   className="flex items-center gap-2 py-1 text-sm"
@@ -732,13 +787,9 @@ function HandoverSession() {
                   <span className="min-w-0 flex-1 truncate text-gray-800 dark:text-gray-200">
                     {o.customer_name || "—"}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => toggle(o.id)}
-                    className="shrink-0 text-xs text-gray-400 underline hover:text-red-600"
-                  >
-                    {t("undoScan")}
-                  </button>
+                  {/* ⚠️ «Qaytarish» YO'Q: server qatorni allaqachon
+                      YOPGAN (CLOSED). Tugma qo'ysak u yolg'on va'da
+                      bo'lardi — ro'yxat faqat TEKSHIRISH uchun. */}
                 </li>
               ))}
             </ul>
@@ -770,7 +821,8 @@ function HandoverSession() {
         ) : (
           pending.map((o) => {
             const checked = selectedIds.includes(o.id);
-            const manual = checked && !scannedIds.has(o.id);
+            // Tanlangan HAR qator qo'lda belgilangan: skan tanlovga tushmaydi.
+            const manual = checked;
             return (
               <div
                 key={o.id}
@@ -799,7 +851,11 @@ function HandoverSession() {
                     <Checkbox
                       checked={checked}
                       onChange={() => toggle(o.id)}
-                      disabled={!auth}
+                      /* ⚠️ `disabled={!auth}` OLIB TASHLANDI — u OFFLINE
+                         AKT yo'lini butunlay o'lik qilardi: akt ruxsat
+                         YO'Q paytda yoziladi, lekin belgilab bo'lmasa
+                         `selectedIds` bo'sh qolib tugma hech qachon
+                         faollashmasdi. */
                     />
                   </span>
                   {/* ISM birinchi, yorliq raqami OSTIDA kichikroq. */}
@@ -902,6 +958,27 @@ function HandoverSession() {
                           label: t(MANUAL_OVERRIDE_REASON_KEYS[r]),
                         }))}
                       />
+                      {/* ⚠️ QATOR DARAJASIDA topshiriladi: xodim qaysi
+                          posilka NEGA qo'lda o'tganini ko'rib turadi. */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handOverManual(o.id);
+                        }}
+                        disabled={
+                          !canHandOverManual({
+                            authorized: Boolean(auth),
+                            reason: reasons[o.id],
+                          }) || complete.isPending
+                        }
+                        title={
+                          reasons[o.id] ? undefined : t("manualNeedsReason")
+                        }
+                        className="shrink-0 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 px-3 py-1 text-xs font-semibold text-white transition-all hover:from-purple-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:from-gray-300 disabled:to-gray-300 dark:disabled:from-gray-700 dark:disabled:to-gray-700"
+                      >
+                        {t("handOverRow")}
+                      </button>
                     </>
                   )}
                 </div>
@@ -962,7 +1039,8 @@ function HandoverSession() {
               ) : (
                 pending.map((o, index) => {
                   const checked = selectedIds.includes(o.id);
-                  const manual = checked && !scannedIds.has(o.id);
+                  // Tanlangan HAR qator qo'lda belgilangan: skan tanlovga tushmaydi.
+            const manual = checked;
                   return (
                     <tr
                       key={o.id}
@@ -982,7 +1060,7 @@ function HandoverSession() {
                         <Checkbox
                           checked={checked}
                           onChange={() => toggle(o.id)}
-                          disabled={!auth}
+                          /* ⚠️ Offline akt uchun ruxsatSIZ ham belgilanadi. */
                         />
                       </td>
                       {/* Tartib raqami — yorliq raqami ism OSTIDA turadi. */}
@@ -1127,6 +1205,27 @@ function HandoverSession() {
                                   label: t(MANUAL_OVERRIDE_REASON_KEYS[r]),
                                 }))}
                               />
+                              {/* ⚠️ QATOR DARAJASIDA topshiriladi: xodim qaysi
+                                  posilka NEGA qo'lda o'tganini ko'rib turadi. */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handOverManual(o.id);
+                                }}
+                                disabled={
+                                  !canHandOverManual({
+                                    authorized: Boolean(auth),
+                                    reason: reasons[o.id],
+                                  }) || complete.isPending
+                                }
+                                title={
+                                  reasons[o.id] ? undefined : t("manualNeedsReason")
+                                }
+                                className="shrink-0 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 px-3 py-1 text-xs font-semibold text-white transition-all hover:from-purple-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:from-gray-300 disabled:to-gray-300 dark:disabled:from-gray-700 dark:disabled:to-gray-700"
+                              >
+                                {t("handOverRow")}
+                              </button>
                             </>
                           )}
                         </div>
@@ -1164,16 +1263,17 @@ function HandoverSession() {
                 {t("waitingConsent")}
               </span>
             )}
-            <Button
-              type="primary"
-              size="large"
-              className="ml-auto"
-              disabled={!submitEnabled}
-              loading={complete.isPending}
-              onClick={submitBatch}
-            >
-              {t("submitHandover", { count: selectedIds.length })}
-            </Button>
+            {/*
+              ⚠️ «Marketga topshirish (N)» TUGMASI OLIB TASHLANDI.
+              Skan qilindi — demak posilka xodim qo'lida va marketga
+              berildi; tugma ortiqcha qadam va XATOGA joy edi (bosmasdan
+              chiqib ketilsa o'nlab skan bekorga ketardi). Qo'lda
+              belgilangan qatorlar esa O'Z qatoridagi tugma bilan,
+              sababi bilan birga topshiriladi.
+            */}
+            <span className="ml-auto text-sm text-gray-500 dark:text-gray-400">
+              {t("scanToHandOver")}
+            </span>
           </div>
         </div>
       )}
