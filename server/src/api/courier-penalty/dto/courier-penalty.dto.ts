@@ -177,3 +177,22 @@ export class WaiveEntryDto {
   @MaxLength(256)
   note?: string;
 }
+
+/**
+ * MODULNI YOQISH / O'CHIRISH.
+ *
+ * ⚠️ Yagona maydon ATAYLAB: `activated_at` ni mijoz BERMAYDI, uni server
+ * qo'yadi. Aks holda langarni orqaga surib, o'tgan davr uchun pul
+ * yechish mumkin bo'lardi.
+ */
+export class SetActiveDto {
+  @ApiProperty({ example: true })
+  @IsBoolean()
+  active: boolean;
+}
+
+export class SetExemptDto {
+  @ApiProperty({ example: true })
+  @IsBoolean()
+  exempt: boolean;
+}

@@ -5320,6 +5320,31 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       if (targetStatus === RollbackTarget.WAITING) {
+        /**
+         * ⚠️ SHTRAF FAQAT SHU SHOXDA TESKARI QAYTARILADI.
+         *
+         * Rollbackning uchta nishoni bor va ular bir xil EMAS:
+         *
+         *   WAITING        — sotuv butunlay bekor qilinadi, buyurtma
+         *                    yana kuryer ustida. Shtraf ham qaytariladi:
+         *                    aks holda bajarilmagan sotuv uchun kuryerda
+         *                    qarz qolib ketardi.
+         *   CANCELLED      — buyurtma TERMINAL va kech belgilangan holida
+         *   CANCELLED_SENT   qoladi. Bekor yo'li ham shtraf yozadi, ya'ni
+         *                    bu ikki shoxda shtraf QOLISHI kerak. Teskari
+         *                    qaytarilsa, rollback shtrafdan qutulish yo'li
+         *                    bo'lib qolardi — admin «bekorga qaytaraman»
+         *                    deb jazoni bekor qilardi.
+         *
+         * Asl daftar qatori o'chirilmaydi, ustiga teskari qator yoziladi
+         * — batafsil `reverseForOrder` izohida.
+         */
+        await this.courierPenalty.reverseForOrder(queryRunner.manager, {
+          orderId: order.id,
+          reason: 'sale_rolled_back',
+          actorId: user.id,
+        });
+
         order.status = Order_status.WAITING;
         order.cancelled_at = null;
         // ⚠️ Bekor pochtasidan AJRATILADI. Avval havola qolib ketardi: WAITING

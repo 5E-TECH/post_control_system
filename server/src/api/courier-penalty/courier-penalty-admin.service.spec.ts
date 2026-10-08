@@ -10,6 +10,10 @@ import {
   type PenaltyRule,
 } from '../order/utils/courier-penalty.util';
 import { CourierPenaltyEntryEntity } from 'src/core/entity/courier-penalty-entry.entity';
+import { ActivityLogService } from 'src/api/activity-log/activity-log.service';
+
+/** Audit yozuvi testlarni to'smasin — `log()` jimgina o'tadi. */
+const noopLog = { log: jest.fn(async () => undefined) } as unknown as ActivityLogService;
 
 const DAY = 86_400_000;
 const NOW = 1_800_000_000_000;
@@ -78,7 +82,7 @@ function makeService(opts: {
     loadRules: async () => opts.rules ?? [rule()],
   } as unknown as CourierPenaltyService;
 
-  return new CourierPenaltyAdminService(dataSource, core);
+  return new CourierPenaltyAdminService(dataSource, core, noopLog);
 }
 
 describe('kechikkanlar ro‘yxati', () => {
@@ -227,35 +231,34 @@ describe('qoida tekshiruvi', () => {
 /**
  * SHTRAFNI BEKOR QILISH.
  *
- * ⚠️ O'CHIRISH EMAS, TESKARI YOZUV. Daftar yig'indisi kassadagi
- * yozuvlar yig'indisiga teng turishi SHART — asl qator o'chirilsa
- * kassa bilan daftar ajralib, invariant yiqilardi.
+ * ⚠️ PUL YO'LI YADRO SERVISDA. `waive` endi `core.reverseForOrder` ni
+ * chaqiradi — rollback ham AYNI yo'ldan o'tadi. Ikki nusxa yozilsa ular
+ * vaqt o'tib ajralib ketardi va biri pulni qaytarib, ikkinchisi
+ * qaytarmay qo'yardi.
  */
 describe('shtrafni bekor qilish', () => {
   function makeWaiveService(
     entry: Partial<CourierPenaltyEntryEntity> | null,
     existingWaiver: unknown = null,
+    reverseResult = 1,
   ) {
-    const saved: Array<Record<string, unknown>> = [];
+    const reverse = jest.fn(
+      async (_m: unknown, _p: Record<string, unknown>) => reverseResult,
+    );
     const m = {
       findOne: jest.fn(async (_e: unknown, opts: any) =>
         opts?.where?.waives_entry_id ? existingWaiver : entry,
       ),
       create: (_e: unknown, data: Record<string, unknown>) => data,
-      save: jest.fn(async (row: Record<string, unknown>) => {
-        saved.push(row);
-        return row;
-      }),
+      save: jest.fn(async (row: Record<string, unknown>) => row),
     };
     const dataSource = {
       manager: {},
       transaction: async (fn: (mm: unknown) => unknown) => fn(m),
     } as unknown as DataSource;
-    const svc = new CourierPenaltyAdminService(
-      dataSource,
-      {} as unknown as CourierPenaltyService,
-    );
-    return { svc, saved };
+    const core = { reverseForOrder: reverse } as unknown as CourierPenaltyService;
+    const svc = new CourierPenaltyAdminService(dataSource, core, noopLog);
+    return { svc, reverse };
   }
 
   const penalty = {
@@ -270,28 +273,32 @@ describe('shtrafni bekor qilish', () => {
     shadow: true,
   } as Partial<CourierPenaltyEntryEntity>;
 
-  it('teskari ishorali qator yozadi, aslini o‘chirmaydi', async () => {
-    const { svc, saved } = makeWaiveService(penalty);
+  it('yadro servisning teskari qaytarishini chaqiradi', async () => {
+    const { svc, reverse } = makeWaiveService(penalty);
     await svc.waive('e-1', 'system_fault', 'ilova ishlamadi', 'admin-1');
-    expect(saved).toHaveLength(1);
-    expect(saved[0].kind).toBe('waiver');
-    expect(saved[0].amount).toBe(-6000);
-    expect(saved[0].waives_entry_id).toBe('e-1');
-    expect(saved[0].applied_by).toBe('admin-1');
+    expect(reverse).toHaveBeenCalledTimes(1);
+    const arg = reverse.mock.calls[0][1];
+    expect(arg.entryId).toBe('e-1');
+    expect(arg.reason).toBe('system_fault');
+    expect(arg.actorId).toBe('admin-1');
+    expect(arg.note).toBe('ilova ishlamadi');
   });
 
-  /** Soya holati ko'chiriladi — aks holda yig'indi hisobi aralashardi. */
-  it('soya holati asl yozuvdan ko‘chiriladi', async () => {
-    const { svc, saved } = makeWaiveService({ ...penalty, shadow: true });
-    await svc.waive('e-1', 'wrong_rule', null, 'admin-1');
-    expect(saved[0].shadow).toBe(true);
+  /** Teskari qaytarish bajarilmasa amal MUVAFFAQIYATLI deb ko'rsatilmasin. */
+  it('hech narsa qaytarilmasa xato beradi', async () => {
+    const { svc } = makeWaiveService(penalty, null, 0);
+    await expect(svc.waive('e-1', 'wrong_rule', null, 'a')).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   it('sabab yopiq ro‘yxatdan bo‘lmasa rad etiladi', async () => {
-    const { svc } = makeWaiveService(penalty);
+    const { svc, reverse } = makeWaiveService(penalty);
     await expect(
       svc.waive('e-1', 'shunchaki' as never, null, 'admin-1'),
     ).rejects.toThrow(BadRequestException);
+    // Pul yo'liga UMUMAN borilmasin
+    expect(reverse).not.toHaveBeenCalled();
   });
 
   /** Ikki marta bekor qilinsa kuryer qarzi asossiz kamayardi. */
@@ -342,6 +349,7 @@ describe('daftar — bekor qilingan belgisi', () => {
     return new CourierPenaltyAdminService(
       dataSource,
       {} as unknown as CourierPenaltyService,
+      noopLog,
     );
   }
 

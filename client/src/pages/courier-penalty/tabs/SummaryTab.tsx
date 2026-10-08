@@ -113,10 +113,45 @@ const SummaryTab = () => {
         <Card
           icon={<Info className="h-3.5 w-3.5" />}
           label={t("summary.net")}
-          value={`${formatSum(data.net)}`}
+          value={`${formatSum(data.real.net)}`}
           sub={t("summary.couriers", { count: data.couriers })}
           tone="bad"
         />
+      </div>
+
+      {/*
+        ⚠️ IKKI QATLAM ARALASHTIRILMAYDI.
+
+        `real` — kuryer kassasiga HAQIQATAN yozilgan summa; faqat shu son
+        kassa bilan solishtiriladi (invariant I-CP6).
+        `shadow` — «yoqilganda qancha bo'lardi»; kassada hech qachon aks
+        etmaydi. Ikkisini bitta raqamga qo'shish hech qachon
+        to'g'rilanmaydigan son yasash degani.
+      */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-red-200 bg-red-50/50 p-4 dark:border-red-800 dark:bg-red-900/10">
+          <div className="text-xs font-medium text-red-700 dark:text-red-400">
+            {t("summary.layerReal")}
+          </div>
+          <div className="mt-1 text-xl font-bold tabular-nums text-red-700 dark:text-red-400">
+            {formatSum(data.real.net)} {t("currency")}
+          </div>
+          <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+            {t("summary.layerRealHint", { count: data.real.count })}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-800/30">
+          <div className="text-xs font-medium text-gray-600 dark:text-gray-300">
+            {t("summary.layerShadow")}
+          </div>
+          <div className="mt-1 text-xl font-bold tabular-nums text-gray-700 dark:text-gray-200">
+            {formatSum(data.shadow.net)} {t("currency")}
+          </div>
+          <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+            {t("summary.layerShadowHint", { count: data.shadow.count })}
+          </div>
+        </div>
       </div>
 
       {/*

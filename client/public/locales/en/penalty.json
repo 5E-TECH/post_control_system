@@ -9,7 +9,8 @@
     "overdue": "Overdue",
     "summary": "Totals",
     "ledger": "Ledger",
-    "rules": "Rules"
+    "rules": "Rules",
+    "settings": "Settings"
   },
   "overdue": {
     "empty": "No overdue orders",
@@ -38,7 +39,11 @@
     "couriers": "{{count}} couriers",
     "cappedTitle": "{{count}} penalties hit the tariff cap ({{share}}%)",
     "cappedHigh": "More than half hit the cap — one flat rule is not enough. Consider lateness tiers: a higher rate for long delays, lower for short ones.",
-    "cappedLow": "The cap rarely triggers — the current rule is balanced."
+    "cappedLow": "The cap rarely triggers — the current rule is balanced.",
+    "layerReal": "Real — posted to the cashbox",
+    "layerRealHint": "{{count}} entries. Only this figure is reconciled against the courier cashbox.",
+    "layerShadow": "Test — what it would have been",
+    "layerShadowHint": "{{count}} entries. Never reflected in the cashbox."
   },
   "ledger": {
     "all": "All",
@@ -108,6 +113,32 @@
     "system_fault": "System fault",
     "courier_absent": "Courier unavailable",
     "wrong_rule": "Wrong configuration",
-    "management_decision": "Management decision"
+    "management_decision": "Management decision",
+    "sale_rolled_back": "Sale rolled back"
+  },
+  "settings": {
+    "stateOn": "Module LIVE",
+    "stateOnHint": "Penalties are really posted to the courier cashbox",
+    "stateOff": "Test mode",
+    "stateOffHint": "The calculation runs, but no money is deducted",
+    "onTitle": "Turn the module on?",
+    "onBody": "From this moment penalties are REALLY posted to the courier cashbox and increase their debt.",
+    "onAnchor": "The module only applies to orders dispatched AFTER this moment. Older ones are untouched.",
+    "offTitle": "Turn the module off?",
+    "offBody": "The calculation keeps running, but no money is deducted — back to test mode.",
+    "offKeep": "Penalties already charged are NOT refunded. Waive them one by one in the Ledger tab if needed.",
+    "turnOn": "Turn on",
+    "turnOff": "Turn off",
+    "turnedOn": "Module turned on",
+    "turnedOff": "Module turned off",
+    "failed": "Could not complete",
+    "liveWarning": "The module is live — every late marking is posted to the courier cashbox immediately.",
+    "shadowSince": "Test mode since",
+    "activatedAt": "Last turned on",
+    "exemptions": "Courier exemptions",
+    "exemptHint": "An exempt courier is never penalised. External-provider couriers (Elchi/LDG) are exempt already.",
+    "searchCourier": "Search courier",
+    "exemptSaved": "Saved",
+    "noCouriers": "No courier found"
   }
 }

@@ -9,7 +9,8 @@
     "overdue": "Kechikkanlar",
     "summary": "Yig'indi",
     "ledger": "Daftar",
-    "rules": "Qoidalar"
+    "rules": "Qoidalar",
+    "settings": "Sozlamalar"
   },
   "overdue": {
     "empty": "Kechikkan buyurtma yo'q",
@@ -38,7 +39,11 @@
     "couriers": "{{count}} kuryer",
     "cappedTitle": "{{count}} ta shtraf tarif chegarasiga urildi ({{share}}%)",
     "cappedHigh": "Yarmidan ko'pi chegaraga urgan — bitta tekis qoida yetarli emas. Kechikish darajalari qo'shishni ko'rib chiqing: uzoq kechikishda stavka oshsin, qisqasida pasaysin.",
-    "cappedLow": "Chegara kamdan-kam ishlayapti — hozirgi qoida muvozanatli."
+    "cappedLow": "Chegara kamdan-kam ishlayapti — hozirgi qoida muvozanatli.",
+    "layerReal": "Haqiqiy — kassaga yozilgan",
+    "layerRealHint": "{{count}} ta yozuv. Faqat shu son kuryer kassasi bilan solishtiriladi.",
+    "layerShadow": "Soya — yoqilganda qancha bo'lardi",
+    "layerShadowHint": "{{count}} ta yozuv. Kassada aks etmaydi."
   },
   "ledger": {
     "all": "Hammasi",
@@ -108,6 +113,32 @@
     "system_fault": "Tizim nosozligi",
     "courier_absent": "Kuryer ishda bo'lmagan",
     "wrong_rule": "Noto'g'ri sozlama",
-    "management_decision": "Rahbariyat qarori"
+    "management_decision": "Rahbariyat qarori",
+    "sale_rolled_back": "Sotuv orqaga qaytarildi"
+  },
+  "settings": {
+    "stateOn": "Modul YOQILGAN",
+    "stateOnHint": "Shtraf kuryer kassasiga haqiqatan yozilmoqda",
+    "stateOff": "Sinov rejimi",
+    "stateOffHint": "Hisob ishlaydi, lekin pul yechilmaydi",
+    "onTitle": "Modulni yoqasizmi?",
+    "onBody": "Shu paytdan boshlab shtraf kuryer kassasiga HAQIQATAN yoziladi va ularning qarzini oshiradi.",
+    "onAnchor": "Modul faqat SHU PAYTDAN KEYIN jo'natilgan buyurtmalarga tegadi. Eskilari tegilmaydi.",
+    "offTitle": "Modulni o'chirasizmi?",
+    "offBody": "Hisob ishlashda davom etadi, lekin pul yechilmaydi — soya rejimiga qaytadi.",
+    "offKeep": "Allaqachon undirilgan shtraflar QAYTARILMAYDI. Kerak bo'lsa Daftar tabidan birma-bir bekor qiling.",
+    "turnOn": "Yoqish",
+    "turnOff": "O'chirish",
+    "turnedOn": "Modul yoqildi",
+    "turnedOff": "Modul o'chirildi",
+    "failed": "Bajarib bo'lmadi",
+    "liveWarning": "Modul yoniq — har kechikkan belgilash kuryer kassasiga darhol yoziladi.",
+    "shadowSince": "Soya boshlangan",
+    "activatedAt": "Oxirgi yoqilgan",
+    "exemptions": "Kuryer istisnolari",
+    "exemptHint": "Istisno qilingan kuryerga shtraf umuman yozilmaydi. Tashqi provayder kuryerlari (Elchi/LDG) allaqachon istisno.",
+    "searchCourier": "Kuryerni qidiring",
+    "exemptSaved": "Saqlandi",
+    "noCouriers": "Kuryer topilmadi"
   }
 }

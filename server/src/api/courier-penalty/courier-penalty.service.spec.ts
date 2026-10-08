@@ -6,6 +6,8 @@ import { CourierPenaltyConfigEntity } from 'src/core/entity/courier-penalty-conf
 import { CourierPenaltyRuleEntity } from 'src/core/entity/courier-penalty-rule.entity';
 import { PostEntity } from 'src/core/entity/post.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
+import { CashEntity } from 'src/core/entity/cash-box.entity';
+import { CourierPenaltyEntryEntity } from 'src/core/entity/courier-penalty-entry.entity';
 
 /**
  * SHTRAF SERVISI — SOYA REJIMI SHARTNOMASI.
@@ -31,8 +33,12 @@ const ORDER_ID = 'order-1';
 type Rows = {
   post?: Partial<PostEntity> | null;
   courier?: Partial<UserEntity> | null;
+  actor?: Partial<UserEntity> | null;
   config?: Partial<CourierPenaltyConfigEntity> | null;
   rules?: Array<Partial<CourierPenaltyRuleEntity>>;
+  cashbox?: Partial<CashEntity> | null;
+  courierBalance?: number;
+  entries?: Array<Partial<CourierPenaltyEntryEntity>>;
 };
 
 const defaultRule = (): Partial<CourierPenaltyRuleEntity> => ({
@@ -54,22 +60,59 @@ const defaultRule = (): Partial<CourierPenaltyRuleEntity> => ({
 function makeManager(rows: Rows = {}) {
   const inserted: Array<Record<string, unknown>> = [];
   const conflict = { hit: false };
+  /** Kassa yozuvlari — `applyCashboxDelta` ularni shu yerga tushiradi. */
+  const cashWrites: Array<Record<string, unknown>> = [];
+  /** Moliyaviy tarozi qatorlari. */
+  const fbhWrites: Array<Record<string, unknown>> = [];
+  const updates: Array<Record<string, unknown>> = [];
+  let balance = rows.courierBalance ?? 0;
 
   const manager = {
-    findOne: jest.fn(async (entity: unknown) => {
+    findOne: jest.fn(async (entity: unknown, opts?: any) => {
       if (entity === PostEntity)
         return rows.post === undefined
           ? { id: POST_ID, created_at: T0, courier_id: COURIER_ID, region_id: null }
           : rows.post;
-      if (entity === UserEntity)
+      if (entity === UserEntity) {
+        // Aktyor tekshiruvi: boshqa id so'ralsa aktyor qaytariladi.
+        if (opts?.where?.id && opts.where.id !== COURIER_ID)
+          return rows.actor ?? null;
         return rows.courier === undefined
           ? { id: COURIER_ID, tariff_center: 20000, tariff_home: 20000 }
           : rows.courier;
+      }
       if (entity === CourierPenaltyConfigEntity)
         return rows.config === undefined ? { shadow_since: null } : rows.config;
+      if (entity === CashEntity)
+        return rows.cashbox === undefined
+          ? { id: 'cb-1', user_id: COURIER_ID, balance }
+          : rows.cashbox;
       return null;
     }),
-    find: jest.fn(async () => rows.rules ?? [defaultRule()]),
+    find: jest.fn(async (entity: unknown) => {
+      if (entity === CashEntity) return [];
+      if (entity === CourierPenaltyEntryEntity) return rows.entries ?? [];
+      return rows.rules ?? [defaultRule()];
+    }),
+    update: jest.fn(async (_e: unknown, id: unknown, data: unknown) => {
+      updates.push({ id, ...(data as Record<string, unknown>) });
+      return { affected: 1 };
+    }),
+    /** `applyCashboxDelta` ning atomik UPDATE ... RETURNING yo'li. */
+    query: jest.fn(async (_sql: string, params: unknown[]) => {
+      balance += Number(params[0]);
+      return [[{ balance: String(balance) }], 1];
+    }),
+    create: jest.fn((entity: unknown, data: Record<string, unknown>) => ({
+      __entity: entity,
+      ...data,
+    })),
+    save: jest.fn(async (a: unknown, b?: unknown) => {
+      const row = (b ?? a) as Record<string, unknown>;
+      if (row?.operation_type) cashWrites.push(row);
+      else if (row?.balance_before !== undefined) fbhWrites.push(row);
+      return { id: 'hist-1', ...row };
+    }),
     createQueryBuilder: () => {
       const qb: Record<string, unknown> = {};
       let values: Record<string, unknown> = {};
@@ -93,7 +136,17 @@ function makeManager(rows: Rows = {}) {
     },
   };
 
-  return { manager: manager as unknown as EntityManager, inserted, conflict };
+  return {
+    manager: manager as unknown as EntityManager,
+    inserted,
+    conflict,
+    cashWrites,
+    fbhWrites,
+    updates,
+    get balance() {
+      return balance;
+    },
+  };
 }
 
 const order = (over: Record<string, unknown> = {}) =>
@@ -323,211 +376,301 @@ describe('grandfathering', () => {
 });
 
 /**
- * ⚠️ FAZA 1 NI QULFLAYDI. Modul qo'lda yoqilsa ham kassa ulanishi hali
- * yo'q — bu holat JIM o'tmasligi kerak, aks holda admin «yoqdim» deb
- * o'ylab, aslida hech kim shtraf to'lamayotganini bilmasdi.
+ * ══════════════ YOQILGAN REJIM — PUL HAQIQATAN KO'CHADI ══════════════
+ *
+ * Bu bo'lim Faza 3 ning shartnomasini qulflaydi. Har bir test aniq bir
+ * tarzda noto'g'ri bo'lishi mumkin bo'lgan narsani qotiradi.
  */
-describe('yoqilgan holat — Faza 3 gacha ogohlantiradi', () => {
-  it('is_active bo‘lsa xato jurnaliga yozadi, yozuv esa soya qoladi', async () => {
-    const { manager, inserted } = makeManager({
-      config: { is_active: true, activated_at: T0 - DAY },
-    });
-    const spy = jest
-      .spyOn((service as any).logger, 'error')
-      .mockImplementation(() => {});
+describe('yoqilgan rejim — kassaga yozish', () => {
+  const activeCfg = (over: Record<string, unknown> = {}) => ({
+    is_active: true,
+    activated_at: T0 - 90 * DAY,
+    shadow_since: T0 - 200 * DAY,
+    ...over,
+  });
 
-    await service.recordForOrder(manager, {
+  it('shtraf kuryer kassasiga INCOME bo‘lib tushadi', async () => {
+    const h = makeManager({ config: activeCfg(), courierBalance: 100000 });
+    await service.recordForOrder(h.manager, {
+      order: order(),
+      markedAt: T0 + 6 * DAY,
+      actorId: COURIER_ID,
+    });
+
+    expect(h.inserted[0].shadow).toBe(false);
+    expect(h.cashWrites).toHaveLength(1);
+    /**
+     * ⚠️ Kuryer kassasida musbat balans = QARZ. Shtraf qarzni OSHIRISHI
+     * kerak, ya'ni `income`. `expense` yozilsa jazo o'rniga mukofot
+     * bo'lib qolardi.
+     */
+    expect(h.cashWrites[0].operation_type).toBe('income');
+    expect(h.cashWrites[0].amount).toBe(4000);
+    expect(h.cashWrites[0].source_type).toBe('courier_penalty');
+    expect(h.balance).toBe(104000);
+  });
+
+  /** Daftar qatori kassa yozuviga BOG'LANISHI shart (invariant I-CP1). */
+  it('daftar qatori kassa langarini oladi', async () => {
+    const h = makeManager({ config: activeCfg(), courierBalance: 100000 });
+    await service.recordForOrder(h.manager, {
       order: order(),
       markedAt: T0 + 6 * DAY,
     });
+    expect(h.updates).toHaveLength(1);
+    expect(h.updates[0].cashbox_history_id).toBeTruthy();
+  });
 
-    expect(spy).toHaveBeenCalledTimes(1);
-    expect(String(spy.mock.calls[0][0])).toContain('Faza 3');
-    expect(inserted[0].shadow).toBe(true);
-    expect(inserted[0].cashbox_history_id).toBeNull();
+  /** Moliyaviy tarozi sababsiz siljimasin. */
+  it('moliyaviy tarozi qatori yoziladi', async () => {
+    const h = makeManager({ config: activeCfg(), courierBalance: 100000 });
+    await service.recordForOrder(h.manager, {
+      order: order(),
+      markedAt: T0 + 6 * DAY,
+    });
+    expect(h.fbhWrites).toHaveLength(1);
+    expect(h.fbhWrites[0].source_type).toBe('courier_penalty');
+    expect(h.fbhWrites[0].amount).toBe(4000);
+  });
+
+  /**
+   * ⚠️ ENG MUHIM TEST. Takroriy chaqiruvda daftar `orIgnore` bilan jim
+   * o'tadi — kassa yozuvi SHUNGA bog'langan bo'lishi shart. Aks holda
+   * daftarda bitta qator qolib, kassadan pul IKKI MARTA yechilardi.
+   */
+  it('takroriy chaqiruvda kassaga TEGILMAYDI', async () => {
+    const h = makeManager({ config: activeCfg(), courierBalance: 100000 });
+    h.conflict.hit = true;
+    await service.recordForOrder(h.manager, {
+      order: order(),
+      markedAt: T0 + 6 * DAY,
+    });
+    expect(h.cashWrites).toHaveLength(0);
+    expect(h.fbhWrites).toHaveLength(0);
+    expect(h.balance).toBe(100000);
+  });
+
+  /**
+   * ⚠️ SOTUV SHTRAF TUFAYLI YIQILMASIN. Kassasiz kuryer amalda
+   * bo'lmasligi kerak, lekin bo'lsa shtraf soyada qoladi.
+   */
+  it('kassa topilmasa sotuv yiqilmaydi, shtraf soyada qoladi', async () => {
+    const h = makeManager({ config: activeCfg(), cashbox: null });
+    const spy = jest
+      .spyOn((service as any).logger, 'error')
+      .mockImplementation(() => {});
+    const r = await service.recordForOrder(h.manager, {
+      order: order(),
+      markedAt: T0 + 6 * DAY,
+    });
+    expect(r).not.toBeNull();
+    expect(h.inserted[0].shadow).toBe(true);
+    expect(h.cashWrites).toHaveLength(0);
+    expect(spy).toHaveBeenCalled();
+  });
+
+  /**
+   * ⚠️ YOQILGANDA LANGAR FAQAT `activated_at`.
+   *
+   * `shadow_since` ga tushib ketsa, yoqilgan kuni soya boshlanganidan
+   * beri jo'natilgan HAMMA buyurtma uchun kuryerlardan birdan haqiqiy
+   * pul yechilardi.
+   */
+  it('yoqilganda langar shadow_since ga TUSHMAYDI', async () => {
+    const h = makeManager({
+      // Pochta soya davrida jo'natilgan, lekin yoqilishdan OLDIN
+      config: activeCfg({ activated_at: T0 + DAY }),
+      courierBalance: 100000,
+    });
+    const r = await service.recordForOrder(h.manager, {
+      order: order(),
+      markedAt: T0 + 30 * DAY,
+    });
+    expect(r).toBeNull();
+    expect(h.cashWrites).toHaveLength(0);
+  });
+
+  /**
+   * ⚠️ TASHQI PROVAYDER AKTYOR. Egalik darvozasi `external_provider`
+   * aktyorni chetlab o'tadi, ya'ni Elchi/LDG webhooki haqiqiy kuryerning
+   * buyurtmasini belgilashi mumkin — u holda shtraf begunoh odamga
+   * tushardi.
+   */
+  it('tashqi provayder aktyor nomidan shtraf yozilmaydi', async () => {
+    const h = makeManager({
+      config: activeCfg(),
+      actor: { id: 'elchi-proxy', external_provider: 'elchi' },
+    });
+    const r = await service.recordForOrder(h.manager, {
+      order: order(),
+      markedAt: T0 + 6 * DAY,
+      actorId: 'elchi-proxy',
+    });
+    expect(r).toBeNull();
+    expect(h.cashWrites).toHaveLength(0);
   });
 });
 
 /**
- * KURYER MUDDAT HISOBOTI.
+ * BONUS — QARZ HAJMIDA CHEKLANADI.
  *
- * ⚠️ ENG MUHIM QULF: ekran va kassa BIR xil sonni ko'rsatishi kerak.
- * Hisobot `computeCourierAdjustment` ni qayta chaqiradi — qo'lda
- * `kun × narx` hisoblamaydi. Agar kimdir «tezlik uchun» uni qo'lda
- * hisoblashga o'tkazsa, pol/chegara/grandfathering takrorlanib, vaqt o'tib
- * ekran kassaga qarshi chiqardi: kuryer «menga 12 000 deb turgan edi»
- * deyib haqli e'tiroz bildirardi.
+ * ⚠️ Tizimda kuryerga PUL BERISH yo'li YO'Q, faqat undan olish bor.
+ * Cheklovsiz bonus kassani manfiyga tushirib, hisob-kitob qilinmaydigan
+ * majburiyat yaratardi. Bu shtrafdagi «tarif poli» qoidasining aynasi.
  */
-describe('myDeadlines — kuryer sanog‘i', () => {
-  const DEADLINE = 4;
+describe('bonus chegarasi', () => {
+  const bonusRule = () => ({
+    ...defaultRule(),
+    id: 'b-1',
+    event: 'early_mark',
+    threshold_days: 2,
+    calc: 'once',
+    amount: 5000,
+  });
 
-  /** Hisobot uchun kengaytirilgan manager taqlidi (xom SQL qatorlari ham). */
-  function makeReportManager(opts: {
-    rows: Array<Record<string, unknown>>;
-    courier?: Partial<UserEntity> | null;
-    config?: Partial<CourierPenaltyConfigEntity> | null;
-    rules?: Array<Partial<CourierPenaltyRuleEntity>>;
-  }) {
-    const base = makeManager({
-      courier: opts.courier,
-      config: opts.config,
-      rules: opts.rules,
-    });
-    const qb: Record<string, unknown> = {};
-    const chain = () => qb;
-    Object.assign(qb, {
-      select: chain,
-      from: chain,
-      innerJoin: chain,
-      leftJoin: chain,
-      where: chain,
-      andWhere: chain,
-      orderBy: chain,
-      getRawMany: async () => opts.rows,
-      // Yozuv yo'li uchun (bu testlarda ishlatilmaydi)
-      insert: chain,
-      into: chain,
-      values: chain,
-      orIgnore: chain,
-      returning: chain,
-      execute: async () => ({ raw: [] }),
-    });
-    (base.manager as unknown as Record<string, unknown>).createQueryBuilder =
-      () => qb;
-    return base.manager;
-  }
+  const cfg = { is_active: true, activated_at: T0 - 90 * DAY };
 
-  const row = (dispatchedDaysAgo: number, over: Record<string, unknown> = {}) => ({
-    id: `o-${dispatchedDaysAgo}`,
-    order_number: 100000 + dispatchedDaysAgo,
-    // ⚠️ SATR — xom SQL `bigint` ni shunday qaytaradi.
-    courier_tariff: '20000',
-    where_deliver: 'address',
-    post_created_at: String(T0 - dispatchedDaysAgo * DAY),
-    post_region_id: null,
-    market_name: 'Test market',
+  it('qarz yetarli bo‘lsa to‘liq bonus', async () => {
+    const h = makeManager({
+      config: cfg,
+      rules: [bonusRule()],
+      courierBalance: 50000,
+    });
+    await service.recordForOrder(h.manager, {
+      order: order(),
+      markedAt: T0 + DAY,
+    });
+    expect(h.cashWrites[0].operation_type).toBe('expense');
+    expect(h.cashWrites[0].amount).toBe(5000);
+    expect(h.balance).toBe(45000);
+  });
+
+  it('qarz kam bo‘lsa bonus qisqaradi', async () => {
+    const h = makeManager({
+      config: cfg,
+      rules: [bonusRule()],
+      courierBalance: 2000,
+    });
+    await service.recordForOrder(h.manager, {
+      order: order(),
+      markedAt: T0 + DAY,
+    });
+    // Daftarga ham AMALDAGI summa yoziladi
+    expect(h.inserted[0].amount).toBe(-2000);
+    expect(h.cashWrites[0].amount).toBe(2000);
+    expect(h.balance).toBe(0);
+  });
+
+  /** Qarz yo'q — bonus ham yo'q, kassa manfiyga tushmaydi. */
+  it('qarz bo‘lmasa bonus yozilmaydi', async () => {
+    const h = makeManager({
+      config: cfg,
+      rules: [bonusRule()],
+      courierBalance: 0,
+    });
+    const r = await service.recordForOrder(h.manager, {
+      order: order(),
+      markedAt: T0 + DAY,
+    });
+    expect(r).toBeNull();
+    expect(h.cashWrites).toHaveLength(0);
+  });
+});
+
+/**
+ * TESKARI QAYTARISH — rollback va qo'lda bekor qilish uchun YAGONA yo'l.
+ */
+describe('reverseForOrder', () => {
+  const realEntry = (over: Record<string, unknown> = {}) => ({
+    id: 'e-1',
+    order_id: ORDER_ID,
+    courier_id: COURIER_ID,
+    rule_id: 'r-1',
+    kind: 'penalty',
+    reason: 'late_mark',
+    amount: 6000,
+    late_days: 3,
+    base_tariff: 50000,
+    shadow: false,
+    cashbox_history_id: 'hist-0',
+    waives_entry_id: null,
     ...over,
   });
 
-  it('istisno qilingan kuryerga bo‘sh hisobot', async () => {
-    const manager = makeReportManager({
-      rows: [row(10)],
-      courier: { id: COURIER_ID, penalty_exempt: true, tariff_home: 20000 },
+  it('haqiqiy shtrafni kassadan qaytaradi', async () => {
+    const h = makeManager({ entries: [realEntry()], courierBalance: 100000 });
+    const n = await service.reverseForOrder(h.manager, {
+      orderId: ORDER_ID,
+      reason: 'sale_rolled_back',
+      actorId: ADMIN_ID,
     });
-    const r = await service.myDeadlines(manager, COURIER_ID, T0);
-    expect(r.module.exempt).toBe(true);
-    expect(r.orders).toHaveLength(0);
-  });
-
-  it('muddat ichidagi buyurtma — qolgan kun, shtraf 0', async () => {
-    const manager = makeReportManager({
-      rows: [row(1)],
-      config: { shadow_since: T0 - 90 * DAY },
-    });
-    const r = await service.myDeadlines(manager, COURIER_ID, T0);
-    expect(r.orders).toHaveLength(1);
-    const o = r.orders[0];
-    expect(o.days_left).toBe(DEADLINE); // 5 kun oyna, 1 kun o'tdi → 4
-    expect(o.late_days).toBe(0);
-    expect(o.penalty_now).toBe(0);
-    expect(o.due_today).toBe(false);
-    // Ertaga ham hali muddat ichida
-    expect(o.penalty_tomorrow).toBe(0);
+    expect(n).toBe(1);
+    expect(h.cashWrites).toHaveLength(1);
+    expect(h.cashWrites[0].operation_type).toBe('expense');
+    expect(h.cashWrites[0].amount).toBe(6000);
+    expect(h.balance).toBe(94000);
   });
 
   /**
-   * «Bugun muddati tugaydi» — ayni shu holat uchun ogohlantirish chiqadi.
-   * Ertaga bosilsa shtraf BOSHLANADI, shuning uchun `penalty_tomorrow`
-   * musbat bo'lishi SHART — aks holda ogohlantirishning ma'nosi yo'q.
+   * ⚠️ SOYA QATORIGA PUL QAYTARILMAYDI. Shartsiz qaytarilsa, hech qachon
+   * UNDIRILMAGAN shtraf uchun kuryerga haqiqiy pul berilardi — jazo
+   * o'rniga mukofot.
    */
-  it('bugun oxirgi kun — ertaga shtraf boshlanadi', async () => {
-    const manager = makeReportManager({
-      rows: [row(4)],
-      config: { shadow_since: T0 - 90 * DAY },
+  it('soya qatoriga pul qaytarilmaydi', async () => {
+    const h = makeManager({
+      entries: [realEntry({ shadow: true, cashbox_history_id: null })],
+      courierBalance: 100000,
     });
-    const r = await service.myDeadlines(manager, COURIER_ID, T0);
-    const o = r.orders[0];
-    expect(o.due_today).toBe(true);
-    expect(o.penalty_now).toBe(0);
-    expect(o.penalty_tomorrow).toBe(2000);
-    expect(r.summary.due_today).toBe(1);
-    expect(r.summary.penalty_tomorrow).toBe(2000);
+    const n = await service.reverseForOrder(h.manager, {
+      orderId: ORDER_ID,
+      reason: 'sale_rolled_back',
+      actorId: ADMIN_ID,
+    });
+    // Daftar qatori yoziladi, LEKIN kassaga tegilmaydi
+    expect(n).toBe(1);
+    expect(h.cashWrites).toHaveLength(0);
+    expect(h.balance).toBe(100000);
   });
 
-  it('kechikkan buyurtma — hozirgi va ertangi summa', async () => {
-    const manager = makeReportManager({
-      rows: [row(7)],
-      config: { shadow_since: T0 - 90 * DAY },
+  /** Ikki marta qaytarilsa kuryer qarzi asossiz kamayardi. */
+  it('allaqachon qaytarilgan yozuv ikkinchi marta qaytarilmaydi', async () => {
+    const h = makeManager({
+      entries: [
+        realEntry(),
+        { id: 'w-1', kind: 'waiver', waives_entry_id: 'e-1', amount: -6000 },
+      ],
+      courierBalance: 100000,
     });
-    const r = await service.myDeadlines(manager, COURIER_ID, T0);
-    const o = r.orders[0];
-    expect(o.late_days).toBe(3);
-    expect(o.penalty_now).toBe(6000);
-    expect(o.penalty_tomorrow).toBe(8000);
-    expect(o.days_left).toBeNull();
-    expect(r.summary.overdue).toBe(1);
+    const n = await service.reverseForOrder(h.manager, {
+      orderId: ORDER_ID,
+      reason: 'sale_rolled_back',
+      actorId: ADMIN_ID,
+    });
+    expect(n).toBe(0);
+    expect(h.cashWrites).toHaveLength(0);
   });
 
-  /**
-   * ⚠️ `penalty_max` — POL. Eng yomon holat tarif bilan chegaralangan,
-   * «kun × narx» cheksiz o'smaydi. Kuryerga cheksiz o'sadigan son
-   * ko'rsatilsa, u modulni jazo emas, qarz tuzog'i deb qabul qilardi.
-   */
-  it('eng yomon holat tarif bilan chegaralangan', async () => {
-    const manager = makeReportManager({
-      rows: [row(40)],
-      config: { shadow_since: T0 - 90 * DAY },
+  /** Bitta yozuvni nishonlash — qo'lda bekor qilish yo'li. */
+  it('entryId berilsa faqat o‘sha yozuv qaytariladi', async () => {
+    const h = makeManager({ entries: [realEntry()], courierBalance: 100000 });
+    const n = await service.reverseForOrder(h.manager, {
+      orderId: ORDER_ID,
+      entryId: 'e-1',
+      reason: 'system_fault',
+      actorId: ADMIN_ID,
     });
-    const r = await service.myDeadlines(manager, COURIER_ID, T0);
-    expect(r.orders[0].penalty_max).toBe(20000);
-    expect(r.orders[0].penalty_now).toBe(20000);
-    expect(r.orders[0].capped).toBe(true);
+    expect(n).toBe(1);
   });
 
-  /**
-   * Grandfathering: modul yoqilishidan oldin jo'natilgan buyurtma
-   * ro'yxatda KO'RINADI (kuryer uni ko'rib turishi kerak), lekin
-   * summalari 0 va `immune` belgisi bor — «nega bunga shtraf yo'q»
-   * savoli tug'ilmasin.
-   */
-  it('modul yoqilishidan oldingi buyurtma — immune, summalar 0', async () => {
-    const manager = makeReportManager({
-      rows: [row(40)],
-      config: { shadow_since: T0 - 10 * DAY },
-    });
-    const r = await service.myDeadlines(manager, COURIER_ID, T0);
-    const o = r.orders[0];
-    expect(o.immune).toBe(true);
-    expect(o.penalty_now).toBe(0);
-    expect(o.penalty_max).toBe(0);
-    // Xulosaga ham kirmaydi
-    expect(r.summary.overdue).toBe(0);
-    expect(r.summary.penalty_max).toBe(0);
-  });
-
-  it('xulosa bir nechta buyurtmani jamlaydi', async () => {
-    const manager = makeReportManager({
-      rows: [row(1), row(4), row(7), row(9)],
-      config: { shadow_since: T0 - 90 * DAY },
-    });
-    const r = await service.myDeadlines(manager, COURIER_ID, T0);
-    expect(r.summary.pending).toBe(4);
-    expect(r.summary.due_today).toBe(1);
-    expect(r.summary.overdue).toBe(2);
-    // 3 kun × 2000 + 5 kun × 2000 = 6000 + 10000
-    expect(r.summary.penalty_now).toBe(16000);
-    // ertaga: 2000 (bugun tugaydigan) + 8000 + 12000
-    expect(r.summary.penalty_tomorrow).toBe(22000);
-  });
-
-  /** Soya rejimi klientga OCHIQ aytiladi — ekran yolg'on gapirmasin. */
-  it('soya rejimi hisobotda ko‘rinadi', async () => {
-    const manager = makeReportManager({
-      rows: [row(7)],
-      config: { is_active: false, shadow_since: T0 - 90 * DAY },
-    });
-    const r = await service.myDeadlines(manager, COURIER_ID, T0);
-    expect(r.module.active).toBe(false);
+  it('qaytariladigan yozuv bo‘lmasa 0', async () => {
+    const h = makeManager({ entries: [] });
+    expect(
+      await service.reverseForOrder(h.manager, {
+        orderId: ORDER_ID,
+        reason: 'sale_rolled_back',
+        actorId: ADMIN_ID,
+      }),
+    ).toBe(0);
   });
 });
 

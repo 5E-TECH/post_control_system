@@ -1,13 +1,21 @@
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
-import { Gavel, ClipboardList, ListChecks, ScrollText, Sigma } from "lucide-react";
+import {
+  ClipboardList,
+  Gavel,
+  ListChecks,
+  ScrollText,
+  Settings2,
+  Sigma,
+} from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import OverdueTab from "./tabs/OverdueTab";
 import LedgerTab from "./tabs/LedgerTab";
 import RulesTab from "./tabs/RulesTab";
 import SummaryTab from "./tabs/SummaryTab";
+import SettingsTab from "./tabs/SettingsTab";
 
-type TabKey = "overdue" | "summary" | "ledger" | "rules";
+type TabKey = "overdue" | "summary" | "ledger" | "rules" | "settings";
 
 /**
  * KURYER SHTRAFLARI — admin ekrani.
@@ -31,6 +39,7 @@ const CourierPenaltyPage = () => {
     { key: "summary", label: t("tabs.summary"), icon: <Sigma className="h-4 w-4" /> },
     { key: "ledger", label: t("tabs.ledger"), icon: <ScrollText className="h-4 w-4" /> },
     { key: "rules", label: t("tabs.rules"), icon: <ClipboardList className="h-4 w-4" /> },
+    { key: "settings", label: t("tabs.settings"), icon: <Settings2 className="h-4 w-4" /> },
   ];
 
   return (
@@ -72,6 +81,7 @@ const CourierPenaltyPage = () => {
         {active === "summary" && <SummaryTab />}
         {active === "ledger" && <LedgerTab />}
         {active === "rules" && <RulesTab />}
+      {active === "settings" && <SettingsTab />}
       </div>
     </div>
   );

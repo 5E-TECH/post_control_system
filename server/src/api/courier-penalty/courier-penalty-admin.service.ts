@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource, EntityManager, In } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull } from 'typeorm';
 import { CourierPenaltyConfigEntity } from 'src/core/entity/courier-penalty-config.entity';
 import { CourierPenaltyRuleEntity } from 'src/core/entity/courier-penalty-rule.entity';
 import { CourierPenaltyEntryEntity } from 'src/core/entity/courier-penalty-entry.entity';
@@ -17,6 +17,8 @@ import {
 } from '../order/utils/courier-penalty.util';
 import { CourierPenaltyService } from './courier-penalty.service';
 import { WAIVER_REASONS, type WaiverReason } from './waiver-reasons.const';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import type { JwtPayload } from 'src/common/utils/types/user.type';
 
 /**
  * SHTRAF MODULI — ADMIN TOMONI.
@@ -33,6 +35,13 @@ export class CourierPenaltyAdminService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly core: CourierPenaltyService,
+    /**
+     * ⚠️ Pul kassaga tega boshlagandan keyin «kim yoqdi, kim 2 000 ni
+     * 20 000 ga o'zgartirdi, kim shtrafni bekor qildi» savollariga javob
+     * FAQAT shu orqali bo'ladi. `ActivityLogModule` global, shuning uchun
+     * modulga import qo'shish shart emas.
+     */
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   private get manager(): EntityManager {
@@ -353,6 +362,14 @@ export class CourierPenaltyAdminService {
         COALESCE(sum(-"amount") FILTER (WHERE "kind" = 'waiver'), 0) AS waiver_sum,
         count(DISTINCT "courier_id")                             AS couriers,
         count(*) FILTER (WHERE "shadow" = true)                  AS shadow_count,
+        -- ⚠️ HAQIQIY QATLAM: kuryer kassasiga yozilgan yagona to'g'ri
+        -- yig'indi. Aynan shu son kassadagi courier_penalty yozuvlari
+        -- yig'indisiga TENG bo'lishi shart (invariant I-CP6) — soya bilan
+        -- aralashtirilsa hech qachon to'g'rilanmaydigan raqam chiqardi.
+        COALESCE(sum("amount") FILTER (WHERE "shadow" = false), 0) AS real_net,
+        count(*) FILTER (WHERE "shadow" = false)                 AS real_count,
+        -- Soya qatlami — «yoqilganda qancha bo'lardi»
+        COALESCE(sum("amount") FILTER (WHERE "shadow" = true), 0)  AS shadow_net,
         -- Tarif chegarasiga urilgan: shtraf AYNAN tarifga teng chiqqan
         count(*) FILTER (
           WHERE "kind" = 'penalty' AND "base_tariff" IS NOT NULL
@@ -380,8 +397,22 @@ export class CourierPenaltyAdminService {
       shadow_count: num(totals?.shadow_count),
       /** Pol ishlagan yozuvlar — «darajalar kerakmi» signali. */
       capped_count: num(totals?.capped_count),
-      /** Shtraf − bekor qilinganlar: haqiqiy ta'sir. */
-      net: num(totals?.penalty_sum) - num(totals?.waiver_sum),
+      /**
+       * ⚠️ IKKI QATLAM ATAYLAB AJRATILGAN.
+       *
+       * `real_net` — kuryer kassasiga HAQIQATAN yozilgan summa
+       * (shtraf − bonus − bekor qilish). Faqat shu son kassa bilan
+       * solishtiriladi.
+       *
+       * `shadow_net` — «yoqilganda qancha bo'lardi». U hech qachon
+       * kassada aks etmaydi va etmasligi ham kerak.
+       *
+       * Ikkisini qo'shib bitta `net` qilish — bir-biriga to'g'ri
+       * kelmaydigan raqam yasash degani.
+       */
+      real: { count: num(totals?.real_count), net: num(totals?.real_net) },
+      shadow: { count: num(totals?.shadow_count), net: num(totals?.shadow_net) },
+      net: num(totals?.real_net),
     };
   }
 
@@ -425,20 +456,76 @@ export class CourierPenaltyAdminService {
       active_from: dto.active_from ?? now,
       created_by: actorId,
     } as CourierPenaltyRuleEntity);
-    return this.manager.save(rule);
+    const saved = await this.manager.save(rule);
+
+    await this.activityLog.log({
+      entity_type: 'courier_penalty_rule',
+      entity_id: saved.id,
+      action: 'rule_created',
+      new_value: {
+        event: saved.event,
+        scope_type: saved.scope_type,
+        threshold_days: saved.threshold_days,
+        calc: saved.calc,
+        amount: Number(saved.amount),
+      },
+      description: 'Shtraf qoidasi qo‘shildi',
+      user: { id: actorId },
+    });
+
+    return saved;
   }
 
   async updateRule(
     id: string,
     dto: Partial<CourierPenaltyRuleEntity>,
+    user: JwtPayload,
   ): Promise<CourierPenaltyRuleEntity> {
     const rule = await this.manager.findOne(CourierPenaltyRuleEntity, {
       where: { id },
     });
     if (!rule) throw new NotFoundException('Qoida topilmadi');
+
+    /**
+     * ⚠️ ESKI HOLAT `Object.assign` DAN OLDIN OLINADI.
+     *
+     * Qoida = PUL miqdori. «Kim 2 000 so'mni 20 000 ga o'zgartirdi»
+     * degan savolga javob faqat shu nusxa bilan bo'ladi — `Object.assign`
+     * dan keyin olingan «eski qiymat» yangisining o'zi bo'lib qolardi.
+     */
+    const before = {
+      event: rule.event,
+      scope_type: rule.scope_type,
+      threshold_days: rule.threshold_days,
+      calc: rule.calc,
+      amount: Number(rule.amount),
+      max_amount: rule.max_amount == null ? null : Number(rule.max_amount),
+      is_active: rule.is_active,
+    };
+
     Object.assign(rule, dto);
     this.assertRule(rule);
-    return this.manager.save(rule);
+    const saved = await this.manager.save(rule);
+
+    await this.activityLog.log({
+      entity_type: 'courier_penalty_rule',
+      entity_id: id,
+      action: 'rule_updated',
+      old_value: before,
+      new_value: {
+        event: saved.event,
+        scope_type: saved.scope_type,
+        threshold_days: saved.threshold_days,
+        calc: saved.calc,
+        amount: Number(saved.amount),
+        max_amount: saved.max_amount == null ? null : Number(saved.max_amount),
+        is_active: saved.is_active,
+      },
+      description: 'Shtraf qoidasi o‘zgartirildi',
+      user,
+    });
+
+    return saved;
   }
 
   /**
@@ -448,14 +535,28 @@ export class CourierPenaltyAdminService {
    * qaysi qoida bo'yicha yozilgan» degan savol oylar o'tib ham javobsiz
    * qolmasligi kerak. Qator o'chirilsa dalil yo'qolardi.
    */
-  async deactivateRule(id: string) {
+  async deactivateRule(id: string, user: JwtPayload) {
     const rule = await this.manager.findOne(CourierPenaltyRuleEntity, {
       where: { id },
     });
     if (!rule) throw new NotFoundException('Qoida topilmadi');
+
+    const before = { is_active: rule.is_active, active_to: rule.active_to };
     rule.is_active = false;
     rule.active_to = Date.now();
-    return this.manager.save(rule);
+    const saved = await this.manager.save(rule);
+
+    await this.activityLog.log({
+      entity_type: 'courier_penalty_rule',
+      entity_id: id,
+      action: 'rule_deactivated',
+      old_value: before,
+      new_value: { is_active: false, active_to: saved.active_to },
+      description: 'Shtraf qoidasi so‘ndirildi',
+      user,
+    });
+
+    return saved;
   }
 
   /**
@@ -541,37 +642,151 @@ export class CourierPenaltyAdminService {
       if (existing)
         throw new BadRequestException('Bu yozuv allaqachon bekor qilingan');
 
-      const now = Date.now();
-      const waiver = m.create(CourierPenaltyEntryEntity, {
-        created_at: now,
-        updated_at: now,
-        order_id: entry.order_id,
-        courier_id: entry.courier_id,
-        rule_id: entry.rule_id,
-        kind: 'waiver',
+      /**
+       * ⚠️ PUL YO'LI YADRO SERVISDA. Teskari kassa yozuvi, soya
+       * tekshiruvi va ikki marta qaytarmaslik qoidasi `reverseForOrder`
+       * ichida — rollback ham AYNI yo'ldan o'tadi. Ikki nusxa yozilsa
+       * ular vaqt o'tib ajralib ketardi va biri pulni qaytarib, ikkinchisi
+       * qaytarmay qo'yardi.
+       */
+      const reversed = await this.core.reverseForOrder(m, {
+        orderId: entry.order_id,
+        entryId: entry.id,
         reason,
-        // Teskari ishora — asl yozuvni so'ndiradi.
-        amount: -Number(entry.amount),
-        late_days: entry.late_days,
-        base_tariff: entry.base_tariff,
-        /**
-         * Soya holati ASL yozuvdan ko'chiriladi: soyadagi shtrafni bekor
-         * qilish ham soyada qoladi, aks holda yig'indi hisobi aralashardi.
-         */
-        shadow: entry.shadow,
-        cashbox_history_id: null,
-        waives_entry_id: entry.id,
-        applied_by: actorId,
+        actorId,
         note,
       });
-      return m.save(waiver);
+      if (!reversed)
+        throw new BadRequestException('Yozuvni bekor qilib bo‘lmadi');
+
+      await this.activityLog.log({
+        entity_type: 'courier_penalty_entry',
+        entity_id: entry.id,
+        action: 'penalty_waived',
+        old_value: {
+          amount: Number(entry.amount),
+          kind: entry.kind,
+          shadow: entry.shadow,
+        },
+        new_value: { reason, note },
+        description: `Shtraf bekor qilindi: ${reason}`,
+        user: { id: actorId },
+        manager: m,
+      });
+
+      return { reversed, entry_id: entry.id };
     });
   }
 
-  /** Kuryerlar ro'yxati — qoida va filtr tanlovlari uchun. */
+  // ══════════════════ MODULNI YOQISH / O'CHIRISH ══════════════════
+
+  /**
+   * MODULNI YOQADI yoki O'CHIRADI.
+   *
+   * ⚠️ YOQISHDA `activated_at` HAR SAFAR QAYTA QO'YILADI.
+   *
+   * Bu grandfathering langari: modul faqat shu paytdan KEYIN JO'NATILGAN
+   * buyurtmalarga tegadi. Agar langar eski qiymatida qoldirilsa,
+   * o'chirilgan davrda jo'natilgan buyurtmalar qayta yoqilganda birdan
+   * haqiqiy shtrafga tushardi — ya'ni «o'chirib qo'ydim» degan qaror
+   * orqaga qaytib kuryerlardan pul yechilardi.
+   *
+   * O'chirish ESKI yozuvlarni qaytarmaydi: undirilgan shtraf joyida
+   * qoladi. Uni qaytarish kerak bo'lsa — har biri alohida, sabab bilan
+   * (`waive`). Bu ataylab: ommaviy jim qaytarish dalilsiz pul harakati
+   * bo'lardi.
+   */
+  async setActive(active: boolean, user: JwtPayload) {
+    const config = await this.manager.findOne(CourierPenaltyConfigEntity, {
+      where: {},
+      order: { created_at: 'ASC' },
+    });
+    /**
+     * ⚠️ `getOrCreate` ATAYLAB EMAS. Singleton qator migratsiyada ekilgan;
+     * bu yerda yaratish ikkinchi qator tug'ilishi xavfini ochardi va
+     * keyin «qaysi biri haqiqiy» degan savol chiqardi.
+     */
+    if (!config)
+      throw new NotFoundException(
+        'Modul kaliti topilmadi — migratsiya qo‘llanganmi?',
+      );
+
+    const before = {
+      is_active: config.is_active,
+      activated_at: config.activated_at,
+    };
+
+    config.is_active = active;
+    if (active) config.activated_at = Date.now();
+    config.updated_by = user.id;
+    const saved = await this.manager.save(config);
+
+    await this.activityLog.log({
+      entity_type: 'courier_penalty_config',
+      entity_id: config.id,
+      action: active ? 'module_enabled' : 'module_disabled',
+      old_value: before,
+      new_value: {
+        is_active: saved.is_active,
+        activated_at: saved.activated_at,
+      },
+      description: active
+        ? 'Kuryer shtraf moduli YOQILDI — shtraf kassaga yoziladi'
+        : 'Kuryer shtraf moduli O‘CHIRILDI — soya rejimiga qaytdi',
+      user,
+    });
+
+    return saved;
+  }
+
+  /**
+   * Kuryerni shtrafdan QO'LDA istisno qiladi (yoki istisnoni oladi).
+   *
+   * Tashqi provayder kuryerlari kodda allaqachon istisno; bu bayroq
+   * ichki kuryerni alohida chiqarish uchun (masalan uzoq ta'til,
+   * maxsus kelishuv).
+   */
+  async setExempt(courierId: string, exempt: boolean, user: JwtPayload) {
+    const courier = await this.manager.findOne(UserEntity, {
+      where: { id: courierId, role: Roles.COURIER },
+      select: ['id', 'name', 'penalty_exempt'],
+    });
+    if (!courier) throw new NotFoundException('Kuryer topilmadi');
+
+    const before = courier.penalty_exempt;
+    courier.penalty_exempt = exempt;
+    await this.manager.save(UserEntity, courier);
+
+    await this.activityLog.log({
+      entity_type: 'user',
+      entity_id: courierId,
+      action: exempt ? 'penalty_exempted' : 'penalty_unexempted',
+      old_value: { penalty_exempt: before },
+      new_value: { penalty_exempt: exempt },
+      description: `${courier.name ?? courierId} shtraf modulidan ${
+        exempt ? 'chiqarildi' : 'qaytarildi'
+      }`,
+      user,
+    });
+
+    return { id: courierId, penalty_exempt: exempt };
+  }
+
+  /**
+   * Kuryerlar ro'yxati — qoida qamrovi, filtr va istisno ekrani uchun.
+   *
+   * ⚠️ TASHQI PROVAYDER VAKILLARI CHIQARIB TASHLANADI.
+   *
+   * Elchi/LDG posilkalarini virtual vakil-kuryer belgilaydi va ular
+   * KODDA allaqachon istisno — shtraf ularga hech qachon yozilmaydi.
+   * Ro'yxatda qolsa ikki joyda chalg'itardi: istisno ekranida
+   * «istisno qilish» o'tkagichi hech narsa qilmasdi, qoida qamrovida
+   * esa admin ular uchun hech qachon ishlamaydigan qoida yozib
+   * qo'yardi.
+   */
   async couriers() {
     return this.manager.find(UserEntity, {
-      where: { role: Roles.COURIER },
+      where: { role: Roles.COURIER, external_provider: IsNull() },
       select: ['id', 'name', 'phone_number', 'penalty_exempt', 'region_id'],
       order: { name: 'ASC' },
     });

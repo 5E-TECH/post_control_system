@@ -126,7 +126,32 @@ export interface PenaltySummary {
   shadow_count: number;
   /** Tarif chegarasiga urilganlar — «darajalar kerakmi» signali. */
   capped_count: number;
+  /**
+   * ⚠️ IKKI QATLAM ATAYLAB AJRATILGAN.
+   *
+   * `real` — kuryer kassasiga HAQIQATAN yozilgan summa. Faqat shu son
+   * kassa bilan solishtiriladi.
+   * `shadow` — «yoqilganda qancha bo'lardi»; kassada hech qachon aks
+   * etmaydi. Ikkisini qo'shish bir-biriga to'g'ri kelmaydigan raqam
+   * yasash degani.
+   */
+  real: { count: number; net: number };
+  shadow: { count: number; net: number };
   net: number;
+}
+
+export interface PenaltyConfig {
+  id: string;
+  is_active: boolean;
+  activated_at: number | null;
+  shadow_since: number | null;
+}
+
+export interface PenaltyCourier {
+  id: string;
+  name: string;
+  phone_number: string;
+  penalty_exempt: boolean;
 }
 
 export interface PenaltyRule {
@@ -201,8 +226,14 @@ export const useCourierPenaltyAdmin = () => {
       staleTime: Infinity,
     });
 
+  const getConfig = () =>
+    useQuery<PenaltyConfig | null>({
+      queryKey: [courierPenaltyKey, "config"],
+      queryFn: () => api.get(`${ADMIN}/config`).then((r) => r.data?.data),
+    });
+
   const getCouriers = () =>
-    useQuery<Array<{ id: string; name: string; phone_number: string }>>({
+    useQuery<PenaltyCourier[]>({
       queryKey: [courierPenaltyKey, "couriers"],
       queryFn: () => api.get(`${ADMIN}/couriers`).then((r) => r.data?.data),
       staleTime: 5 * 60_000,
@@ -226,6 +257,24 @@ export const useCourierPenaltyAdmin = () => {
     onSuccess: invalidate,
   });
 
+  /**
+   * MODULNI YOQISH / O'CHIRISH.
+   *
+   * ⚠️ `activated_at` ni klient BERMAYDI — uni server qo'yadi. Aks holda
+   * langarni orqaga surib, o'tgan davr uchun pul yechish mumkin bo'lardi.
+   */
+  const setActive = useMutation({
+    mutationFn: (active: boolean) =>
+      api.post(`${ADMIN}/config/active`, { active }).then((r) => r.data),
+    onSuccess: invalidate,
+  });
+
+  const setExempt = useMutation({
+    mutationFn: ({ id, exempt }: { id: string; exempt: boolean }) =>
+      api.patch(`${ADMIN}/couriers/${id}/exempt`, { exempt }).then((r) => r.data),
+    onSuccess: invalidate,
+  });
+
   const waive = useMutation({
     mutationFn: ({
       id,
@@ -244,6 +293,9 @@ export const useCourierPenaltyAdmin = () => {
     getOverdue,
     getEntries,
     getSummary,
+    getConfig,
+    setActive,
+    setExempt,
     getRules,
     getWaiverReasons,
     getCouriers,

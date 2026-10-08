@@ -23,6 +23,8 @@ import {
   EntriesQueryDto,
   OverdueQueryDto,
   SummaryQueryDto,
+  SetActiveDto,
+  SetExemptDto,
   UpsertRuleDto,
   WaiveEntryDto,
 } from './dto/courier-penalty.dto';
@@ -112,11 +114,12 @@ export class CourierPenaltyAdminController {
   @ApiOperation({ summary: 'Qoidani o‘zgartirish' })
   @Patch('rules/:id')
   async updateRule(
+    @CurrentUser() user: JwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpsertRuleDto,
   ) {
     return successRes(
-      await this.service.updateRule(id, dto as never),
+      await this.service.updateRule(id, dto as never, user),
       200,
       'Rule updated',
     );
@@ -128,11 +131,49 @@ export class CourierPenaltyAdminController {
       "O'CHIRMAYDI — `is_active = false` qiladi. Daftar yozuvlari `rule_id` orqali qoidaga ishora qiladi; qator o'chirilsa «bu shtraf qaysi qoida bo'yicha yozilgan» degan dalil yo'qolardi.",
   })
   @Delete('rules/:id')
-  async deactivateRule(@Param('id', ParseUUIDPipe) id: string) {
+  async deactivateRule(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return successRes(
-      await this.service.deactivateRule(id),
+      await this.service.deactivateRule(id, user),
       200,
       'Rule deactivated',
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Modulni YOQISH / O‘CHIRISH',
+    description:
+      "⚠️ Yoqishda `activated_at` HAR SAFAR qayta qo'yiladi — modul faqat shu paytdan KEYIN jo'natilgan buyurtmalarga tegadi. Aks holda o'chirilgan davrda jo'natilganlar qayta yoqilganda birdan shtrafga tushardi. O'chirish eski yozuvlarni QAYTARMAYDI.",
+  })
+  @Post('config/active')
+  async setActive(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: SetActiveDto,
+  ) {
+    return successRes(
+      await this.service.setActive(dto.active, user),
+      200,
+      dto.active ? 'Module enabled' : 'Module disabled',
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Kuryerni shtrafdan istisno qilish / qaytarish',
+    description:
+      "Tashqi provayder kuryerlari kodda allaqachon istisno; bu bayroq ichki kuryerni alohida chiqarish uchun.",
+  })
+  @Patch('couriers/:id/exempt')
+  async setExempt(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetExemptDto,
+  ) {
+    return successRes(
+      await this.service.setExempt(id, dto.exempt, user),
+      200,
+      'Exemption updated',
     );
   }
 
