@@ -1,0 +1,113 @@
+{
+  "title": "Kuryer shtraflari",
+  "subtitle": "Kechikkan belgilashlar, daftar va qoidalar",
+  "currency": "so'm",
+  "order": "Buyurtma",
+  "market": "Market",
+  "courier": "Kuryer",
+  "tabs": {
+    "overdue": "Kechikkanlar",
+    "summary": "Yig'indi",
+    "ledger": "Daftar",
+    "rules": "Qoidalar"
+  },
+  "overdue": {
+    "empty": "Kechikkan buyurtma yo'q",
+    "couriers": "Kuryerlar",
+    "orders": "Buyurtmalar",
+    "penaltyNow": "Hozirgi shtraf",
+    "minDays": "Eng kam kechikish (kun)",
+    "pcs": "ta",
+    "days": "kun",
+    "lateDays": "Kechikish",
+    "penalty": "Shtraf",
+    "cap": "Chegara",
+    "immune": "Tegilmaydi",
+    "immuneHint": "Modul yoqilishidan oldin jo'natilgan — shtrafga tushmaydi"
+  },
+  "summary": {
+    "live": "Modul YOQILGAN",
+    "liveHint": "Shtraflar kuryer kassasiga yozilmoqda",
+    "shadow": "Sinov rejimi",
+    "shadowHint": "{{since}} dan beri hisoblanmoqda, lekin pul yechilmaydi",
+    "penalty": "Shtraf",
+    "bonus": "Bonus",
+    "waived": "Bekor qilingan",
+    "net": "Sof ta'sir",
+    "entries": "{{count}} ta yozuv",
+    "couriers": "{{count}} kuryer",
+    "cappedTitle": "{{count}} ta shtraf tarif chegarasiga urildi ({{share}}%)",
+    "cappedHigh": "Yarmidan ko'pi chegaraga urgan — bitta tekis qoida yetarli emas. Kechikish darajalari qo'shishni ko'rib chiqing: uzoq kechikishda stavka oshsin, qisqasida pasaysin.",
+    "cappedLow": "Chegara kamdan-kam ishlayapti — hozirgi qoida muvozanatli."
+  },
+  "ledger": {
+    "all": "Hammasi",
+    "date": "Sana",
+    "kind": "Tur",
+    "reason": "Sabab",
+    "amount": "Summa",
+    "action": "Amal",
+    "empty": "Yozuv yo'q",
+    "shadow": "soya",
+    "shadowHint": "Sinov rejimi — pulga tegilmagan",
+    "waive": "Bekor qilish",
+    "waiveTitle": "#{{n}} shtrafini bekor qilish",
+    "waiveAmount": "Summa",
+    "note": "Izoh",
+    "notePlaceholder": "Ixtiyoriy tafsilot",
+    "waived": "Shtraf bekor qilindi",
+    "waiveFailed": "Bekor qilib bo'lmadi",
+    "alreadyWaived": "bekor qilingan"
+  },
+  "rules": {
+    "add": "Qoida qo'shish",
+    "edit": "O'zgartirish",
+    "save": "Saqlash",
+    "saved": "Saqlandi",
+    "saveFailed": "Saqlab bo'lmadi",
+    "scope": "Qamrov",
+    "event": "Hodisa",
+    "threshold": "Muddat (kun)",
+    "bonusTier": "Daraja (kun ichida)",
+    "calc": "Hisob",
+    "amount": "Summa",
+    "max": "Eng ko'pi",
+    "capTariff": "Tarif",
+    "off": "So'ndirish",
+    "turnedOff": "Qoida so'ndirildi",
+    "offTitle": "Qoidani so'ndirasizmi?",
+    "offHint": "Qoida o'chirilmaydi — faqat so'ndiriladi. Eski yozuvlar qaysi qoida bo'yicha yozilgani ko'rinib qoladi.",
+    "previewPenalty": "Kechikkan har kun uchun {{amount}} so'm shtraf ({{unit}})",
+    "previewBonus": "Muddatida belgilansa {{amount}} so'm bonus"
+  },
+  "kind": {
+    "penalty": "Shtraf",
+    "bonus": "Bonus",
+    "waiver": "Bekor qilindi"
+  },
+  "scope": {
+    "global": "Hammaga",
+    "courier": "Kuryer",
+    "region": "Viloyat"
+  },
+  "event": {
+    "late_mark": "Kech belgilash",
+    "early_mark": "Tez belgilash",
+    "damage": "Zarar"
+  },
+  "calc": {
+    "per_day": "Har kun",
+    "once": "Bir marta"
+  },
+  "reason": {
+    "late_mark": "Kech belgilash",
+    "early_mark": "Tez belgilash",
+    "damage": "Zarar",
+    "blocked_by_post": "Markaz sababli ushlanib qolgan",
+    "blocked_by_market": "Market sababli ushlanib qolgan",
+    "system_fault": "Tizim nosozligi",
+    "courier_absent": "Kuryer ishda bo'lmagan",
+    "wrong_rule": "Noto'g'ri sozlama",
+    "management_decision": "Rahbariyat qarori"
+  }
+}

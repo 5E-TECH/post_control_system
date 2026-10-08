@@ -160,6 +160,7 @@ const OperatorStats = lazy(
 const OperatorEarnings = lazy(() => import("../pages/operator-earnings"));
 const OperatorOrders = lazy(() => import("../pages/operator-orders"));
 const CourierBulk = lazy(() => import("../pages/courier-bulk"));
+const CourierPenalty = lazy(() => import("../pages/courier-penalty"));
 const MyRegion = lazy(() => import("../pages/my-region"));
 const Investor = lazy(() => import("../pages/investor"));
 const InvestorOverview = lazy(() => import("../pages/investor/overview"));
@@ -268,6 +269,17 @@ const AppRouters = () => {
               element: (
                 <RequireRole roles={["superadmin", "admin", "registrator"]}>
                   <ReplacementReturns />
+                </RequireRole>
+              ),
+            },
+            {
+              // Kuryer shtraflari — kechikkanlar, daftar, qoidalar.
+              // ⚠️ Faqat superadmin va admin: shtraf ma'lumoti kuryerning
+              // shaxsiy moliyaviy ma'lumoti, registrator ko'rmasligi kerak.
+              path: "courier-penalty",
+              element: (
+                <RequireRole roles={["superadmin", "admin"]}>
+                  <CourierPenalty />
                 </RequireRole>
               ),
             },

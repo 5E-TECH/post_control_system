@@ -416,8 +416,14 @@ export class CourierPenaltyService {
     );
   }
 
-  /** Kalit qatori; yo'q bo'lsa `null` — hisob soya sifatida davom etadi. */
-  private async loadConfig(
+  /**
+   * Kalit qatori; yo'q bo'lsa `null` — hisob soya sifatida davom etadi.
+   *
+   * ⚠️ OCHIQ: admin servisi ham AYNI shu manbadan o'qiydi. Nusxasini
+   * yozsa, admin ekrani bilan sotuv yo'li turli kalitni ko'rib qolishi
+   * mumkin edi.
+   */
+  async loadConfig(
     manager: EntityManager,
   ): Promise<CourierPenaltyConfigEntity | null> {
     return manager.findOne(CourierPenaltyConfigEntity, {
@@ -432,7 +438,7 @@ export class CourierPenaltyService {
    * kirishi kerak, keshlangan nusxa esa «nega hali ham eski summa» degan
    * tushunarsiz holat tug'dirardi.
    */
-  private async loadRules(manager: EntityManager): Promise<PenaltyRule[]> {
+  async loadRules(manager: EntityManager): Promise<PenaltyRule[]> {
     const rows = await manager.find(CourierPenaltyRuleEntity, {
       where: { is_active: true },
     });
