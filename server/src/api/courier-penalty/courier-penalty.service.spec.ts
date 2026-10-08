@@ -571,3 +571,107 @@ describe('xom SQL turlari', () => {
     expect(r.orders[0].penalty_max).toBe(20000);
   });
 });
+
+/**
+ * BEKOR YO'LI — QULFLANGAN QAROR.
+ *
+ * ⚠️ BU TEST QASDDAN «NOTO'G'RI KO'RINADIGAN» XULQNI QULFLAYDI.
+ *
+ * Umumiy qoida: «shtraf 0 gacha tushsin, undan pastga emas» — ya'ni
+ * kuryer hech qachon ustiga pul to'lamaydi. SOTUVDA bu ishlaydi: shtraf
+ * tarifdan oshmaydi.
+ *
+ * BEKORDA esa kuryerga tarif UMUMAN to'lanmaydi, ya'ni uning shu
+ * buyurtmadagi daromadi allaqachon NOL va shtraf boshqa buyurtmalardan
+ * ishlagan pulidan yechiladi — CHO'NTAKDAN.
+ *
+ * Qoidani so'zma-so'z o'qisak bekorga shtraf bo'lmasligi kerak edi.
+ * Shunday qilinmadi: u holda kuryer uchun eng foydali yo'l sotuvni
+ * vaqtida bosib, bekorni UMUMAN bosmaslik bo'lardi va bekorlar abadiy
+ * `waiting` bo'lib qolardi.
+ *
+ * Agar kelajakda kimdir «0 dan past emas» qoidasini bekorga ham
+ * qo'llamoqchi bo'lsa — bu test yiqiladi va uni shu izohga qaytaradi.
+ * Qarorni o'zgartirish KOD emas, SIYOSAT masalasi.
+ */
+describe('bekor yo‘li — qulflangan qaror', () => {
+  const cancelOrder = () =>
+    order({
+      // ⚠️ Bekorda bu ustun BO'SH qoladi — sotuv yo'li uni to'ldiradi.
+      courier_tariff: null,
+      where_deliver: Where_deliver.CENTER,
+    });
+
+  it('kechikkan BEKOR uchun shtraf YOZILADI', async () => {
+    const { manager, inserted } = makeManager({
+      courier: { id: COURIER_ID, tariff_center: 30000, tariff_home: 50000 },
+      config: { shadow_since: T0 - 90 * DAY },
+    });
+    await service.recordForOrder(manager, {
+      order: cancelOrder(),
+      markedAt: T0 + 7 * DAY,
+    });
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0].amount).toBe(6000); // 3 kun × 2 000
+  });
+
+  /**
+   * Chegara — kuryerning STAVKASI, ya'ni «shu buyurtma ko'pi bilan
+   * qancha keltirardi». Yetkazish turiga mos stavka olinishi SHART:
+   * markazga 30 000, uyga 50 000.
+   */
+  it('chegara yetkazish turiga mos stavkadan olinadi', async () => {
+    for (const [where, expected] of [
+      [Where_deliver.CENTER, 30000],
+      [Where_deliver.ADDRESS, 50000],
+    ] as const) {
+      const { manager, inserted } = makeManager({
+        courier: { id: COURIER_ID, tariff_center: 30000, tariff_home: 50000 },
+        config: { shadow_since: T0 - 90 * DAY },
+      });
+      await service.recordForOrder(manager, {
+        order: order({ courier_tariff: null, where_deliver: where }),
+        // Juda uzoq kechikish — chegara ishlashi uchun
+        markedAt: T0 + 90 * DAY,
+      });
+      expect(inserted[0].base_tariff).toBe(expected);
+      expect(inserted[0].amount).toBe(expected);
+    }
+  });
+
+  /**
+   * ⚠️ ENG MUHIM QATOR. Bekorda kuryer kassasiga HECH NARSA yozilmaydi,
+   * ya'ni bu summa uning boshqa daromadidan ketadi. Shu bilan ham
+   * shtraf NOLGA TUSHIRILMAYDI — qabul qilingan narx.
+   */
+  it('daromad nol bo‘lsa ham shtraf nolga tushirilmaydi', async () => {
+    const { manager, inserted } = makeManager({
+      courier: { id: COURIER_ID, tariff_center: 30000, tariff_home: 30000 },
+      config: { shadow_since: T0 - 90 * DAY },
+    });
+    await service.recordForOrder(manager, {
+      order: cancelOrder(),
+      markedAt: T0 + 10 * DAY,
+    });
+    expect(inserted[0].amount).toBeGreaterThan(0);
+  });
+
+  /**
+   * Stavkasi yo'q kuryer (yangi, hali tarif berilmagan) — chegara 0,
+   * ya'ni shtraf ham 0. Bu YAGONA holat bekorda shtraf bo'lmaydi:
+   * «ko'pi bilan qancha keltirardi» savolining javobi nol.
+   */
+  it('stavkasi yo‘q kuryerga shtraf yozilmaydi', async () => {
+    const { manager, inserted } = makeManager({
+      courier: { id: COURIER_ID, tariff_center: 0, tariff_home: 0 },
+      config: { shadow_since: T0 - 90 * DAY },
+    });
+    expect(
+      await service.recordForOrder(manager, {
+        order: cancelOrder(),
+        markedAt: T0 + 10 * DAY,
+      }),
+    ).toBeNull();
+    expect(inserted).toHaveLength(0);
+  });
+});

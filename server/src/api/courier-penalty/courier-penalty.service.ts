@@ -370,9 +370,39 @@ export class CourierPenaltyService {
    * Shtraf CHEGARASI olinadigan tarif.
    *
    * Buyurtmadagi yozilgan tarif ustun: sotuvda u AYNAN kuryerga
-   * hisoblangan summa. Bekor qilishda esa ustun bo'sh qoladi (bekorda
-   * tarif to'lanmaydi) — u holda kuryerning stavkasi olinadi, ya'ni
-   * «shu buyurtma ko'pi bilan qancha keltirardi» degan chegara.
+   * hisoblangan summa. Bekor qilishda esa ustun bo'sh qoladi — u holda
+   * kuryerning stavkasi olinadi.
+   *
+   * ── ⚠️ QULFLANGAN QAROR: BEKORDA SHTRAF CHO'NTAKDAN OLINADI ──────────
+   *
+   * Bu YERDA ZIDDIYAT BOR va u ATAYLAB shunday qoldirilgan. Buni
+   * «tuzatish» uchun qo'l urishdan oldin oxirigacha o'qing.
+   *
+   * Qoida: «shtraf 0 gacha tushsin, undan pastga emas».
+   *
+   *   SOTUVDA bu mukammal ishlaydi: shtraf tarifdan oshmaydi, ya'ni
+   *   kuryer eng yomon holatda shu buyurtmadan HECH NARSA olmaydi,
+   *   lekin USTIGA TO'LAMAYDI.
+   *
+   *   BEKORDA esa kuryerga tarif UMUMAN to'lanmaydi (`cancelOrder`
+   *   kuryer kassasiga birorta yozuv yozmaydi — jonli sinov bilan
+   *   tasdiqlangan). Ya'ni uning shu buyurtmadagi daromadi allaqachon
+   *   NOL. Shtraf esa uning BOSHQA buyurtmalardan ishlagan pulidan
+   *   yechiladi — bu cho'ntakdan to'lash.
+   *
+   * Qoidani so'zma-so'z o'qisak, bekorga shtraf UMUMAN bo'lmasligi kerak
+   * edi. SHUNDAY QILINMADI, chunki u holda kuryer uchun eng foydali
+   * strategiya ochiq-oydin bo'lardi: sotuvni vaqtida bosib, bekorni
+   * UMUMAN bosmaslik. Bekorlar abadiy `waiting` bo'lib qolardi, market
+   * moli muzlab turaverardi va modul o'z maqsadining yarmini bajarardi.
+   *
+   * Shuning uchun chegara shu buyurtma «ko'pi bilan qancha keltirardi»
+   * degan summa — kuryerning stavkasi. Cho'ntakdan ketishi MA'LUM va
+   * QABUL QILINGAN narx (foydalanuvchi qarori, 2026-10-07).
+   *
+   * Qulf: `courier-penalty.service.spec.ts` → «bekor yo'li — qulflangan
+   * qaror». Qarorni o'zgartirmoqchi bo'lsangiz o'sha test yiqiladi va
+   * sizni shu izohga qaytaradi.
    */
   private baseTariffOf(
     order: Pick<OrderEntity, 'courier_tariff' | 'where_deliver'>,
