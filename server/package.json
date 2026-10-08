@@ -27,6 +27,7 @@
     "migration:revert": "npm run typeorm -- migration:revert",
     "migration:show": "npm run typeorm -- migration:show",
     "db:backup": "bash scripts/db-backup.sh",
+    "db:measure-courier-delay": "ts-node -r tsconfig-paths/register scripts/measure-courier-delay.ts",
     "db:check-cashbox": "ts-node -r tsconfig-paths/register scripts/check-cashbox-invariant.ts",
     "db:check-extra-cost": "ts-node -r tsconfig-paths/register scripts/check-extra-cost.ts",
     "db:check-cards": "ts-node -r tsconfig-paths/register scripts/check-card-invariant.ts",

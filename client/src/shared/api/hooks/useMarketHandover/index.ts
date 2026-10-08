@@ -72,6 +72,15 @@ export interface AwaitingOrder {
   where_deliver: string | null;
   created_at: number | null;
   product_quantity: number | null;
+  /**
+   * QANDAY MAHSULOT bekor bo'lgan.
+   *
+   * ⚠️ Marketplace buyurtmalarida `order_item` YARATILMAYDI
+   * (`marketplace-intake.service.ts`), ya'ni bu massiv BO'SH bo'lishi
+   * mumkin — `product_quantity` esa > 0. Ko'rsatishda shu holat
+   * qoplanishi SHART.
+   */
+  items: OrderProduct[];
   comment: string | null;
 
   /** Almashtirish yorlig'i (`ReplacementBadge`) uchun. */
@@ -137,6 +146,90 @@ export interface ConsentSession {
 }
 
 /** Xodim skan qilgach ochiladigan topshirish oynasi. */
+/** Buyurtmadagi bitta mahsulot — ro'yxatda «nima bekor bo'lgan» ustuni uchun. */
+export interface OrderProduct {
+  name: string;
+  quantity: number;
+}
+
+/**
+ * TOPSHIRILGAN PARTIYA — «topshirilgan pochta» ekvivalenti.
+ *
+ * Market omborga BIR keladi va o'nlab posilkani BIRGA olib ketadi.
+ * Yassi ro'yxat bu faktni yo'qotadi: market «falon kuni nima oldim?»
+ * degan savolga javob topa olmaydi va bahsda dalil ko'rsatolmaydi.
+ */
+export interface HandoverBatch {
+  session_id: string;
+  market_id: string;
+  market_name: string | null;
+  market_phone: string | null;
+  /** `web` — market QR/PIN ruxsati; `offline` — vakil akti. */
+  channel: string;
+  staff_name: string | null;
+  representative_name: string | null;
+  representative_phone: string | null;
+  override_reason: string | null;
+  handed_at: number;
+  /** Toshkent kuni, `YYYY-MM-DD` (serverda bitta konversiya bilan). */
+  day: string;
+  parcel_count: number;
+  item_count: number;
+  total_price: number;
+  replacement_count: number;
+}
+
+export interface HandoverBatchesPage {
+  batches: HandoverBatch[];
+  page: number;
+  limit: number;
+  total_batches: number;
+}
+
+/**
+ * Partiya ichidagi posilka — TOPSHIRISH DALILI bilan.
+ *
+ * ⚠️ `market_handover_override_reason` NULL bo'lsa yorliq
+ * SKANERLANGAN; qiymat bo'lsa xodim uni QO'LDA belgilagan (yorliq
+ * o'qilmagan). Bu `mode` dan ALOHIDA fakt: sessiya market QR'i bilan
+ * ochilgan bo'lsa ham ayrim posilkalar yorliqsiz o'tishi mumkin.
+ */
+export interface HandoverBatchOrder extends AwaitingOrder {
+  market_handover_at: number | null;
+  market_handover_mode: string | null;
+  market_handover_override_reason: string | null;
+  market_handover_by: string | null;
+  market_handover_by_name: string | null;
+  center_received_by: string | null;
+  center_received_by_name: string | null;
+}
+
+export interface HandoverBatchDetail {
+  session: {
+    session_id: string;
+    channel: string | null;
+    /** Market QR'ini skanerlagan (sessiyani ochgan) xodim. */
+    opened_by_name: string | null;
+    closed_at: number | null;
+    representative_name: string | null;
+    representative_phone: string | null;
+    override_reason: string | null;
+  };
+  orders: HandoverBatchOrder[];
+  total: number;
+  total_price: number;
+}
+
+export interface HandoverHistoryParams {
+  page?: number;
+  limit?: number;
+  /** `YYYY-MM-DD` — TOSHKENT kuni (epoch EMAS). */
+  from?: string;
+  to?: string;
+  search?: string;
+  market_id?: string;
+}
+
 export interface HandoverAuthorization {
   session_id: string;
   market_id: string;
@@ -242,6 +335,42 @@ export const useMarketHandover = () => {
       refetchInterval: enabled ? 3_000 : false,
       // Modal qayta ochilganda eski holat ko'rinib qolmasin.
       staleTime: 0,
+    });
+
+  /** MARKET: men olgan qaytarishlar — partiya bo'yicha. */
+  const getMyHandovers = (
+    params: HandoverHistoryParams = {},
+    enabled = true,
+  ) =>
+    useQuery<HandoverBatchesPage>({
+      queryKey: [marketHandoverKey, "my", "handovers", params],
+      queryFn: () =>
+        api
+          .get("market-handover/my/handovers", { params })
+          .then((res) => res.data?.data),
+      enabled,
+    });
+
+  /** XODIM: barcha marketlarning topshirish partiyalari. */
+  const getHandovers = (params: HandoverHistoryParams = {}, enabled = true) =>
+    useQuery<HandoverBatchesPage>({
+      queryKey: [marketHandoverKey, "handovers", params],
+      queryFn: () =>
+        api
+          .get("market-handover/handovers", { params })
+          .then((res) => res.data?.data),
+      enabled,
+    });
+
+  /** Bitta partiya ichi — posilkalar + mahsulotlari. */
+  const getHandoverBatch = (sessionId: string, enabled = true) =>
+    useQuery<HandoverBatchDetail>({
+      queryKey: [marketHandoverKey, "handovers", "batch", sessionId],
+      queryFn: () =>
+        api
+          .get(`market-handover/handovers/${sessionId}`)
+          .then((res) => res.data?.data),
+      enabled: enabled && Boolean(sessionId),
     });
 
   const createConsent = useMutation<ConsentSession, unknown, void>({
@@ -377,6 +506,9 @@ export const useMarketHandover = () => {
     getMyReturns,
     getMyReturnCounts,
     getConsentStatus,
+    getMyHandovers,
+    getHandovers,
+    getHandoverBatch,
     createConsent,
     getAwaitingMarkets,
     getAwaitingOrders,

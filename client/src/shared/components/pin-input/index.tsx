@@ -13,6 +13,21 @@ interface Props {
   onComplete?: (digits: string) => void;
   length?: number;
   disabled?: boolean;
+  /**
+   * Skanerlangan token prefiksi (masalan `"mrc-"`).
+   *
+   * ⚠️ NEGA KERAK. Bu sahifada apparat skaner DOIM aktiv, lekin fokus
+   * INPUT da bo'lsa skaner hooki hodisani o'tkazib yuboradi — belgilar
+   * esa TO'G'RIDAN-TO'G'RI shu maydonga tushadi. Token raqamlari
+   * filtrlanib 6 xonaga yetgach AVTO-YUBORILARDI, ya'ni skanerlash
+   * SOXTA PIN urinishiga aylanardi. Besh marta takrorlansa server
+   * sessiyani BLOKLAYDI (`MARKET_HANDOVER_PIN_MAX_ATTEMPTS`) va market
+   * yangi QR ko'rsatishga majbur bo'lardi — sababi esa ekranda
+   * ko'rinmasdi.
+   */
+  scannerPrefix?: string;
+  /** Skanerlangan token aniqlanganda — PIN o'rniga shu chaqiriladi. */
+  onScannedToken?: (raw: string) => void;
   /** Server rad etgandan keyin qizil holat. */
   invalid?: boolean;
   label?: string;
@@ -47,6 +62,8 @@ function PinInput({
   onComplete,
   length = 6,
   disabled = false,
+  scannerPrefix,
+  onScannedToken,
   invalid = false,
   label,
   className = "",
@@ -54,6 +71,21 @@ function PinInput({
   const id = useId();
 
   const handle = (raw: string) => {
+    /**
+     * ⚠️ SKANERLANGAN TOKEN PIN EMAS — uni YEB QO'YMAYMIZ.
+     *
+     * Fokus shu maydonda bo'lsa skaner belgilari to'g'ridan-to'g'ri bu
+     * yerga tushadi. Filtrlangan raqamlar 6 xonaga yetganda avto-yuborish
+     * ishga tushib, har skan bitta SOXTA PIN urinishiga aylanardi.
+     * Endi token tanib olinadi va kerakli joyga yo'naltiriladi —
+     * ya'ni PIN maydoni fokusda bo'lsa ham skanerlash ISHLAYDI.
+     */
+    if (scannerPrefix && raw.toLowerCase().includes(scannerPrefix)) {
+      onChange("");
+      onScannedToken?.(raw.trim());
+      return;
+    }
+
     const digits = raw.replace(/\D/g, "").slice(0, length);
     onChange(digits);
     // To'lgan zahoti yuboriladi — «Tasdiqlash» tugmasi faqat zaxira.

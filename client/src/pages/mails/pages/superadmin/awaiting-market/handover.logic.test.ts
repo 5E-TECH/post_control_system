@@ -1,71 +1,27 @@
 import { describe, expect, it } from "vitest";
 import {
   buildManualOverrides,
-  canSubmitBatch,
+  canHandOverManual,
   isValidManualReason,
-  manualSelection,
   missingReasonIds,
 } from "./handover.logic";
 import { MANUAL_OVERRIDE_REASONS } from "../../../../../shared/api/hooks/useMarketHandover";
 
 const REASON = MANUAL_OVERRIDE_REASONS[0];
 
-describe("topshirish tanlovi — qo'lda belgilash qoidasi", () => {
-  it("skanerlangan posilka qo'lda belgilangan deb sanalmaydi", () => {
-    expect(manualSelection(["a", "b"], new Set(["a", "b"]))).toEqual([]);
-  });
-
-  it("skanerlanmagan (qo'lda bosilgan) posilka ajratiladi", () => {
-    expect(manualSelection(["a", "b", "c"], new Set(["a"]))).toEqual([
-      "b",
-      "c",
-    ]);
-  });
-
+describe("qo'lda belgilash qoidasi — sabab MAJBURIY", () => {
   it("qo'lda belgilangan posilka SABABSIZ o'tmaydi", () => {
     expect(missingReasonIds(["b"], {})).toEqual(["b"]);
-    expect(
-      canSubmitBatch({
-        authorized: true,
-        selectedIds: ["a", "b"],
-        scannedIds: new Set(["a"]),
-        reasons: {},
-      }),
-    ).toBe(false);
   });
 
   it("sabab tanlangach o'tadi", () => {
     expect(missingReasonIds(["b"], { b: REASON })).toEqual([]);
-    expect(
-      canSubmitBatch({
-        authorized: true,
-        selectedIds: ["a", "b"],
-        scannedIds: new Set(["a"]),
-        reasons: { b: REASON },
-      }),
-    ).toBe(true);
   });
 
-  it("RUXSATSIZ topshirib bo'lmaydi (hammasi skanerlangan bo'lsa ham)", () => {
-    expect(
-      canSubmitBatch({
-        authorized: false,
-        selectedIds: ["a"],
-        scannedIds: new Set(["a"]),
-        reasons: {},
-      }),
-    ).toBe(false);
-  });
-
-  it("hech narsa tanlanmasa topshirish faol bo'lmaydi", () => {
-    expect(
-      canSubmitBatch({
-        authorized: true,
-        selectedIds: [],
-        scannedIds: new Set(),
-        reasons: {},
-      }),
-    ).toBe(false);
+  it("bir nechtasidan faqat sababsizlari qoladi", () => {
+    expect(missingReasonIds(["a", "b", "c"], { a: REASON, c: REASON })).toEqual([
+      "b",
+    ]);
   });
 });
 
@@ -98,5 +54,46 @@ describe("sabab — YOPIQ ro'yxat (backend @IsIn bilan bir xil)", () => {
     const payload = buildManualOverrides(["a"], { a: REASON });
     expect(payload[0].reason).toBe(REASON);
     expect(MANUAL_OVERRIDE_REASONS).toContain(payload[0].reason);
+  });
+});
+
+/**
+ * ⚠️ SKAN = TOPSHIRISH (2026-10-07 qarori).
+ *
+ * Avval skanerlangani to'planib, oxirida «Marketga topshirish (N)»
+ * bosilardi. Bu ortiqcha qadam va XATOGA joy edi: xodim tugmani
+ * bosmasdan chiqib ketsa yoki ruxsat oynasi tugasa, o'nlab skan
+ * bekorga ketardi. Endi har skan o'zi topshiradi, QO'LDA belgilangan
+ * qator esa O'Z sababi bilan ALOHIDA tasdiqlanadi.
+ */
+describe("canHandOverManual — qo'lda topshirish darvozasi", () => {
+  it("ruxsat bor va sabab YOPIQ ro'yxatdan bo'lsa — ha", () => {
+    expect(
+      canHandOverManual({ authorized: true, reason: REASON }),
+    ).toBe(true);
+  });
+
+  it("sabab yo'q bo'lsa — yo'q", () => {
+    expect(canHandOverManual({ authorized: true, reason: undefined })).toBe(
+      false,
+    );
+    expect(canHandOverManual({ authorized: true, reason: "" })).toBe(false);
+  });
+
+  it("YOPIQ ro'yxatdan TASHQARI sabab — yo'q (server 422 berardi)", () => {
+    expect(
+      canHandOverManual({ authorized: true, reason: "o'zim yozdim" }),
+    ).toBe(false);
+    // Tarjima qilingan yorliq ham RAD etiladi — server `@IsIn` qiymatni
+    // kutadi, yorliqni emas.
+    expect(canHandOverManual({ authorized: true, reason: "QR torn" })).toBe(
+      false,
+    );
+  });
+
+  it("ruxsat yo'q bo'lsa sabab to'g'ri bo'lsa ham — yo'q", () => {
+    expect(canHandOverManual({ authorized: false, reason: REASON })).toBe(
+      false,
+    );
   });
 });

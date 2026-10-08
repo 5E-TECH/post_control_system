@@ -194,7 +194,7 @@ async function main() {
     }
     const snap = JSON.parse(fs.readFileSync(comparePath, 'utf8')) as {
       schema_ready?: boolean;
-      items: Array<{ market_id: string; diff: string }>;
+      items: Array<{ market_id?: string; id?: string; diff: string }>;
     };
 
     /**
@@ -226,7 +226,14 @@ async function main() {
       process.exit(0);
     }
 
-    const prevMap = new Map(snap.items.map((it) => [it.market_id, it.diff]));
+    /**
+     * ⚠️ `--snapshot` `market_id`, `--freeze` esa `id` yozadi — ikkisini
+     * ham qabul qilamiz, aks holda qo'lda muzlatilgan tayanch bilan
+     * solishtirilganda har bir farq yolg'ondan «yangi» ko'rinardi.
+     */
+    const prevMap = new Map(
+      snap.items.map((it) => [it.market_id ?? it.id ?? '', it.diff]),
+    );
 
     const newDrifts: Array<{ id: string; before: string; after: string }> = [];
     for (const r of drifted) {

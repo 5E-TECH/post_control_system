@@ -7,6 +7,7 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { MarketHandoverService } from './market-handover.service';
 import { MarketReturnHandoverSessionEntity } from 'src/core/entity/market-return-handover-session.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
+import { OrderItemEntity } from 'src/core/entity/order-item.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import {
@@ -124,6 +125,11 @@ describe('MarketHandoverService', () => {
           useValue: sessionRepo,
         },
         { provide: getRepositoryToken(OrderEntity), useValue: orderRepo },
+        // Ro'yxatlarda mahsulot ustuni uchun (`itemsByOrder`).
+        {
+          provide: getRepositoryToken(OrderItemEntity),
+          useValue: makeRepoMock('order_item'),
+        },
         { provide: getRepositoryToken(UserEntity), useValue: userRepo },
         { provide: DataSource, useValue: dataSource },
         { provide: ActivityLogService, useValue: { log: jest.fn() } },

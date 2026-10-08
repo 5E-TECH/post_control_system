@@ -143,6 +143,9 @@ const AwaitingMarket = lazy(
 const HandoverSession = lazy(
   () => import("../pages/mails/pages/superadmin/awaiting-market/HandoverSession"),
 );
+const HandoverBatchDetail = lazy(
+  () => import("../pages/handovers/BatchDetail"),
+);
 const CourierExtraCost = lazy(
   () => import("../pages/extra-cost-requests/courier"),
 );
@@ -368,6 +371,29 @@ const AppRouters = () => {
                   roles={["superadmin", "admin", "registrator", "logist"]}
                 >
                   <AwaitingMarket />
+                </RequireRole>
+              ),
+            },
+            {
+              // Partiya ichi — ikkala rol ham shu yerga keladi
+              // («Market kutilmoqda» sahifasidagi «Topshirilganlar»
+              // tabidan yoki market kabinetidagi «Men olganlarim» dan).
+              // Alohida RO'YXAT sahifasi YO'Q: u tabga ko'chirilgan.
+              // Market ham o'z partiyasini ochadi — ruxsat SERVERDA
+              // (`market_id` tokendan), bu yerda faqat ko'rinish.
+              path: "handovers/:sessionId",
+              element: (
+                <RequireRole
+                  roles={[
+                    "superadmin",
+                    "admin",
+                    "registrator",
+                    "logist",
+                    "market",
+                    "operator",
+                  ]}
+                >
+                  <HandoverBatchDetail />
                 </RequireRole>
               ),
             },
