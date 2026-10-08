@@ -158,7 +158,18 @@ export const useCourierPenaltyAdmin = () => {
       queryKey: [courierPenaltyKey, "overdue", params],
       queryFn: () =>
         api.get(`${ADMIN}/overdue`, { params }).then((r) => r.data?.data),
-      refetchInterval: 60_000,
+      /**
+       * ⚠️ 5 DAQIQA, 60 SONIYA EMAS.
+       *
+       * Ro'yxat KUNLAB kechikkan buyurtmalardan iborat — bir daqiqada
+       * o'zgarmaydi. Lekin u SAHIFALANMAYDI: javob hamma kechikkan
+       * buyurtmani olib keladi, ya'ni katta to'planmada har so'rov og'ir.
+       * Tez-tez so'rash foyda bermay, faqat yuk qo'shardi.
+       *
+       * Kuryerning o'z sanog'i (`my-deadlines`) esa 60 soniyada qoladi:
+       * u kichik, shaxsiy va soat bilan ko'rsatiladi.
+       */
+      refetchInterval: 5 * 60_000,
     });
 
   const getEntries = (
