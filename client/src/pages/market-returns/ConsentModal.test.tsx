@@ -81,6 +81,13 @@ describe("ConsentModal — market QR/PIN ruxsati", () => {
     });
 
     expect(screen.getByText(/Muddati tugadi/)).toBeInTheDocument();
+    // ⚠️ Yangi QR darhol SO'RALMAYDI: server holati 3 s da bir keladi,
+    // shuning uchun avto-yangilash bir polling oralig'ini kutadi
+    // (xodim oxirgi soniyada skanerlagan bo'lishi mumkin).
+    expect(onRegenerate).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
     expect(
       screen.getByRole("button", { name: /Yangi ruxsat/ }),
     ).toBeInTheDocument();
@@ -455,11 +462,72 @@ describe("ConsentModal — yangi sessiya darhol «tugagan» deb hisoblanmaydi", 
       />,
     );
     expect(onRegenerate).not.toHaveBeenCalled();
+    // ⚠️ IKKI BOSQICH: avval sanoq tugaydi (render → `expired`), ANDAN
+    // KEYIN kutish taymeri rejalashtiriladi. Bitta `advanceTimersByTime`
+    // ichida React effektlari oraliqda yuvilmaydi.
     act(() => {
       vi.advanceTimersByTime(3000);
     });
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
     // Qo'riqlagich HAQIQIY muddat tugashini TO'SMAYDI.
     expect(onRegenerate).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * ⚠️ POLLING BILAN POYGA (audit, 2026-10-07).
+ *
+ * Mahalliy sanoq 0 ga yetgan payt xodim xuddi shu soniyalarda
+ * skanerlagan bo'lishi mumkin; server holati esa 3 s da bir keladi.
+ * Darhol yangilasak topshirish O'RTASIDA yangi sessiya yaratilib,
+ * `sameSession` buzilardi va «Xodim skanerladi» ekrani ko'rinmasdi.
+ */
+describe("ConsentModal — oxirgi soniyadagi skan yangi sessiya yaratmaydi", () => {
+  beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
+  afterEach(() => vi.useRealTimers());
+
+  it("kutish oynasi ichida holat `handover` ga o'tsa YANGILANMAYDI", () => {
+    const onRegenerate = vi.fn();
+    const props = (status?: ConsentStatus) => ({
+      open: true as const,
+      onClose: () => {},
+      session: session({ session_id: "s-1", ttl_seconds: 2 }),
+      loading: false,
+      onRegenerate,
+      status: status ?? null,
+    });
+
+    const { rerender } = render(<ConsentModal {...props()} />);
+
+    // Sanoq tugadi — kutish oynasi boshlandi.
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(onRegenerate).not.toHaveBeenCalled();
+
+    // Polling yetib keldi: xodim skanerlagan ekan.
+    rerender(
+      <ConsentModal
+        {...props({
+          state: "handover",
+          session_id: "s-1",
+          seconds_left: 600,
+          handed_over_count: 0,
+          pin_blocked: false,
+          awaiting_count: 7,
+        })}
+      />,
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(20_000);
+    });
+
+    // ⚠️ Yangi sessiya YARATILMADI va ekran topshirish holatida.
+    expect(onRegenerate).not.toHaveBeenCalled();
+    expect(screen.getByText(/Xodim skanerladi/)).toBeInTheDocument();
   });
 });
 

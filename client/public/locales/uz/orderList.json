@@ -78,5 +78,21 @@
   "center": "Markazgacha",
   "address": "Uygacha",
   "delivery": "Qayergacha",
-  "sana": "Sana"
+  "sana": "Sana",
+  "deadline": {
+    "bannerLate": "{{count}} ta buyurtma muddati o'tdi — shtraf o'syapti",
+    "bannerToday": "{{count}} ta buyurtma muddati BUGUN tugaydi",
+    "alsoDueToday": "Bundan tashqari {{count}} ta buyurtma muddati bugun tugaydi",
+    "sumNow": "Hozir bosilsa",
+    "sumTomorrow": "Ertaga bosilsa",
+    "sumMax": "Eng ko'pi",
+    "currency": "so'm",
+    "shadowNotice": "Sinov rejimi — hozircha pul yechilmaydi, faqat ogohlantirish",
+    "badgeLate": "{{count}} kun kechikdi",
+    "badgeDays": "{{count}} kun qoldi",
+    "badgeHours": "{{count}} soat qoldi",
+    "badgeMinutes": "{{count}} daqiqa qoldi",
+    "badgeTitle": "Muddat {{days}} kun · shtraf boshlanadi: {{date}}",
+    "columnDeadline": "Muddat"
+  }
 }

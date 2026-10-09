@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { normalizeQrToken } from "../helpers/normalizeQrToken";
+import { isTextEntryTarget } from "../helpers/isTextEntryTarget";
 
 /** Market ruxsat QR'ining prefiksi (server `mrc-` KICHIK harfda yaratadi). */
 export const MARKET_QR_PREFIX = "mrc-";
@@ -48,15 +49,11 @@ export function useMarketQrScanner({
       // PIN maydoniga qo'lda terilayotgan bo'lsa tinglamaymiz — aks holda
       // har raqam skaner bufferiga ham tushib, Enter bosilganda
       // "noto'g'ri QR" deb ovoz berardi.
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
+      //
+      // ⚠️ Lekin CHECKBOX/RADIO va antd Select'ning `readOnly` ichki inputi
+      // matn qabul qilmaydi — ular skanerni TO'SMASLIGI kerak
+      // (`isTextEntryTarget` izohiga qara).
+      if (isTextEntryTarget(e.target)) return;
 
       if (e.key === "Enter") {
         const raw = buffer.trim();

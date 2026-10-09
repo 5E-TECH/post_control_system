@@ -12,6 +12,7 @@ import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity
 
 import { MarketReturnHandoverSessionEntity } from 'src/core/entity/market-return-handover-session.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
+import { OrderItemEntity } from 'src/core/entity/order-item.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { DistrictEntity } from 'src/core/entity/district.entity';
 import { RegionEntity } from 'src/core/entity/region.entity';
@@ -27,6 +28,7 @@ import {
 } from 'src/common/utils/cancel-return.util';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { successRes } from 'src/infrastructure/lib/response';
+import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import {
@@ -43,6 +45,7 @@ import {
 import {
   AwaitingQueryDto,
   CompleteHandoverDto,
+  HandoverHistoryQueryDto,
   OfflineHandoverDto,
   ScanHandoverDto,
 } from './dto/market-handover.dto';
@@ -85,6 +88,8 @@ export class MarketHandoverService {
   constructor(
     @InjectRepository(MarketReturnHandoverSessionEntity)
     private readonly sessionRepo: Repository<MarketReturnHandoverSessionEntity>,
+    @InjectRepository(OrderItemEntity)
+    private readonly orderItemRepo: Repository<OrderItemEntity>,
     @InjectRepository(OrderEntity)
     private readonly orderRepo: Repository<OrderEntity>,
     @InjectRepository(UserEntity)
@@ -724,6 +729,7 @@ export class MarketHandoverService {
           mode: MarketHandoverMode.MARKET_WEB,
           sessionId: session.id,
           actorId: String(user.id),
+          overrideReason: overrides.get(order.id) ?? null,
         });
       }
 
@@ -903,6 +909,8 @@ export class MarketHandoverService {
       mode: MarketHandoverMode;
       sessionId: string;
       actorId: string;
+      /** Yorliq o'qilmagani uchun qo'lda belgilangan bo'lsa — sabab. */
+      overrideReason?: string | null;
     },
   ): Promise<void> {
     const patch: QueryDeepPartialEntity<OrderEntity> = {
@@ -910,6 +918,10 @@ export class MarketHandoverService {
       market_handover_by: ctx.actorId,
       market_handover_mode: ctx.mode,
       market_handover_session_id: ctx.sessionId,
+      // ⚠️ NULL = yorliq skanerlangan. Chetlab o'tish AYNAN shu yerda
+      // qayd etiladi — avval u faqat `activity_log` matnida qolardi va
+      // buyurtmaga qarab bilib bo'lmasdi.
+      market_handover_override_reason: ctx.overrideReason ?? null,
     };
 
     if (order.is_replacement_return) {
@@ -1171,6 +1183,369 @@ export class MarketHandoverService {
     );
   }
 
+  /**
+   * MAHSULOTLARNI SAHIFAGA BIRIKTIRISH — IKKINCHI SO'ROV BILAN.
+   *
+   * ⚠️ NEGA `leftJoinAndSelect` EMAS. `items` — TO-MANY munosabat; uni
+   * `skip`/`take` bilan birga qo'shsak TypeORM DISTINCT subquery quradi
+   * va sahifalash BUZILADI: ikki mahsulotli buyurtma ikki qator berib,
+   * «20 ta» so'ralganda ekranga 13 ta buyurtma tushardi. Shu sabab
+   * avval SAHIFA olinadi, keyin uning id'lari bo'yicha mahsulotlar
+   * BITTA qo'shimcha so'rovda yuklanadi (`IDX_ORDER_ITEM_ORDER_ID`
+   * indeksidan o'qiladi, N+1 emas).
+   *
+   * ⚠️ Faqat ko'rsatish uchun KERAKLI ustunlar: mahsulot jadvalida rasm
+   * va tavsif bor, ular ro'yxatda ishlatilmaydi va javobni bekorga
+   * shishirardi.
+   */
+  // ════════════════ TOPSHIRILGANLAR TARIXI (PARTIYALAR) ════════════════
+
+  /**
+   * TOPSHIRILGAN QAYTARISHLAR — PARTIYA BO'YICHA («topshirilgan pochta» kabi).
+   *
+   * ── NEGA PARTIYA ──────────────────────────────────────────────────────
+   *
+   * Market omborga BIR KELADI va o'nlab posilkani BIRGA olib ketadi. Yassi
+   * buyurtma ro'yxati bu faktni yo'qotadi: market «men falon kuni nima
+   * oldim?» degan savolga javob topa olmaydi va bahs chiqqanda dalil
+   * ko'rsatolmaydi. Topshirish sessiyasi aynan shu partiyani bildiradi —
+   * bitta QR ruxsati ostida topshirilgan hamma narsa.
+   *
+   * ── NEGA SESSIYA EMAS, BUYURTMADAN GURUHLANADI ────────────────────────
+   *
+   * Sessiyada `handed_over_count` ustuni bor, LEKIN u o'sha paytdagi
+   * sanoq — keyin buyurtma qaytarib olinsa (rollback) u eskirib qoladi.
+   * Haqiqat manbai — buyurtmaning o'zidagi `market_handover_session_id`.
+   * Shuning uchun sanoq va summa HAR DOIM buyurtmalardan hisoblanadi.
+   *
+   * ⚠️ VAQT MINTAQASI: kun yorlig'i BITTA `AT TIME ZONE 'Asia/Tashkent'`
+   * bilan olinadi. Qo'shaloq konversiya UTC-kunga tushirib yuboradi va
+   * kechqurun topshirilgan partiya ERTANGI kunga tushib ketardi.
+   */
+  private async handoverBatchesPage(
+    query: HandoverHistoryQueryDto,
+    marketId: string | null,
+    message: string,
+  ) {
+    const page = Math.max(1, Number(query.page ?? 1));
+    const limit = Math.min(100, Math.max(1, Number(query.limit ?? 20)));
+
+    const qb = this.orderRepo
+      .createQueryBuilder('o')
+      .innerJoin(
+        MarketReturnHandoverSessionEntity,
+        's',
+        's.id = o.market_handover_session_id',
+      )
+      .innerJoin(UserEntity, 'm', 'm.id = o.user_id')
+      .leftJoin(UserEntity, 'st', 'st.id = s.scanned_by_user_id')
+      .where('o.market_handover_at IS NOT NULL')
+      .andWhere('o.deleted_at IS NULL')
+      .select('s.id', 'session_id')
+      .addSelect('o.user_id', 'market_id')
+      .addSelect('m.name', 'market_name')
+      .addSelect('m.phone_number', 'market_phone')
+      .addSelect('s.channel', 'channel')
+      .addSelect('st.name', 'staff_name')
+      .addSelect('s.representative_name', 'representative_name')
+      .addSelect('s.representative_phone', 'representative_phone')
+      .addSelect('s.override_reason', 'override_reason')
+      .addSelect('MAX(o.market_handover_at)', 'handed_at')
+      .addSelect('COUNT(o.id)::int', 'parcel_count')
+      .addSelect('COALESCE(SUM(o.product_quantity), 0)::int', 'item_count')
+      .addSelect('COALESCE(SUM(o.total_price), 0)::float8', 'total_price')
+      .addSelect(
+        'COUNT(*) FILTER (WHERE o.is_replacement_return = true)::int',
+        'replacement_count',
+      )
+      // ⚠️ BITTA konversiya — memory: pcs-timezone-day-bucketing.
+      .addSelect(
+        "to_char(to_timestamp(MAX(o.market_handover_at) / 1000) AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD')",
+        'day',
+      )
+      .groupBy('s.id')
+      .addGroupBy('o.user_id')
+      .addGroupBy('m.name')
+      .addGroupBy('m.phone_number')
+      .addGroupBy('s.channel')
+      .addGroupBy('st.name')
+      .addGroupBy('s.representative_name')
+      .addGroupBy('s.representative_phone')
+      .addGroupBy('s.override_reason')
+      .orderBy('MAX(o.market_handover_at)', 'DESC');
+
+    if (marketId) {
+      qb.andWhere('o.user_id = :marketId', { marketId });
+    } else if (query.market_id) {
+      qb.andWhere('o.user_id = :filterMarket', {
+        filterMarket: String(query.market_id),
+      });
+    }
+
+    /**
+     * ⚠️ SANA ORALIG'I `market_handover_at` BO'YICHA (sessiya
+     * `closed_at` i emas): offline akt sessiyasi darhol yopiladi, oddiy
+     * sessiya esa xodim «Yakunlash» bosgandan keyin — ikkisi bir xil
+     * o'lchov bo'lishi uchun TOPSHIRILGAN payt olinadi.
+     */
+    /**
+     * ⚠️ `YYYY-MM-DD` → TOSHKENT kunining boshi/oxiri.
+     *
+     * `Number(sana)` QILIB BO'LMAYDI: foydalanuvchi «6-oktabr» desa, u
+     * Toshkent kunini nazarda tutadi. Xom UTC bilan kechqurun (UTC+5 da
+     * 19:00 dan keyin) topshirilgan partiya ERTANGI kunga tushib ketardi
+     * va market «men buni kecha oldim-ku» deb hayron bo'lardi.
+     * `post.service.ts buildCreatedAtRange` bilan ayni yordamchi.
+     */
+    if (query.from) {
+      qb.andWhere('o.market_handover_at >= :from', {
+        from: toUzbekistanTimestamp(String(query.from), false),
+      });
+    }
+    if (query.to) {
+      qb.andWhere('o.market_handover_at <= :to', {
+        to: toUzbekistanTimestamp(String(query.to), true),
+      });
+    }
+    if (query.search) {
+      const raw = query.search.trim();
+      const asNumber = Number(raw.replace('#', ''));
+      const clauses = ['m.name ILIKE :q'];
+      const params: Record<string, unknown> = { q: `%${raw}%` };
+      if (/^#?\d+$/.test(raw) && Number.isFinite(asNumber)) {
+        clauses.push('o.order_number = :num');
+        params.num = asNumber;
+      }
+      qb.andWhere(`(${clauses.join(' OR ')})`, params);
+    }
+
+    /**
+     * ⚠️ `getRawMany` GURUHLANGAN natijada `skip/take` ISHLAMAYDI
+     * (TypeORM uni asosiy jadvalga qo'llaydi), shuning uchun
+     * `offset/limit` — xom SQL darajasida.
+     */
+    const rows = await qb
+      .offset((page - 1) * limit)
+      .limit(limit)
+      .getRawMany<Record<string, string | number | null>>();
+
+    // Umumiy sanoq — alohida so'rovda (guruhlar soni).
+    const totalRow = await this.orderRepo
+      .createQueryBuilder('o')
+      .where('o.market_handover_at IS NOT NULL')
+      .andWhere('o.deleted_at IS NULL')
+      .andWhere(
+        marketId || query.market_id
+          ? 'o.user_id = :mid'
+          : 'TRUE',
+        marketId || query.market_id
+          ? { mid: marketId ?? String(query.market_id) }
+          : {},
+      )
+      .select('COUNT(DISTINCT o.market_handover_session_id)::int', 'c')
+      .getRawOne<{ c: number }>();
+
+    const batches = rows.map((r) => ({
+      session_id: String(r.session_id),
+      market_id: String(r.market_id),
+      market_name: r.market_name as string | null,
+      market_phone: r.market_phone as string | null,
+      channel: r.channel as string,
+      staff_name: r.staff_name as string | null,
+      representative_name: r.representative_name as string | null,
+      representative_phone: r.representative_phone as string | null,
+      override_reason: r.override_reason as string | null,
+      // ⚠️ Xom SQL `bigint`/`numeric` ni SATR qaytaradi — Number() SHART.
+      handed_at: Number(r.handed_at),
+      day: String(r.day),
+      parcel_count: Number(r.parcel_count),
+      item_count: Number(r.item_count),
+      total_price: Number(r.total_price),
+      replacement_count: Number(r.replacement_count),
+    }));
+
+    return successRes(
+      {
+        batches,
+        page,
+        limit,
+        total_batches: Number(totalRow?.c ?? 0),
+      },
+      200,
+      message,
+    );
+  }
+
+  /** XODIM: barcha marketlarning topshirish partiyalari. */
+  async listHandovers(query: HandoverHistoryQueryDto) {
+    return this.handoverBatchesPage(query, null, 'Topshirilgan qaytarishlar');
+  }
+
+  /** MARKET: o'z partiyalari (market_id TOKENDAN — IDOR himoyasi). */
+  async listMyHandovers(user: JwtPayload, query: HandoverHistoryQueryDto) {
+    return this.handoverBatchesPage(
+      query,
+      String(user.id),
+      'Men olgan qaytarishlar',
+    );
+  }
+
+  /**
+   * BITTA PARTIYA ICHI — topshirilgan posilkalar, mahsulotlari bilan.
+   *
+   * ⚠️ Market faqat O'Z partiyasini ocha oladi: `market_id` tokendan
+   * olinadi va WHERE shartiga QO'SHILADI (URL'dagi sessiya id'siga
+   * ishonilmaydi — `extra-cost` dagi IDOR saboqining aynan o'zi).
+   */
+  async handoverBatchOrders(sessionId: string, user: JwtPayload) {
+    const isMarket = String(user.role) === String(Roles.MARKET);
+
+    const qb = this.orderRepo
+      .createQueryBuilder('o')
+      .leftJoin('o.customer', 'customer')
+      .leftJoin('o.district', 'district')
+      .leftJoin('district.region', 'region')
+      .leftJoin('o.replacementOf', 'replacementOf')
+      .addSelect(['customer.id', 'customer.name', 'customer.phone_number'])
+      .addSelect(['district.id', 'district.name'])
+      .addSelect(['region.id', 'region.name'])
+      .addSelect(['replacementOf.id', 'replacementOf.order_number'])
+      .where('o.market_handover_session_id = :sessionId', { sessionId })
+      .andWhere('o.deleted_at IS NULL')
+      .orderBy('o.order_number', 'ASC');
+
+    if (isMarket) {
+      qb.andWhere('o.user_id = :marketId', { marketId: String(user.id) });
+    }
+
+    const orders = await qb.getMany();
+    if (!orders.length) {
+      throw new NotFoundException('Partiya topilmadi');
+    }
+
+    const session = await this.sessionRepo.findOne({
+      where: { id: sessionId },
+    });
+    const itemMap = await this.itemsByOrder(orders.map((o) => o.id));
+
+    /**
+     * XODIM ISMLARI — bitta ikkinchi so'rovda.
+     *
+     * ⚠️ `leftJoinAndSelect` ATAYLAB emas: `users` qatori parol hashi va
+     * tokenlarni ham olib kelardi. Bu yerda faqat ISM kerak.
+     *
+     * Uch xil aktyor bo'lishi mumkin: markazga qabul qilgan, marketga
+     * topshirgan va sessiyani ochgan xodim — ular har doim ham bir
+     * odam emas (smena almashishi mumkin).
+     */
+    const actorIds = Array.from(
+      new Set(
+        [
+          ...orders.map((o) => o.center_received_by),
+          ...orders.map((o) => o.market_handover_by),
+          session?.scanned_by_user_id ?? null,
+        ].filter((v): v is string => Boolean(v)),
+      ),
+    );
+    const actorNames = new Map<string, string>();
+    if (actorIds.length) {
+      const rows = await this.userRepo.find({
+        where: { id: In(actorIds) },
+        select: ['id', 'name', 'phone_number'],
+      });
+      for (const u of rows) actorNames.set(String(u.id), u.name ?? '—');
+    }
+
+    return successRes(
+      {
+        session: {
+          session_id: sessionId,
+          channel: session?.channel ?? null,
+          /** Sessiyani ochgan (market QR'ini skanerlagan) xodim. */
+          opened_by_name: session?.scanned_by_user_id
+            ? (actorNames.get(String(session.scanned_by_user_id)) ?? null)
+            : null,
+          closed_at: session?.closed_at ?? null,
+          representative_name: session?.representative_name ?? null,
+          representative_phone: session?.representative_phone ?? null,
+          override_reason: session?.override_reason ?? null,
+        },
+        orders: orders.map((o) => ({
+          id: o.id,
+          order_number: o.order_number,
+          total_price: o.total_price,
+          status: o.status,
+          center_received_at: o.center_received_at,
+          market_handover_at: o.market_handover_at,
+          market_handover_mode: o.market_handover_mode,
+          /**
+           * TOPSHIRISH DALILI — partiya ichidagi oynada to'liq ko'rinadi.
+           *
+           * `override_reason` NULL bo'lsa yorliq SKANERLANGAN; qiymat
+           * bo'lsa xodim uni qo'lda belgilagan (yorliq o'qilmagan).
+           */
+          market_handover_override_reason:
+            o.market_handover_override_reason ?? null,
+          market_handover_by: o.market_handover_by,
+          market_handover_by_name: o.market_handover_by
+            ? (actorNames.get(String(o.market_handover_by)) ?? null)
+            : null,
+          center_received_by: o.center_received_by,
+          center_received_by_name: o.center_received_by
+            ? (actorNames.get(String(o.center_received_by)) ?? null)
+            : null,
+          customer_name: o.customer?.name ?? null,
+          customer_phone: o.customer?.phone_number ?? null,
+          district_name: o.district?.name ?? null,
+          region_name: o.district?.region?.name ?? null,
+          where_deliver: o.where_deliver,
+          created_at: o.created_at,
+          product_quantity: o.product_quantity,
+          items: itemMap.get(o.id) ?? [],
+          comment: o.comment ?? null,
+          is_replacement_return: o.is_replacement_return,
+          replacement_state: o.replacement_state,
+          replacement_of_order_id: o.replacement_of_order_id,
+          replacementOf: o.replacementOf
+            ? { order_number: o.replacementOf.order_number }
+            : null,
+        })),
+        total: orders.length,
+        total_price: orders.reduce((s, o) => s + Number(o.total_price ?? 0), 0),
+      },
+      200,
+      'Partiya tarkibi',
+    );
+  }
+
+  private async itemsByOrder(
+    orderIds: string[],
+  ): Promise<Map<string, Array<{ name: string; quantity: number }>>> {
+    const map = new Map<string, Array<{ name: string; quantity: number }>>();
+    if (!orderIds.length) return map;
+
+    const rows = await this.orderItemRepo
+      .createQueryBuilder('oi')
+      .leftJoin('oi.product', 'p')
+      .select('oi.orderId', 'order_id')
+      .addSelect('p.name', 'name')
+      .addSelect('oi.quantity', 'quantity')
+      .where('oi.orderId IN (:...ids)', { ids: orderIds })
+      .orderBy('p.name', 'ASC')
+      .getRawMany<{ order_id: string; name: string | null; quantity: number }>();
+
+    for (const r of rows) {
+      const list = map.get(String(r.order_id)) ?? [];
+      list.push({
+        name: r.name ?? '—',
+        // ⚠️ Xom SQL `int` ni ham SATR qaytarishi mumkin — Number() SHART.
+        quantity: Number(r.quantity ?? 0),
+      });
+      map.set(String(r.order_id), list);
+    }
+    return map;
+  }
+
   private async awaitingOrdersPage(
     marketId: string,
     query: AwaitingQueryDto,
@@ -1248,6 +1623,10 @@ export class MarketHandoverService {
       .take(limit)
       .getManyAndCount();
 
+    // ⚠️ Mahsulotlar SAHIFA olingandan KEYIN, alohida so'rovda —
+    // `itemsByOrder` izohiga qara (to-many + skip/take sahifalashni buzadi).
+    const itemMap = await this.itemsByOrder(orders.map((o) => o.id));
+
     const now = Date.now();
     return successRes(
       {
@@ -1274,6 +1653,14 @@ export class MarketHandoverService {
           where_deliver: o.where_deliver,
           created_at: o.created_at,
           product_quantity: o.product_quantity,
+          /**
+           * QANDAY MAHSULOT bekor bo'lib markazda turibdi.
+           *
+           * ⚠️ Market «falon buyurtma» deb emas, «falon mahsulot» deb
+           * eslaydi: omborga kelib nima olib ketishini oldindan bilishi
+           * kerak. Bitta buyurtmada bir nechta mahsulot bo'lishi mumkin.
+           */
+          items: itemMap.get(o.id) ?? [],
           comment: o.comment ?? null,
 
           // Almashtirish yorlig'i (`ReplacementBadge`) uchun to'plam.

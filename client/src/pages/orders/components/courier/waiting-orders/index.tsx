@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState, type MouseEvent } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import EmptyPage from "../../../../../shared/components/empty-page";
 import {
@@ -38,6 +38,8 @@ import ExtraCostProofField, {
   type ProofFieldValue,
 } from "../../../../../shared/components/ExtraCostProofField";
 import ExtraCostDecisionBanner from "../../../../../shared/components/ExtraCostDecisionBanner";
+import DeadlineBadge from "../../../../../shared/components/DeadlineBadge";
+import { useCourierPenalty } from "../../../../../shared/api/hooks/useCourierPenalty";
 
 export type FieldType = {
   comment?: string;
@@ -57,6 +59,23 @@ const WaitingOrders = () => {
   const limit = Number(getParam("limit") || 10);
   const { getCourierOrders, sellOrder, cancelOrder, partlySellOrder } =
     useOrder();
+
+  /**
+   * MUDDAT SANOG'I — buyurtma bo'yicha xarita.
+   *
+   * ⚠️ NEGA ALOHIDA SO'ROV. Sanoqni buyurtma ro'yxatining o'ziga qo'shish
+   * mumkin edi, lekin u ro'yxat SQL'i har sahifada JOIN va hisob olib
+   * yurishini talab qilardi. Muddat esa sahifaga bog'liq emas — kuryerning
+   * BARCHA hal qilinmagan buyurtmalari uchun bitta yengil so'rov yetarli,
+   * va ayni javob yuqoridagi bannerni ham to'ldiradi.
+   */
+  const { getMyDeadlines } = useCourierPenalty();
+  const { data: deadlineReport } = getMyDeadlines();
+  const deadlineById = useMemo(() => {
+    const map = new Map<string, NonNullable<typeof deadlineReport>["orders"][number]>();
+    for (const row of deadlineReport?.orders ?? []) map.set(row.id, row);
+    return map;
+  }, [deadlineReport]);
   const search = useSelector((state: RootState) => state.setUserFilter.search);
   const districtId = useSelector(
     (state: RootState) => state.setUserFilter.district_id,
@@ -386,6 +405,7 @@ const WaitingOrders = () => {
                     Qaytarish kutilmoqda
                   </span>
                 )}
+                <DeadlineBadge row={deadlineById.get(item?.id)} />
               </div>
               <span className="text-xs text-gray-400">
                 #{(page - 1) * limit + index + 1}
@@ -493,10 +513,10 @@ const WaitingOrders = () => {
               <th className="px-3 py-3 text-left text-sm font-semibold w-[12%]">
                 {t("phone")}
               </th>
-              <th className="px-3 py-3 text-left text-sm font-semibold w-[12%]">
+              <th className="px-3 py-3 text-left text-sm font-semibold w-[10%]">
                 {t("detail.address")}
               </th>
-              <th className="px-3 py-3 text-left text-sm font-semibold w-[12%]">
+              <th className="px-3 py-3 text-left text-sm font-semibold w-[10%]">
                 {t("market")}
               </th>
               <th className="px-3 py-3 text-left text-sm font-semibold w-[10%]">
@@ -508,8 +528,17 @@ const WaitingOrders = () => {
               <th className="px-3 py-3 text-left text-sm font-semibold w-[9%]">
                 {t("delivery")}
               </th>
-              <th className="px-3 py-3 text-left text-sm font-semibold w-[12%]">
+              <th className="px-3 py-3 text-left text-sm font-semibold w-[10%]">
                 {t("sana")}
+              </th>
+              {/*
+                ⚠️ Muddat ustuni KENG. Nishon ichida ikki ma'lumot bor
+                («6 kun kechikdi · 12 000 so'm») va u bo'linmaydi —
+                tor ustunda matn uch qatorga tushib, jadval o'qilmas
+                bo'lib qolgandi.
+              */}
+              <th className="px-3 py-3 text-left text-sm font-semibold w-[15%]">
+                {t("deadline.columnDeadline")}
               </th>
               <th className="px-3 py-3 text-center text-sm font-semibold w-[140px]">
                 {t("harakat")}
@@ -567,6 +596,15 @@ const WaitingOrders = () => {
                 </td>
                 <td className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">
                   {formatDate(item?.created_at)}
+                </td>
+                <td className="px-3 py-3">
+                  {/*
+                    Muddat nishoni — `safe` holatda KO'RINMAYDI, shuning
+                    uchun kataklar ko'pincha bo'sh turadi. Bu ataylab:
+                    har qatorga belgi qo'yilsa ogohlantirish shovqinga
+                    ko'milib ketardi.
+                  */}
+                  <DeadlineBadge row={deadlineById.get(item?.id)} />
                 </td>
                 <td className="px-3 py-3">
                   <div className="flex items-center justify-center gap-1.5">

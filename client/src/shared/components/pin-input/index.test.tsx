@@ -111,3 +111,83 @@ describe("PinInput — 6 xonali kod", () => {
     );
   });
 });
+
+/**
+ * ⚠️ PRODUCTION NUQSONI (audit, 2026-10-07) — SOXTA PIN URINISHLARI.
+ *
+ * Bu sahifada apparat skaner DOIM aktiv, lekin fokus PIN maydonida bo'lsa
+ * skaner hooki hodisani o'tkazib yuboradi va belgilar TO'G'RIDAN-TO'G'RI
+ * maydonga tushadi. Token raqamlari filtrlanib 6 xonaga yetgach
+ * AVTO-YUBORILARDI — ya'ni har skan bitta XATO PIN urinishiga aylanardi.
+ * Besh marta takrorlansa server sessiyani BLOKLAYDI va market yangi QR
+ * ko'rsatishga majbur bo'lardi; sababi esa ekranda ko'rinmasdi.
+ */
+describe("PinInput — skanerlangan token PIN deb yeyilmaydi", () => {
+  function ScanHarness({
+    onScannedToken,
+    onComplete,
+  }: {
+    onScannedToken?: (raw: string) => void;
+    onComplete?: (d: string) => void;
+  }) {
+    const [pin, setPin] = useState("");
+    return (
+      <>
+        <PinInput
+          value={pin}
+          onChange={setPin}
+          onComplete={onComplete}
+          onScannedToken={onScannedToken}
+          scannerPrefix="mrc-"
+          label="PIN"
+        />
+        <span data-testid="value">{pin}</span>
+      </>
+    );
+  }
+
+  it("market QR tokeni PIN bo'lmaydi — tashqariga yo'naltiriladi", async () => {
+    const user = userEvent.setup();
+    const onScannedToken = vi.fn();
+    const onComplete = vi.fn();
+    render(
+      <ScanHarness onScannedToken={onScannedToken} onComplete={onComplete} />,
+    );
+
+    const input = screen.getByLabelText("PIN");
+    await user.click(input);
+    // Skaner butun tokenni bir zarbda "yozadi".
+    await user.paste("mrc-4839201a2b3c4d5e");
+
+    expect(onScannedToken).toHaveBeenCalledTimes(1);
+    expect(onScannedToken.mock.calls[0][0]).toContain("mrc-");
+    // ⚠️ ENG MUHIMI: soxta PIN urinishi YUBORILMAYDI.
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(screen.getByTestId("value").textContent).toBe("");
+  });
+
+  it("KATTA harfli token ham tanib olinadi (Caps Lock / skaner)", async () => {
+    const user = userEvent.setup();
+    const onScannedToken = vi.fn();
+    const onComplete = vi.fn();
+    render(
+      <ScanHarness onScannedToken={onScannedToken} onComplete={onComplete} />,
+    );
+    await user.click(screen.getByLabelText("PIN"));
+    await user.paste("MRC-4839201A2B3C");
+    expect(onScannedToken).toHaveBeenCalledTimes(1);
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it("oddiy PIN hamon ishlaydi (tuzatish foydali xulqni buzmadi)", async () => {
+    const user = userEvent.setup();
+    const onScannedToken = vi.fn();
+    const onComplete = vi.fn();
+    render(
+      <ScanHarness onScannedToken={onScannedToken} onComplete={onComplete} />,
+    );
+    await user.type(screen.getByLabelText("PIN"), "483920");
+    expect(onComplete).toHaveBeenCalledWith("483920");
+    expect(onScannedToken).not.toHaveBeenCalled();
+  });
+});

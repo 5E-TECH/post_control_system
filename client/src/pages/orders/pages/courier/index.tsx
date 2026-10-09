@@ -22,6 +22,7 @@ import { buildAdminPath } from "../../../../shared/const";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
+import CourierDeadlineBanner from "../../../../shared/components/CourierDeadlineBanner";
 
 const { RangePicker } = DatePicker;
 
@@ -197,6 +198,14 @@ const CourierOrders = () => {
             Buyurtmalarni boshqarish va sotish
           </p>
         </div>
+
+        {/*
+          MUDDAT OGOHLANTIRISHI — konteynerda, tabning ichida EMAS.
+          Kuryer «Hammasi» yoki «Bekor» tabida yurganda ham ko'rishi kerak:
+          ogohlantirish faqat bitta tabda chiqsa, u eng ko'p ochiladigan
+          joyda ko'rinmay qolishi mumkin edi.
+        */}
+        <CourierDeadlineBanner />
 
         {/* Search & Date Filter */}
         <div className="flex flex-col sm:flex-row gap-3 mb-4">

@@ -14,7 +14,7 @@
   "myRegion": "Мой регион",
   "settings": "Настройки",
   "awaiting_market": "Ожидает маркет",
-  "market_returns": "Возвращённые заказы",
+  "market_returns": "Возвраты",
   "extra_cost": "Доп. расход",
   "market_operators": "Операторы",
   "ai_balance": "AI баланс",
@@ -22,5 +22,6 @@
   "replacements": "Замены",
   "marketplace_intake": "Приём Marketplace",
   "my_orders": "Мои заказы",
-  "my_earnings": "Мои доходы"
+  "my_earnings": "Мои доходы",
+  "courier_penalty": "Штрафы"
 }

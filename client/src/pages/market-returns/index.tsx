@@ -1,4 +1,5 @@
 import { memo, useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button, Empty, Pagination, type PaginationProps } from "antd";
 import { useTranslation } from "react-i18next";
 import {
@@ -20,12 +21,14 @@ import { useApiNotification } from "../../shared/hooks/useApiNotification";
 import { useDebouncedValue } from "../../shared/hooks/useDebouncedValue";
 import { formatPhone } from "../../shared/helpers/formatPhone";
 import SearchInput from "../../shared/components/search-input";
+import { summarizeProducts } from "../../shared/lib/orderProducts";
 import {
   formatMoment,
   returnAgeTone,
 } from "../../shared/lib/returnStage";
 import ReplacementBadge from "../../shared/components/replacement-badge";
 import ConsentModal from "./ConsentModal";
+import BatchList from "../handovers/BatchList";
 
 const PAGE_SIZE = 20;
 
@@ -38,7 +41,7 @@ const money = (n?: number | null) =>
  */
 const TableRowSkeleton = () => (
   <tr className="animate-pulse">
-    {[...Array(8)].map((_, i) => (
+    {[...Array(9)].map((_, i) => (
       <td key={i} className="px-4 py-4">
         <div className="h-4 w-full rounded bg-gray-200 dark:bg-gray-700" />
       </td>
@@ -79,6 +82,35 @@ function MarketReturns() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 400);
   const [modalOpen, setModalOpen] = useState(false);
+  /**
+   * TAB: markazda kutayotganlar yoki MEN OLGANLARIM.
+   *
+   * ⚠️ Alohida sahifa EMAS, tab: market uchun bu ikkisi BITTA ish —
+   * «nima kutyapti» va «nima oldim». Ikki menyu bandi qo'shsak
+   * telefonda (7 ta ikonka) joy yetmasdi.
+   *
+   * ⚠️ HOLAT URL DA, `useState` da EMAS. Partiya ichiga kirib
+   * «Orqaga» bosilganda komponent QAYTA MOUNT bo'ladi va mahalliy
+   * holat boshlang'ich qiymatga qaytardi — ya'ni «Olganlarim» dan
+   * kirgan odam «Markazda» tabiga tushib qolardi. URL da bo'lsa
+   * brauzer uni tarix bilan birga tiklaydi.
+   *
+   * ⚠️ `replace: true` — tab almashtirish tarixga YANGI yozuv
+   * qo'shmaydi, aks holda «Orqaga» avval tabni qaytarib, keyingina
+   * sahifadan chiqardi.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab: "awaiting" | "history" =
+    searchParams.get("tab") === "history" ? "history" : "awaiting";
+  const setTab = useCallback(
+    (next: "awaiting" | "history") => {
+      const params = new URLSearchParams(searchParams);
+      if (next === "awaiting") params.delete("tab");
+      else params.set("tab", next);
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
   const [session, setSession] = useState<ConsentSession | null>(null);
 
   const { getMyReturns, getMyReturnCounts, getConsentStatus, createConsent } =
@@ -155,6 +187,35 @@ function MarketReturns() {
         </div>
       </div>
 
+      {/* ─────── Tablar ─────── */}
+      <div className="mb-4 flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-[#2A263D]">
+        {(["awaiting", "history"] as const).map((key) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            // ⚠️ `whitespace-nowrap` — uzun nom ikkinchi qatorga tushib,
+            // tab paneli qalinlashib ketardi.
+            className={`flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+              tab === key
+                ? "bg-white text-purple-700 shadow-sm dark:bg-[#3d3759] dark:text-purple-300"
+                : "text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
+          >
+            {key === "awaiting" ? t("tabAwaiting") : t("tabHistory")}
+            {key === "awaiting" && awaiting > 0 && (
+              <span className="ml-1.5 rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                {awaiting}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {tab === "history" ? (
+        <BatchList mode="market" />
+      ) : (
+      <>
       {/*
         ASOSIY AMAL — telefonda BUTUN KENGLIKDA va yuqorida.
         ⚠️ Market shu tugmani bosib QR'ni xodimga ko'rsatadi; u ro'yxatning
@@ -174,7 +235,9 @@ function MarketReturns() {
       </Button>
 
       {/* ─────── Xulosa ─────── */}
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
+      {/* ⚠️ Uchinchi «Qanday olinadi» plitkasi OLIB TASHLANDI: ko'rsatma
+          har kirganda takrorlanib, asosiy raqamlarni pastga surardi. */}
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3">
         <div className="rounded-xl border border-gray-100 bg-white p-3 sm:p-4 dark:border-gray-800 dark:bg-[#2A263D]">
           <div className="text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
             {t("statAtCenter")}
@@ -194,14 +257,6 @@ function MarketReturns() {
             {oldestDays >= 7 && (
               <AlertTriangle className="h-5 w-5 shrink-0 text-red-500" />
             )}
-          </div>
-        </div>
-        <div className="col-span-2 rounded-xl border border-gray-100 bg-white p-3 sm:p-4 lg:col-span-1 dark:border-gray-800 dark:bg-[#2A263D]">
-          <div className="text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            {t("statHowTo")}
-          </div>
-          <div className="text-sm text-gray-600 dark:text-gray-300">
-            {t("howToSteps")}
           </div>
         </div>
       </div>
@@ -326,6 +381,28 @@ function MarketReturns() {
                 </span>
               </div>
 
+
+              {/* MAHSULOT — market nima olib ketishini oldindan biladi. */}
+              {(() => {
+                const p = summarizeProducts(o.items, o.product_quantity);
+                return (
+                  <div
+                    className="mt-1.5 flex items-start gap-1.5 text-xs text-gray-700 dark:text-gray-300"
+                    title={p.nameless ? t("noProductName") : p.fullText}
+                  >
+                    <Package className="mt-0.5 h-3 w-3 shrink-0 text-gray-400" />
+                    <span className="min-w-0">
+                      {p.nameless
+                        ? t("pcs", { count: p.totalQuantity })
+                        : p.visible
+                            .map((it) => `${it.name} x${it.quantity}`)
+                            .join(", ")}
+                      {p.hiddenCount > 0 &&
+                        ` ${t("moreProducts", { count: p.hiddenCount })}`}
+                    </span>
+                  </div>
+                );
+              })()}
               {o.comment && (
                 <p
                   className="mt-1.5 line-clamp-2 text-xs italic text-gray-500 dark:text-gray-400"
@@ -357,6 +434,12 @@ function MarketReturns() {
                 <th className="min-w-[150px] px-4 py-4 text-left text-sm font-semibold">
                   {t("colAddress")}
                 </th>
+                <th
+                  className="min-w-[160px] px-4 py-4 text-left text-sm font-semibold"
+                  title={t("productsHint")}
+                >
+                  {t("colProduct")}
+                </th>
                 <th className="whitespace-nowrap px-4 py-4 text-right text-sm font-semibold">
                   {t("colPrice")}
                 </th>
@@ -376,7 +459,7 @@ function MarketReturns() {
                 [...Array(8)].map((_, i) => <TableRowSkeleton key={i} />)
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12">
+                  <td colSpan={9} className="py-12">
                     <Empty description={emptyText} />
                   </td>
                 </tr>
@@ -427,6 +510,42 @@ function MarketReturns() {
                       <div className="text-xs text-gray-400">
                         {deliverLabel(o.where_deliver)}
                       </div>
+                    </td>
+                    {/* MAHSULOT — market nima olib ketishini oldindan biladi. */}
+                    <td className="max-w-[200px] px-4 py-4 text-sm">
+                      {(() => {
+                        const p = summarizeProducts(o.items, o.product_quantity);
+                        if (p.nameless) {
+                          return (
+                            <span
+                              className="text-gray-400"
+                              title={t("noProductName")}
+                            >
+                              {t("pcs", { count: p.totalQuantity })}
+                            </span>
+                          );
+                        }
+                        return (
+                          <div className="min-w-0" title={p.fullText}>
+                            {p.visible.map((it) => (
+                              <div
+                                key={it.name}
+                                className="truncate text-gray-800 dark:text-gray-200"
+                              >
+                                {it.name}
+                                <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
+                                  x{it.quantity}
+                                </span>
+                              </div>
+                            ))}
+                            {p.hiddenCount > 0 && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {t("moreProducts", { count: p.hiddenCount })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-4 text-right text-sm font-semibold tabular-nums text-gray-800 dark:text-white">
                       <div>{money(o.total_price)}</div>
@@ -486,6 +605,9 @@ function MarketReturns() {
             className="[&_.ant-pagination-item-active]:border-purple-600 [&_.ant-pagination-item-active]:bg-purple-600 [&_.ant-pagination-item-active_a]:text-white"
           />
         </div>
+      )}
+
+      </>
       )}
 
       <ConsentModal

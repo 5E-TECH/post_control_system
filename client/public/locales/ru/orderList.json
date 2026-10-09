@@ -78,5 +78,21 @@
   "delivery": "До какого",
   "center": "До центра",
   "address": "До дома",
-  "sana": "Дата"
+  "sana": "Дата",
+  "deadline": {
+    "bannerLate": "Срок {{count}} заказов истёк — штраф растёт",
+    "bannerToday": "Срок {{count}} заказов истекает СЕГОДНЯ",
+    "alsoDueToday": "Кроме того, срок {{count}} заказов истекает сегодня",
+    "sumNow": "Если отметить сейчас",
+    "sumTomorrow": "Если отметить завтра",
+    "sumMax": "Максимум",
+    "currency": "сум",
+    "shadowNotice": "Тестовый режим — деньги пока не списываются, только предупреждение",
+    "badgeLate": "просрочено на {{count}} дн.",
+    "badgeDays": "осталось {{count}} дн.",
+    "badgeHours": "осталось {{count}} ч.",
+    "badgeMinutes": "осталось {{count}} мин.",
+    "badgeTitle": "Срок {{days}} дн. · штраф начнётся: {{date}}",
+    "columnDeadline": "Срок"
+  }
 }

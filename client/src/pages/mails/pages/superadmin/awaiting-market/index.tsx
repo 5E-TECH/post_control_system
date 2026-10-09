@@ -1,5 +1,5 @@
-import { memo, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { memo, useCallback, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Empty, Pagination, type PaginationProps } from "antd";
 import { useTranslation } from "react-i18next";
 import {
@@ -15,6 +15,7 @@ import {
 import { useMarketHandover } from "../../../../../shared/api/hooks/useMarketHandover";
 import { formatPhone } from "../../../../../shared/helpers/formatPhone";
 import SearchInput from "../../../../../shared/components/search-input";
+import BatchList from "../../../../handovers/BatchList";
 import {
   formatMoment,
   returnAgeTone,
@@ -72,6 +73,28 @@ function AwaitingMarket() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(PAGE_SIZE);
   const [search, setSearch] = useState("");
+  /**
+   * TAB: navbat (hali topshirilmagan) yoki TOPSHIRILGANLAR tarixi.
+   *
+   * ⚠️ Alohida menyu bandi EMAS: ikkisi bitta ishning ikki tomoni —
+   * «kim kutyapti» va «kimga berdik». Yon menyuda alohida band bo'lsa
+   * xodim ikki joyni aylanib yurardi; mobil navda esa joy ham yo'q.
+   *
+   * ⚠️ HOLAT URL DA — partiya ichidan «Orqaga» qaytganda tab
+   * tiklanishi uchun (mahalliy holat qayta mountda yo'qolardi).
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab: "queue" | "handed" =
+    searchParams.get("tab") === "handed" ? "handed" : "queue";
+  const setTab = useCallback(
+    (next: "queue" | "handed") => {
+      const params = new URLSearchParams(searchParams);
+      if (next === "queue") params.delete("tab");
+      else params.set("tab", next);
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
   // ⚠️ Har harfda so'rov ketmasin — loyihadagi qidiruvlar debounce bilan.
   const debouncedSearch = useDebouncedValue(search, 400);
 
@@ -138,6 +161,35 @@ function AwaitingMarket() {
       </div>
 
       {/* ─────── Xulosa ─────── */}
+      {/* ─────── Tablar ─────── */}
+      <div className="mb-4 flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-[#2A263D]">
+        {(["queue", "handed"] as const).map((key) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            // ⚠️ `whitespace-nowrap` — uzun nom ikkinchi qatorga tushib,
+            // tab paneli qalinlashib ketardi.
+            className={`flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+              tab === key
+                ? "bg-white text-purple-700 shadow-sm dark:bg-[#3d3759] dark:text-purple-300"
+                : "text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
+          >
+            {key === "queue" ? t("tabQueue") : t("tabHandedOver")}
+            {key === "queue" && total > 0 && (
+              <span className="ml-1.5 rounded-md bg-sky-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
+                {total}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {tab === "handed" ? (
+        <BatchList mode="staff" />
+      ) : (
+      <>
       {/* ⚠️ Plitkalar OMBORNING umumiy holati: qidiruv ularni toraytirmaydi
           (server ham shu mantiqda hisoblaydi). */}
       <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
@@ -480,6 +532,8 @@ function AwaitingMarket() {
             className="[&_.ant-pagination-item-active]:border-purple-600 [&_.ant-pagination-item-active]:bg-purple-600 [&_.ant-pagination-item-active_a]:text-white"
           />
         </div>
+      )}
+      </>
       )}
     </div>
   );

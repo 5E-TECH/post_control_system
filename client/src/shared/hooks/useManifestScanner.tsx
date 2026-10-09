@@ -23,6 +23,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { normalizeQrToken } from "../helpers/normalizeQrToken";
+import { isTextEntryTarget } from "../helpers/isTextEntryTarget";
+import type { ScanFeedbackState } from "../components/scan-feedback";
 
 const BASE_URL = import.meta.env.BASE_URL || "/";
 
@@ -67,11 +69,12 @@ const playError = () => {
 };
 
 // ============ TYPES ============
-export interface VisualFeedback {
-  show: boolean;
-  type: "success" | "error" | "warning";
-  message?: string;
-}
+/**
+ * ⚠️ Tip overlay komponentidan OLINADI — ikki joyda alohida e'lon
+ * qilinsa ular ajrab ketardi (`info` toni qo'shilganda aynan shu xavf
+ * bor edi).
+ */
+export type VisualFeedback = ScanFeedbackState;
 
 export interface UseManifestScannerParams {
   /**
@@ -128,8 +131,18 @@ export function useManifestScanner({
   setSelectedIdsRef.current = setSelectedIds;
   onMissResolvedRef.current = onMissResolved;
 
-  // Topilgan / "yo'q" deb tasdiqlangan / hozir tekshirilayotgan tokenlar.
-  const successTokens = useRef<Set<string>>(new Set());
+  /**
+   * Topilgan tokenlar — `Set` EMAS, `Map<token, orderId>`.
+   *
+   * ⚠️ NEGA ID ESLAB QOLINADI. Avval `Set` edi va takroriy skanda faqat
+   * «Allaqachon topilgan!» deyilardi, TANLASH esa qayta bajarilmasdi.
+   * Natijada xodim «Tanlovni tozalash» ni bosgach (masalan pallet
+   * aralashib ketgani uchun) ilgari skanerlangan posilkani QAYTA
+   * skanerlay olmasdi: skaner «topilgan» deydi, qator esa tanlanmaydi.
+   * Yagona chiqish yo'li — uni QO'LDA belgilab, «QR yirtilgan» kabi
+   * SOXTA sabab yozish edi. Ya'ni nuqson topshirish DALILINI buzardi.
+   */
+  const successTokens = useRef<Map<string, string>>(new Map());
   const errorTokens = useRef<Set<string>>(new Set());
   const processingTokens = useRef<Set<string>>(new Set());
 
@@ -158,9 +171,13 @@ export function useManifestScanner({
   const handleToken = useCallback(
     async (token: string) => {
       // 1. Allaqachon topilgan — DARROV (tarmoqsiz)
-      if (successTokens.current.has(token)) {
+      const knownId = successTokens.current.get(token);
+      if (knownId) {
         playSuccess();
         showVisualFeedback("warning", "Allaqachon topilgan!");
+        // ⚠️ QAYTA TANLANADI. Tanlov tozalangan bo'lishi mumkin —
+        // «topilgan» xotirasi tanlovdan MUSTAQIL. `select` idempotent.
+        select(knownId);
         return;
       }
 
@@ -169,7 +186,7 @@ export function useManifestScanner({
       if (fromManifest) {
         playSuccess();
         showVisualFeedback("success", "Topildi!");
-        successTokens.current.add(token);
+        successTokens.current.set(token, fromManifest);
         select(fromManifest);
         return;
       }
@@ -203,7 +220,7 @@ export function useManifestScanner({
           // ro'yxatni yangilaymiz (manifest qayta quriladi, keyingi skani ~0ms).
           playSuccess();
           showVisualFeedback("success", "Topildi!");
-          successTokens.current.add(token);
+          successTokens.current.set(token, orderId);
           select(orderId);
           onMissResolvedRef.current?.();
         } else {
@@ -237,10 +254,10 @@ export function useManifestScanner({
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const handleKeyPress = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
-        return;
-      }
+      // ⚠️ `tagName === "INPUT"` EMAS: antd Checkbox va Select ichida ham
+      // `<input>` bor va ular bosilgach fokusni ushlab qolardi — skaner
+      // JIM o'lardi (`isTextEntryTarget` izohiga qara).
+      if (isTextEntryTarget(e.target)) return;
 
       if (e.key === "Enter") {
         const tokenValue = scanned.trim();

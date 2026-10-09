@@ -171,3 +171,49 @@ export class HandoverConsentFlagDto {
   @IsIn([true, false])
   cancel_handover_consent_required!: boolean;
 }
+
+/**
+ * TOPSHIRILGAN PARTIYALAR TARIXI uchun filtr.
+ *
+ * ⚠️ Sana `YYYY-MM-DD` SATR sifatida keladi, epoch EMAS — loyihadagi
+ * pochta ro'yxati bilan ayni (`post.service.ts buildCreatedAtRange`).
+ * Serverda `toUzbekistanTimestamp` orqali kun boshi/oxiriga keltiriladi:
+ * foydalanuvchi «6-oktabr» desa, u TOSHKENT kunini nazarda tutadi, UTC
+ * kunini emas — aks holda kechqurun topshirilgan partiya ertangi kunga
+ * tushib ketardi.
+ */
+export class HandoverHistoryQueryDto {
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  page?: number;
+
+  @ApiPropertyOptional({ example: 20 })
+  @IsOptional()
+  limit?: number;
+
+  @ApiPropertyOptional({
+    example: '2026-10-01',
+    description: 'Boshlanish sanasi (Toshkent kuni, YYYY-MM-DD)',
+  })
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-10-07',
+    description: 'Tugash sanasi (Toshkent kuni, YYYY-MM-DD)',
+  })
+  @IsOptional()
+  @IsString()
+  to?: string;
+
+  @ApiPropertyOptional({ description: 'Market nomi yoki buyurtma raqami' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'Faqat XODIM uchun: market bo‘yicha filtr' })
+  @IsOptional()
+  @IsUUID()
+  market_id?: string;
+}

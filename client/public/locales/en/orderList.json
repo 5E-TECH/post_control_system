@@ -78,5 +78,21 @@
   "delivery": "Where",
   "center": "To the center",
   "address": "Up to home",
-  "sana": "Date"
+  "sana": "Date",
+  "deadline": {
+    "bannerLate": "{{count}} orders are overdue — the penalty is growing",
+    "bannerToday": "{{count}} orders are due TODAY",
+    "alsoDueToday": "{{count}} more orders are due today",
+    "sumNow": "If marked now",
+    "sumTomorrow": "If marked tomorrow",
+    "sumMax": "At most",
+    "currency": "UZS",
+    "shadowNotice": "Test mode — no money is deducted yet, warning only",
+    "badgeLate": "{{count}} days late",
+    "badgeDays": "{{count}} days left",
+    "badgeHours": "{{count}} hours left",
+    "badgeMinutes": "{{count}} minutes left",
+    "badgeTitle": "Deadline {{days}} days · penalty starts: {{date}}",
+    "columnDeadline": "Deadline"
+  }
 }

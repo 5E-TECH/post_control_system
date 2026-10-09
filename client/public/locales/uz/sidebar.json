@@ -14,7 +14,7 @@
   "myRegion": "Mening viloyatim",
   "settings": "Sozlamalar",
   "awaiting_market": "Market kutilmoqda",
-  "market_returns": "Qaytarilgan buyurtmalar",
+  "market_returns": "Qaytarishlar",
   "extra_cost": "Qo'shimcha xarajat",
   "market_operators": "Operatorlar",
   "ai_balance": "AI balans",
@@ -22,5 +22,6 @@
   "replacements": "Almashtirishlar",
   "marketplace_intake": "Marketplace qabuli",
   "my_orders": "Mening buyurtmalarim",
-  "my_earnings": "Daromadlarim"
+  "my_earnings": "Daromadlarim",
+  "courier_penalty": "Shtraflar"
 }

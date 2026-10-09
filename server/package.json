@@ -27,13 +27,15 @@
     "migration:revert": "npm run typeorm -- migration:revert",
     "migration:show": "npm run typeorm -- migration:show",
     "db:backup": "bash scripts/db-backup.sh",
+    "db:measure-courier-delay": "ts-node -r tsconfig-paths/register scripts/measure-courier-delay.ts",
     "db:check-cashbox": "ts-node -r tsconfig-paths/register scripts/check-cashbox-invariant.ts",
     "db:check-extra-cost": "ts-node -r tsconfig-paths/register scripts/check-extra-cost.ts",
     "db:check-cards": "ts-node -r tsconfig-paths/register scripts/check-card-invariant.ts",
     "db:check-investor-ledger": "ts-node -r tsconfig-paths/register scripts/check-investor-ledger-invariant.ts",
     "db:check-market-settlement": "ts-node -r tsconfig-paths/register scripts/check-market-settlement.ts",
     "db:check-rollback-history": "ts-node -r tsconfig-paths/register scripts/check-rollback-history.ts",
-    "test:marketplace-e2e": "bash scripts/local/run-marketplace-e2e.sh"
+    "test:marketplace-e2e": "bash scripts/local/run-marketplace-e2e.sh",
+    "db:check-courier-penalty": "ts-node -r tsconfig-paths/register scripts/check-courier-penalty.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",

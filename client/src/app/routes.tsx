@@ -143,6 +143,9 @@ const AwaitingMarket = lazy(
 const HandoverSession = lazy(
   () => import("../pages/mails/pages/superadmin/awaiting-market/HandoverSession"),
 );
+const HandoverBatchDetail = lazy(
+  () => import("../pages/handovers/BatchDetail"),
+);
 const CourierExtraCost = lazy(
   () => import("../pages/extra-cost-requests/courier"),
 );
@@ -157,6 +160,7 @@ const OperatorStats = lazy(
 const OperatorEarnings = lazy(() => import("../pages/operator-earnings"));
 const OperatorOrders = lazy(() => import("../pages/operator-orders"));
 const CourierBulk = lazy(() => import("../pages/courier-bulk"));
+const CourierPenalty = lazy(() => import("../pages/courier-penalty"));
 const MyRegion = lazy(() => import("../pages/my-region"));
 const Investor = lazy(() => import("../pages/investor"));
 const InvestorOverview = lazy(() => import("../pages/investor/overview"));
@@ -269,6 +273,17 @@ const AppRouters = () => {
               ),
             },
             {
+              // Kuryer shtraflari — kechikkanlar, daftar, qoidalar.
+              // ⚠️ Faqat superadmin va admin: shtraf ma'lumoti kuryerning
+              // shaxsiy moliyaviy ma'lumoti, registrator ko'rmasligi kerak.
+              path: "courier-penalty",
+              element: (
+                <RequireRole roles={["superadmin", "admin"]}>
+                  <CourierPenalty />
+                </RequireRole>
+              ),
+            },
+            {
               // Marketplace qabuli — operatorning kundalik skan ekrani.
               // Sozlash «Integratsiyalar → Marketplace» da, bu yerda esa ish.
               path: "marketplace-intake",
@@ -368,6 +383,29 @@ const AppRouters = () => {
                   roles={["superadmin", "admin", "registrator", "logist"]}
                 >
                   <AwaitingMarket />
+                </RequireRole>
+              ),
+            },
+            {
+              // Partiya ichi — ikkala rol ham shu yerga keladi
+              // («Market kutilmoqda» sahifasidagi «Topshirilganlar»
+              // tabidan yoki market kabinetidagi «Men olganlarim» dan).
+              // Alohida RO'YXAT sahifasi YO'Q: u tabga ko'chirilgan.
+              // Market ham o'z partiyasini ochadi — ruxsat SERVERDA
+              // (`market_id` tokendan), bu yerda faqat ko'rinish.
+              path: "handovers/:sessionId",
+              element: (
+                <RequireRole
+                  roles={[
+                    "superadmin",
+                    "admin",
+                    "registrator",
+                    "logist",
+                    "market",
+                    "operator",
+                  ]}
+                >
+                  <HandoverBatchDetail />
                 </RequireRole>
               ),
             },

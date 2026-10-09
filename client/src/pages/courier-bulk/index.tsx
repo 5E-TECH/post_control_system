@@ -15,6 +15,7 @@ import {
 import { Modal } from "antd";
 import { useTranslation } from "react-i18next";
 import CourierCameraScanner from "../../shared/components/courier-camera-scanner";
+import CourierDeadlineBanner from "../../shared/components/CourierDeadlineBanner";
 import { useOrder } from "../../shared/api/hooks/useOrder";
 import { useApiNotification } from "../../shared/hooks/useApiNotification";
 import { normalizeQrToken } from "../../shared/helpers/normalizeQrToken";
@@ -731,6 +732,14 @@ const CourierBulkPage = () => {
             {t("reset")}
           </button>
         </div>
+
+        {/*
+          MUDDAT OGOHLANTIRISHI. Kuryer buyurtmalarni ko'pincha AYNAN shu
+          ekranda (skaner bilan) belgilaydi — ogohlantirish shu yerda ham
+          ko'rinishi kerak, aks holda eng faol ishlatiladigan sahifada
+          chetda qolardi.
+        */}
+        <CourierDeadlineBanner />
 
         {/* 2 ta tab + skan zonasi */}
         <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm p-4 mb-4 border border-gray-100 dark:border-gray-800">

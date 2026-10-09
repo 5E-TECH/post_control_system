@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
+  ChevronDown,
   FileSignature,
   FileText,
   KeyRound,
@@ -31,14 +32,23 @@ import {
 import {
   MANUAL_OVERRIDE_REASON_KEYS,
   MANUAL_OVERRIDE_REASONS,
+  type AwaitingOrder,
+  type ManualOverride,
   releaseHandoverBeacon,
   useMarketHandover,
   type HandoverAuthorization,
 } from "../../../../../shared/api/hooks/useMarketHandover";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useManifestScanner } from "../../../../../shared/hooks/useManifestScanner";
-import { useMarketQrScanner } from "../../../../../shared/hooks/useMarketQrScanner";
+import {
+  MARKET_QR_PREFIX,
+  useMarketQrScanner,
+} from "../../../../../shared/hooks/useMarketQrScanner";
 import { formatPhone } from "../../../../../shared/helpers/formatPhone";
+import ScanFeedback, {
+  type ScanFeedbackState,
+} from "../../../../../shared/components/scan-feedback";
+import { summarizeProducts } from "../../../../../shared/lib/orderProducts";
 import PinInput from "../../../../../shared/components/pin-input";
 import { normalizeQrToken } from "../../../../../shared/helpers/normalizeQrToken";
 import { BASE_URL } from "../../../../../shared/const";
@@ -53,8 +63,7 @@ import {
 import ReplacementBadge from "../../../../../shared/components/replacement-badge";
 import {
   buildManualOverrides,
-  canSubmitBatch,
-  manualSelection,
+  canHandOverManual,
   missingReasonIds,
 } from "./handover.logic";
 
@@ -77,7 +86,7 @@ const money = (n?: number | null) =>
 /** Desktop skeleton — `order-view` dagi naqsh. */
 const TableRowSkeleton = () => (
   <tr className="animate-pulse">
-    {[...Array(8)].map((_, i) => (
+    {[...Array(9)].map((_, i) => (
       <td key={i} className="px-4 py-4">
         <div className="h-4 w-full rounded bg-gray-200 dark:bg-gray-700" />
       </td>
@@ -138,7 +147,15 @@ function HandoverSession() {
   const [auth, setAuth] = useState<HandoverAuthorization | null>(null);
   const [pin, setPin] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [scannedIds, setScannedIds] = useState<Set<string>>(new Set());
+  /**
+   * SHU SESSIYADA TOPSHIRILGANLAR.
+   *
+   * ⚠️ «Tanlangan» EMAS, TOPSHIRILGAN: skan serverga darhol yuboriladi
+   * va muvaffaqiyatli javobdan KEYIN shu to'plamga qo'shiladi. Ya'ni
+   * ro'yxatdan chiqqan posilka — haqiqatan yopilgan posilka, ekrandagi
+   * vaqtinchalik belgi emas.
+   */
+  const [handedIds, setHandedIds] = useState<Set<string>>(new Set());
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [handedInSession, setHandedInSession] = useState(0);
   const [offlineOpen, setOfflineOpen] = useState(false);
@@ -155,6 +172,38 @@ function HandoverSession() {
   // va pastdagi `manifest` useMemo'sini har renderda qayta hisoblashga
   // majburlardi (200 posilkada sezilarli).
   const orders = useMemo(() => data?.orders ?? [], [data]);
+
+  /**
+   * RO'YXATDA FAQAT HALI SKANERLANMAGANLAR.
+   *
+   * ⚠️ NEGA. Xodim qo'lida 150 posilka bor va har birini o'qitadi.
+   * Skanerlangani ro'yxatda QOLSA, u har safar «qaysinisini
+   * o'qitdim?» deb butun ro'yxatni ko'zdan kechirishga majbur bo'ladi
+   * — aynan shu sabab posilkalar ikki marta o'qitilardi. `today-orders`
+   * da bu masala allaqachon shunday hal qilingan: topilgani ro'yxatdan
+   * CHIQIB KETADI va qolgani KAMAYIB boradi, ya'ni ro'yxat uzunligi
+   * «yana nechta qoldi» degan javobga aylanadi.
+   *
+   * ⚠️ QO'LDA belgilangan (yorlig'i yirtilgan) qatorlar QOLADI: ularda
+   * sabab tanlash majburiy va u ko'rinib turishi kerak.
+   */
+  const pending = useMemo(
+    () => orders.filter((o) => !handedIds.has(o.id)),
+    [orders, handedIds],
+  );
+  /**
+   * Topshirilganlar — SNAPSHOT, `orders` dan hosila EMAS.
+   *
+   * ⚠️ NEGA. Ro'yxat qayta so'ralganda (masalan skaner manifestdan
+   * tashqaridagi posilkani topib `refetch` chaqirganda) topshirilgan
+   * qatorlar serverdan KELMAYDI — ular endi navbatda emas. Hosila
+   * ro'yxat o'sha zahoti BO'SHAB qolardi va xodim nimani topshirganini
+   * tekshira olmasdi. Shuning uchun muvaffaqiyatli javobdan keyin
+   * qatorning nusxasi saqlanadi.
+   */
+  const [handed, setHanded] = useState<AwaitingOrder[]>([]);
+  /** Topshirilganlar bloki ochiqmi (tekshirib ko'rish uchun). */
+  const [showHanded, setShowHanded] = useState(false);
   const total = Number(data?.total ?? 0);
 
   // ─────────────────── Ruxsat oynasi va heartbeat ───────────────────
@@ -197,12 +246,42 @@ function HandoverSession() {
     const token = auth.authorization_token;
     const everyMs =
       Math.max(5, Number(auth.heartbeat_interval_seconds || 30)) * 1000;
+
+    /**
+     * ⚠️ BITTA XATO RUXSATNI O'LDIRMAYDI.
+     *
+     * Avval `onError: () => setAuth(null)` edi: BITTA o'tkinchi tarmoq
+     * uzilishi yoki 502 butun topshirishni bekor qilardi — xodim
+     * posilkalarni skanerlab bo'lib, «Topshirish» bosganda ruxsat
+     * yo'qligini bilardi va hammasini boshidan boshlashga majbur edi.
+     * Holbuki SERVER bunday emas: heartbeat 30 s da bir ketadi, server
+     * esa 60 s sabr qiladi, ya'ni bitta o'tkazib yuborilgan tik hali
+     * sessiyani yopmaydi. Klient serverdan QATTIQROQ bo'lishi mantiqsiz.
+     *
+     * Endi ikki holat AJRATILADI:
+     *   · 4xx (401/403/404) — server ANIQ «bu ruxsat yo'q» dedi →
+     *     darhol tozalanadi, aks holda xodim har bosishda xato olardi;
+     *   · tarmoq / 5xx — vaqtinchalik. Ketma-ket IKKI marta
+     *     muvaffaqiyatsiz bo'lsagina tozalanadi (≈60 s — serverning
+     *     o'z sabr oynasi bilan bir xil).
+     */
+    let consecutiveFailures = 0;
+
     const id = setInterval(() => {
       heartbeat.mutate(token, {
-        // Server ruxsatni yopgan bo'lsa ekranni DARHOL haqiqatga keltiramiz:
-        // aks holda xodim topshirayotgandek o'ylab turib har bosishda xato
-        // olardi.
-        onError: () => setAuth(null),
+        onSuccess: () => {
+          consecutiveFailures = 0;
+        },
+        onError: (err) => {
+          const status = (err as { response?: { status?: number } })?.response
+            ?.status;
+          const sessionGone =
+            status === 401 || status === 403 || status === 404;
+          consecutiveFailures += 1;
+          if (sessionGone || consecutiveFailures >= 2) {
+            setAuth(null);
+          }
+        },
       });
     }, everyMs);
     return () => clearInterval(id);
@@ -234,6 +313,7 @@ function HandoverSession() {
             setAuth(res);
             setPin("");
             setHandedInSession(0);
+            flashMarket("info", t("toastConsentOpened"));
             handleSuccess(t("toastConsentOpened"), t("toastScanParcels"));
           },
           onError: (err) => {
@@ -245,6 +325,7 @@ function HandoverSession() {
              * chegarasini bekorga yeyardi.
              */
             setPin("");
+            flashMarket("error", t("toastConsentFailedScan"));
             handleApiError(err, t("toastConsentFailedScan"));
           },
         },
@@ -255,14 +336,35 @@ function HandoverSession() {
   );
 
   /**
+   * MARKET QR SKANERI JAVOBI — KO'K.
+   *
+   * ⚠️ Posilka skanidan RANG bilan ajratiladi: market ruxsati butunlay
+   * BOSHQA turdagi hodisa (sessiya ochiladi), yashil bo'lsa xodim uni
+   * «yana bitta posilka topildi» deb o'qirdi.
+   */
+  const [marketFeedback, setMarketFeedback] = useState<ScanFeedbackState>({
+    show: false,
+    type: "info",
+  });
+  const flashMarket = useCallback(
+    (type: ScanFeedbackState["type"], message: string) => {
+      setMarketFeedback({ show: true, type, message });
+      setTimeout(() => setMarketFeedback({ show: false, type }), 900);
+    },
+    [],
+  );
+
+  /**
    * MARKET QR SKANERI — sahifaga kirgan zahoti aktiv, TUGMA YO'Q.
    * Faqat ruxsat ochilmagan paytda ishlaydi.
    */
   useMarketQrScanner({
     enabled: !auth && !scan.isPending,
     onMarketToken: (token) => authorize({ qr_token: token }),
-    onForeignToken: () =>
-      handleWarning(t("toastNotMarketQrTitle"), t("toastNotMarketQrBody")),
+    onForeignToken: () => {
+      flashMarket("error", t("toastNotMarketQrTitle"));
+      handleWarning(t("toastNotMarketQrTitle"), t("toastNotMarketQrBody"));
+    },
   });
 
   // ─────────────────────── Posilka skaneri ───────────────────────
@@ -275,31 +377,93 @@ function HandoverSession() {
     return map;
   }, [orders]);
 
-  const selectedRef = useRef<string[]>([]);
-  selectedRef.current = selectedIds;
+  /** `handOver` ichidan joriy ro'yxatga murojaat — stale closure'siz. */
+  const ordersRef = useRef<AwaitingOrder[]>([]);
+  ordersRef.current = orders;
+  const handedRef = useRef<Set<string>>(new Set());
+  handedRef.current = handedIds;
 
   /**
-   * Skaner tanlagan posilkalarni ALOHIDA belgilab boramiz.
+   * ═════════ SKAN = TOPSHIRISH ═════════
    *
-   * ⚠️ NEGA KERAK: qo'lda belgilangan (skanerlanmagan) posilka uchun YOPIQ
-   * sabab majburiy — "yorliq o'qilmadi" dalili shunda yoziladi. Skanerlangani
-   * sababsiz o'tadi. Bu farqni faqat shu yerda bilib olish mumkin.
+   * ⚠️ PARTIYA TUGMASI YO'Q — VA BU ATAYLAB. Avval skanerlangani
+   * to'planib turardi va xodim oxirida «Marketga topshirish (N)» ni
+   * bosardi. Bu ortiqcha qadam edi: skan qilindi — demak posilka
+   * xodim qo'lida va marketga berildi. Tugma faqat XATOGA joy
+   * qoldirardi: xodim uni bosmasdan sahifadan chiqsa yoki ruxsat
+   * oynasi tugasa, o'nlab skan BEKORGA ketardi va hammasini boshidan
+   * o'qitishga to'g'ri kelardi.
+   *
+   * Loyihada bu naqsh allaqachon bor: yangi buyurtma skanerlanadi va
+   * DARHOL pochtaga biriktirilib ro'yxatdan chiqadi.
+   *
+   * ⚠️ Serverda ketma-ket so'rovlar XAVFSIZ: `resolveActiveSession`
+   * sessiya qatorini `pessimistic_write` bilan qulflaydi, ya'ni
+   * parallel `complete` lar navbatga tushadi va `handed_over_count`
+   * yo'qolgan yangilanish bermaydi.
+   */
+  const handOver = useCallback(
+    (ids: string[], overrides: ManualOverride[] = []) => {
+      const token = authRef.current?.authorization_token;
+      if (!token || ids.length === 0) return;
+      complete.mutate(
+        {
+          market_id: marketId,
+          order_ids: ids,
+          authorization_token: token,
+          manual_overrides: overrides,
+        },
+        {
+          onSuccess: (res) => {
+            // Ro'yxatdan CHIQARISH — server tasdiqlagandan KEYIN.
+            const doneIds = res.order_ids ?? ids;
+            setHandedIds((prev) => {
+              const next = new Set(prev);
+              doneIds.forEach((id) => next.add(id));
+              return next;
+            });
+            // Tekshirish ro'yxati uchun nusxa — refetch'dan omon qoladi.
+            setHanded((prev) => {
+              const known = new Set(prev.map((o) => o.id));
+              const added = ordersRef.current.filter(
+                (o) => doneIds.includes(o.id) && !known.has(o.id),
+              );
+              return added.length ? [...prev, ...added] : prev;
+            });
+            setHandedInSession((n) => n + Number(res.handed_over ?? ids.length));
+            // Qo'lda belgilangani topshirildi — tanlovdan chiqariladi.
+            setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+          },
+          onError: (err) => {
+            // ⚠️ Qator RO'YXATDA QOLADI: topshirilmagan posilka ekrandan
+            // yo'qolsa xodim uni o'tkazib yuborardi.
+            flashMarket("error", t("toastHandoverFailed"));
+            handleApiError(err, t("toastHandoverFailed"));
+          },
+        },
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [marketId],
+  );
+
+  /**
+   * Skaner posilkani topdi — DARHOL topshiramiz.
+   *
+   * ⚠️ Hook `setSelectedIds` shaklidagi setter kutadi; biz undan faqat
+   * QO'SHILGAN id'larni ajratib olamiz va tanlovga yozmasdan to'g'ridan
+   * to'g'ri `handOver` ga uzatamiz.
    */
   const setSelectedFromScanner = useCallback<
     Dispatch<SetStateAction<string[]>>
-  >((updater) => {
-    const prev = selectedRef.current;
-    const next = typeof updater === "function" ? updater(prev) : updater;
-    const added = next.filter((id) => !prev.includes(id));
-    setSelectedIds(next);
-    if (added.length) {
-      setScannedIds((s) => {
-        const n = new Set(s);
-        added.forEach((id) => n.add(id));
-        return n;
-      });
-    }
-  }, []);
+  >(
+    (updater) => {
+      const next = typeof updater === "function" ? updater([]) : updater;
+      const fresh = next.filter((id) => !handedRef.current.has(id));
+      if (fresh.length) handOver(fresh);
+    },
+    [handOver],
+  );
 
   // ⚠️ So'rov QATLAMI hookda — sahifa `api` ni to'g'ridan-to'g'ri chaqirmaydi.
   const resolveMiss = useCallback(
@@ -318,55 +482,31 @@ function HandoverSession() {
 
   // ─────────────────────────── Amallar ───────────────────────────
 
-  const manualIds = useMemo(
-    () => manualSelection(selectedIds, scannedIds),
-    [selectedIds, scannedIds],
-  );
+  /**
+   * QO'LDA belgilanganlar — yorlig'i yirtilgan posilkalar.
+   *
+   * ⚠️ `selectedIds` endi FAQAT shular: skanerlangani tanlovga umuman
+   * tushmaydi, u darhol topshiriladi.
+   */
+  const manualIds = selectedIds;
   const missingReasons = useMemo(
     () => missingReasonIds(manualIds, reasons),
     [manualIds, reasons],
   );
-  const submitEnabled = useMemo(
-    () =>
-      canSubmitBatch({
-        authorized: Boolean(auth),
-        selectedIds,
-        scannedIds,
-        reasons,
-      }),
-    [auth, selectedIds, scannedIds, reasons],
-  );
 
   const clearSelection = useCallback(() => {
     setSelectedIds([]);
-    setScannedIds(new Set());
     setReasons({});
   }, []);
 
-  const submitBatch = useCallback(() => {
-    if (!auth || selectedIds.length === 0) return;
-    complete.mutate(
-      {
-        market_id: marketId,
-        order_ids: selectedIds,
-        authorization_token: auth.authorization_token,
-        manual_overrides: buildManualOverrides(manualIds, reasons),
-      },
-      {
-        onSuccess: (res) => {
-          handleSuccess(
-            t("toastHandedTitle"),
-            t("toastHandedBody", { count: res.handed_over }),
-          );
-          setHandedInSession((n) => n + Number(res.handed_over ?? 0));
-          clearSelection();
-          void refetch();
-        },
-        onError: (err) => handleApiError(err, t("toastHandoverFailed")),
-      },
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth, selectedIds, manualIds, reasons, marketId]);
+  /** Bitta qo'lda belgilangan posilkani sababi bilan topshirish. */
+  const handOverManual = useCallback(
+    (id: string) => {
+      if (!canHandOverManual({ authorized: true, reason: reasons[id] })) return;
+      handOver([id], buildManualOverrides([id], reasons));
+    },
+    [handOver, reasons],
+  );
 
   const finishSession = useCallback(() => {
     if (!auth) return;
@@ -418,7 +558,6 @@ function HandoverSession() {
 
   // ─────────────────────────── Ko'rinish ───────────────────────────
 
-  const scannedCount = selectedIds.filter((id) => scannedIds.has(id)).length;
 
   return (
     <div className="mx-auto w-full max-w-screen-2xl px-4 py-4 pb-28 sm:px-6 lg:px-8">
@@ -487,6 +626,16 @@ function HandoverSession() {
             <PinInput
               value={pin}
               onChange={setPin}
+              // Fokus PIN maydonida bo'lsa skaner belgilari shu yerga
+              // tushadi — ularni PIN deb yemasdan ruxsat ochishga
+              // yo'naltiramiz (aks holda har skan soxta PIN urinishi edi).
+              scannerPrefix={MARKET_QR_PREFIX}
+              onScannedToken={(raw) => {
+                const token = normalizeQrToken(raw);
+                if (token.startsWith(MARKET_QR_PREFIX)) {
+                  authorize({ qr_token: token });
+                }
+              }}
               // To'lgan zahoti yuboriladi; tugma faqat qayta urinish uchun.
               onComplete={(digits) => authorize({ pin: digits })}
               disabled={scan.isPending}
@@ -554,20 +703,19 @@ function HandoverSession() {
           </Button>
         </div>
       )}
-      {/* ─────── Skaner javobi ─────── */}
-      {visualFeedback.show && (
-        <div
-          className={`mb-3 rounded-lg px-3 py-2 text-sm font-semibold ${
-            visualFeedback.type === "success"
-              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-              : visualFeedback.type === "warning"
-                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-                : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-          }`}
-        >
-          {visualFeedback.message}
-        </div>
-      )}
+      {/*
+        ─────── Skaner javobi — BUTUN EKRANLI ───────
+
+        ⚠️ Avval bu ro'yxat tepasidagi kichik rangli qator edi va xodim
+        uni KO'RMASDI: skanerlaganda ko'z POSILKADA bo'ladi, ekranda
+        emas. Natijada ayni yorliq ikki marta o'qitilardi yoki o'tkazib
+        yuborilardi. `today-orders` / `courier-bulk` naqshi bo'yicha
+        butun ekranli overlay — rang masofadan ham ko'rinadi.
+
+        ko'k = market ruxsati ochildi · yashil = posilka topildi
+        sariq = allaqachon skanerlangan · qizil = topilmadi/xato
+      */}
+      <ScanFeedback state={marketFeedback.show ? marketFeedback : visualFeedback} />
 
       {/* ─────── Ro'yxat sarlavhasi ─────── */}
       <div className="mb-2 flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
@@ -575,12 +723,14 @@ function HandoverSession() {
           <Package className="h-4 w-4" />
           {t("parcelsCount", { count: orders.length })}
         </span>
+        {handedInSession > 0 && (
+          <span className="inline-flex items-center gap-1.5 text-emerald-600">
+            <PackageCheck className="h-4 w-4" />
+            {t("handedThisSession", { count: handedInSession })}
+          </span>
+        )}
         {selectedIds.length > 0 && (
           <>
-            <span className="inline-flex items-center gap-1.5 text-emerald-600">
-              <PackageCheck className="h-4 w-4" />
-              {t("scannedCount", { count: scannedCount })}
-            </span>
             {manualIds.length > 0 && (
               <span className="inline-flex items-center gap-1.5 text-orange-600">
                 <AlertTriangle className="h-4 w-4" />
@@ -598,6 +748,55 @@ function HandoverSession() {
         )}
       </div>
 
+      {/* ─────── Skanerlanganlar (yig'iladigan) ─────── */}
+      {/*
+        ⚠️ O'CHIRILMAYDI, YASHIRILADI. Xodim topshirishdan oldin
+        «nimani o'qitdim?» deb tekshira olishi kerak va xato skanni
+        qaytara olishi shart — aks holda butun tanlovni tozalashdan
+        boshqa yo'l qolmasdi.
+      */}
+      {handed.length > 0 && (
+        <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-900/10">
+          <button
+            type="button"
+            onClick={() => setShowHanded((v: boolean) => !v)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left"
+            title={t("handedBlockHint")}
+          >
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+            <span className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+              {t("handedBlock", { count: handed.length })}
+            </span>
+            <ChevronDown
+              className={`ml-auto h-4 w-4 text-emerald-700 transition-transform ${
+                showHanded ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+
+          {showHanded && (
+            <ul className="m-0 max-h-56 list-none overflow-y-auto border-t border-emerald-200 px-3 py-2 dark:border-emerald-900/40">
+              {handed.map((o) => (
+                <li
+                  key={o.id}
+                  className="flex items-center gap-2 py-1 text-sm"
+                >
+                  <span className="tabular-nums text-gray-500 dark:text-gray-400">
+                    #{o.order_number}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-gray-800 dark:text-gray-200">
+                    {o.customer_name || "—"}
+                  </span>
+                  {/* ⚠️ «Qaytarish» YO'Q: server qatorni allaqachon
+                      YOPGAN (CLOSED). Tugma qo'ysak u yolg'on va'da
+                      bo'lardi — ro'yxat faqat TEKSHIRISH uchun. */}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* ─────── Posilkalar ─────── */}
       {/*
         Ko'rinish loyihaning ro'yxat naqshini ko'chiradi: mobilda karta
@@ -612,7 +811,7 @@ function HandoverSession() {
       <div className="block space-y-2 lg:hidden">
         {isLoading ? (
           [...Array(4)].map((_, i) => <MobileCardSkeleton key={i} />)
-        ) : orders.length === 0 ? (
+        ) : pending.length === 0 ? (
           <div className="rounded-xl bg-white py-12 text-center dark:bg-[#2A263D]">
             <ShieldCheck className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
             <p className="m-0 font-semibold text-gray-700 dark:text-gray-200">
@@ -620,9 +819,10 @@ function HandoverSession() {
             </p>
           </div>
         ) : (
-          orders.map((o) => {
+          pending.map((o) => {
             const checked = selectedIds.includes(o.id);
-            const manual = checked && !scannedIds.has(o.id);
+            // Tanlangan HAR qator qo'lda belgilangan: skan tanlovga tushmaydi.
+            const manual = checked;
             return (
               <div
                 key={o.id}
@@ -651,7 +851,11 @@ function HandoverSession() {
                     <Checkbox
                       checked={checked}
                       onChange={() => toggle(o.id)}
-                      disabled={!auth}
+                      /* ⚠️ `disabled={!auth}` OLIB TASHLANDI — u OFFLINE
+                         AKT yo'lini butunlay o'lik qilardi: akt ruxsat
+                         YO'Q paytda yoziladi, lekin belgilab bo'lmasa
+                         `selectedIds` bo'sh qolib tugma hech qachon
+                         faollashmasdi. */
                     />
                   </span>
                   {/* ISM birinchi, yorliq raqami OSTIDA kichikroq. */}
@@ -696,10 +900,27 @@ function HandoverSession() {
                   <span className="inline-flex items-center gap-1 font-semibold tabular-nums text-gray-800 dark:text-gray-200">
                     {money(o.total_price)}
                   </span>
-                  <span className="inline-flex items-center gap-1 tabular-nums">
-                    <Package className="h-3 w-3 text-gray-400" />
-                    {t("pcs", { count: Number(o.product_quantity ?? 0) })}
-                  </span>
+                  {/* MAHSULOT — «2 dona» o'rniga NIMA ekani. */}
+                  {(() => {
+                    const p = summarizeProducts(o.items, o.product_quantity);
+                    return (
+                      <span
+                        className="inline-flex min-w-0 items-center gap-1"
+                        title={p.nameless ? t("noProductName") : p.fullText}
+                      >
+                        <Package className="h-3 w-3 shrink-0 text-gray-400" />
+                        <span className="truncate">
+                          {p.nameless
+                            ? t("pcs", { count: p.totalQuantity })
+                            : p.visible
+                                .map((it) => `${it.name} x${it.quantity}`)
+                                .join(", ")}
+                          {p.hiddenCount > 0 &&
+                            ` ${t("moreProducts", { count: p.hiddenCount })}`}
+                        </span>
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -737,6 +958,27 @@ function HandoverSession() {
                           label: t(MANUAL_OVERRIDE_REASON_KEYS[r]),
                         }))}
                       />
+                      {/* ⚠️ QATOR DARAJASIDA topshiriladi: xodim qaysi
+                          posilka NEGA qo'lda o'tganini ko'rib turadi. */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handOverManual(o.id);
+                        }}
+                        disabled={
+                          !canHandOverManual({
+                            authorized: Boolean(auth),
+                            reason: reasons[o.id],
+                          }) || complete.isPending
+                        }
+                        title={
+                          reasons[o.id] ? undefined : t("manualNeedsReason")
+                        }
+                        className="shrink-0 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 px-3 py-1 text-xs font-semibold text-white transition-all hover:from-purple-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:from-gray-300 disabled:to-gray-300 dark:disabled:from-gray-700 dark:disabled:to-gray-700"
+                      >
+                        {t("handOverRow")}
+                      </button>
                     </>
                   )}
                 </div>
@@ -765,6 +1007,12 @@ function HandoverSession() {
                 <th className="min-w-[150px] px-4 py-4 text-left text-sm font-semibold">
                   {t("colAddress")}
                 </th>
+                <th
+                  className="min-w-[160px] px-4 py-4 text-left text-sm font-semibold"
+                  title={t("productsHint")}
+                >
+                  {t("colProduct")}
+                </th>
                 <th className="whitespace-nowrap px-4 py-4 text-right text-sm font-semibold">
                   {t("colPrice")}
                 </th>
@@ -779,9 +1027,9 @@ function HandoverSession() {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {isLoading ? (
                 [...Array(8)].map((_, i) => <TableRowSkeleton key={i} />)
-              ) : orders.length === 0 ? (
+              ) : pending.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center">
+                  <td colSpan={9} className="py-12 text-center">
                     <ShieldCheck className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
                     <p className="m-0 font-semibold text-gray-700 dark:text-gray-200">
                       {t("noneLeft")}
@@ -789,9 +1037,10 @@ function HandoverSession() {
                   </td>
                 </tr>
               ) : (
-                orders.map((o, index) => {
+                pending.map((o, index) => {
                   const checked = selectedIds.includes(o.id);
-                  const manual = checked && !scannedIds.has(o.id);
+                  // Tanlangan HAR qator qo'lda belgilangan: skan tanlovga tushmaydi.
+            const manual = checked;
                   return (
                     <tr
                       key={o.id}
@@ -811,7 +1060,7 @@ function HandoverSession() {
                         <Checkbox
                           checked={checked}
                           onChange={() => toggle(o.id)}
-                          disabled={!auth}
+                          /* ⚠️ Offline akt uchun ruxsatSIZ ham belgilanadi. */
                         />
                       </td>
                       {/* Tartib raqami — yorliq raqami ism OSTIDA turadi. */}
@@ -860,6 +1109,45 @@ function HandoverSession() {
                             ? t("deliverCenter")
                             : t("deliverAddress")}
                         </div>
+                      </td>
+                      {/* MAHSULOT — xodim ham qaysi molni berayotganini ko'radi. */}
+                      <td className="max-w-[200px] px-4 py-4 text-sm">
+                        {(() => {
+                          const p = summarizeProducts(
+                            o.items,
+                            o.product_quantity,
+                          );
+                          if (p.nameless) {
+                            return (
+                              <span
+                                className="text-gray-400"
+                                title={t("noProductName")}
+                              >
+                                {t("pcs", { count: p.totalQuantity })}
+                              </span>
+                            );
+                          }
+                          return (
+                            <div className="min-w-0" title={p.fullText}>
+                              {p.visible.map((it) => (
+                                <div
+                                  key={it.name}
+                                  className="truncate text-gray-800 dark:text-gray-200"
+                                >
+                                  {it.name}
+                                  <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
+                                    x{it.quantity}
+                                  </span>
+                                </div>
+                              ))}
+                              {p.hiddenCount > 0 && (
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  {t("moreProducts", { count: p.hiddenCount })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-4 text-right text-sm font-semibold tabular-nums text-gray-800 dark:text-white">
                         <div>{money(o.total_price)}</div>
@@ -917,6 +1205,27 @@ function HandoverSession() {
                                   label: t(MANUAL_OVERRIDE_REASON_KEYS[r]),
                                 }))}
                               />
+                              {/* ⚠️ QATOR DARAJASIDA topshiriladi: xodim qaysi
+                                  posilka NEGA qo'lda o'tganini ko'rib turadi. */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handOverManual(o.id);
+                                }}
+                                disabled={
+                                  !canHandOverManual({
+                                    authorized: Boolean(auth),
+                                    reason: reasons[o.id],
+                                  }) || complete.isPending
+                                }
+                                title={
+                                  reasons[o.id] ? undefined : t("manualNeedsReason")
+                                }
+                                className="shrink-0 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 px-3 py-1 text-xs font-semibold text-white transition-all hover:from-purple-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:from-gray-300 disabled:to-gray-300 dark:disabled:from-gray-700 dark:disabled:to-gray-700"
+                              >
+                                {t("handOverRow")}
+                              </button>
                             </>
                           )}
                         </div>
@@ -954,16 +1263,17 @@ function HandoverSession() {
                 {t("waitingConsent")}
               </span>
             )}
-            <Button
-              type="primary"
-              size="large"
-              className="ml-auto"
-              disabled={!submitEnabled}
-              loading={complete.isPending}
-              onClick={submitBatch}
-            >
-              {t("submitHandover", { count: selectedIds.length })}
-            </Button>
+            {/*
+              ⚠️ «Marketga topshirish (N)» TUGMASI OLIB TASHLANDI.
+              Skan qilindi — demak posilka xodim qo'lida va marketga
+              berildi; tugma ortiqcha qadam va XATOGA joy edi (bosmasdan
+              chiqib ketilsa o'nlab skan bekorga ketardi). Qo'lda
+              belgilangan qatorlar esa O'Z qatoridagi tugma bilan,
+              sababi bilan birga topshiriladi.
+            */}
+            <span className="ml-auto text-sm text-gray-500 dark:text-gray-400">
+              {t("scanToHandOver")}
+            </span>
           </div>
         </div>
       )}

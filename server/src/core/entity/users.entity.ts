@@ -77,6 +77,16 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   district_id: string;
 
+  /**
+   * Kuryer shtraf modulidan QO'LDA istisno.
+   *
+   * ⚠️ Tashqi provayder kuryerlari (Elchi, LDG) allaqachon kodda
+   * istisno (`external_provider`) — bu bayroq ichki kuryerni alohida
+   * holatda chiqarib qo'yish uchun.
+   */
+  @Column({ type: 'boolean', default: false })
+  penalty_exempt: boolean;
+
   @Column({ type: 'int', nullable: true })
   tariff_home: number;
 

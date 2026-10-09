@@ -57,6 +57,15 @@ jobs:
         working-directory: server
         run: npx jest src/api/market-handover src/common/utils/cancel-return.util.spec.ts src/api/order/cancel-return-two-stage.spec.ts src/api/post/post.service.spec.ts --ci
 
+      - name: 💰 Kuryer shtraf moduli testlari (BLOKLOVCHI)
+        working-directory: server
+        # ⚠️ PULGA TEGADIGAN MODUL. Soya rejimida ham, yoqilgan rejimda ham
+        # ishora (shtraf=income / bonus=expense), takroriy yozuvda kassaga
+        # tegmaslik va soya qatoriga pul qaytarmaslik shu testlarda
+        # qulflangan. Informatsion to'plamga qoldirilsa, yarim buzilgan
+        # modul YASHIL deploy bilan prodga chiqib ketardi.
+        run: npx jest src/api/courier-penalty src/api/order/utils/courier-penalty.util.spec.ts src/api/order/courier-penalty-wiring.spec.ts --ci
+
       - name: 🧪 To'liq test to'plami (informatsion)
         working-directory: server
         continue-on-error: true
@@ -258,6 +267,23 @@ jobs:
               echo '🧾 Post-migration extra-cost reconciliation...'
               if ! npm run db:check-extra-cost; then
                 echo '❌ EXTRA-COST INVARIANT FAILED! App restart QILINMAYDI.'
+                exit 1
+              fi
+
+              # ----- 💰 Kuryer shtraf invarianti (STRICT) -----
+              #
+              # ⚠️ NEGA BASELINE YO'Q. check-cashbox snapshot/compare
+              # naqshida ishlaydi va baseline HAR DEPLOYDA qayta olinadi,
+              # ya'ni ikki deploy ORASIDA to'plangan drift jim qabul
+              # qilinadi. Shtraf esa daftar va kassani BIR VAQTDA yozadi —
+              # ular ajralsa bu darhol real pul nomutanosibligi, kutib
+              # turadigan narsa emas.
+              #
+              # Jadval hali yo'q bo'lsa skript o'zi o'tkazib yuboradi.
+              echo '💰 Post-migration courier penalty invariant (strict)...'
+              if ! npm run db:check-courier-penalty; then
+                echo '❌ SHTRAF INVARIANTI BUZILGAN! App restart QILINMAYDI.'
+                echo '   Shtraf daftari bilan kuryer kassasi ajralib ketgan.'
                 exit 1
               fi
 
