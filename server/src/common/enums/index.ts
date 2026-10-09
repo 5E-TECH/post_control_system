@@ -57,6 +57,19 @@ export enum Source_type {
   SELL = 'sell',
   CANCEL = 'cancel',
   EXTRA_COST = 'extra_cost',
+  /**
+   * Kuryerning kechikkan belgilash shtrafi / tez belgilash bonusi va
+   * ularning teskari qaytarilishi.
+   *
+   * ⚠️ `CORRECTION` yoki `EXTRA_COST` QAYTA ISHLATILMADI — ikkalasini ham
+   * `reverseExtraCostForCashbox` o'qiydi va shtraf qatori u yerda
+   * «xarajat qaytarildi» deb sanalib, haqiqiy qaytarishni bajarmay
+   * qoldirardi (real pul zarari).
+   *
+   * Yo'nalish `operation_type` bilan ajraladi: `income` = kuryer qarzi
+   * oshdi (shtraf), `expense` = kamaydi (bonus yoki bekor qilish).
+   */
+  COURIER_PENALTY = 'courier_penalty',
   BILLS = 'bills',
   // Investorga foyda taqsimoti (kassadan chiqim; OpEx EMAS). DB enumida
   // allaqachon mavjud. financial_balance_history'ga YOZILMAYDI.
@@ -178,6 +191,15 @@ export enum FinancialSource_type {
   SALARY = 'salary', // Maosh to'lovi
   CORRECTION = 'correction', // Tuzatish (rollback)
   BILLS = 'bills', // Hisob-fakturalar
+  /**
+   * Kuryer shtrafi / bonusi — pochta foydasiga ta'siri.
+   *
+   * ⚠️ Shtraf FAQAT kuryer kassasini o'zgartiradi, ya'ni global tarozi
+   * siljiydi. Sotuv foydasi kabi bu ham daromad tan olinishi, shuning
+   * uchun o'z qatorini oladi — aks holda «Moliyaviy balans» ekranidagi
+   * son sababsiz o'sardi.
+   */
+  COURIER_PENALTY = 'courier_penalty',
 }
 
 // ===================== QO'SHIMCHA XARAJAT TASDIG'I =====================

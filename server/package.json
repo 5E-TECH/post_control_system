@@ -34,7 +34,8 @@
     "db:check-investor-ledger": "ts-node -r tsconfig-paths/register scripts/check-investor-ledger-invariant.ts",
     "db:check-market-settlement": "ts-node -r tsconfig-paths/register scripts/check-market-settlement.ts",
     "db:check-rollback-history": "ts-node -r tsconfig-paths/register scripts/check-rollback-history.ts",
-    "test:marketplace-e2e": "bash scripts/local/run-marketplace-e2e.sh"
+    "test:marketplace-e2e": "bash scripts/local/run-marketplace-e2e.sh",
+    "db:check-courier-penalty": "ts-node -r tsconfig-paths/register scripts/check-courier-penalty.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",

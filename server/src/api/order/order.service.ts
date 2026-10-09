@@ -5320,6 +5320,31 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       if (targetStatus === RollbackTarget.WAITING) {
+        /**
+         * ⚠️ SHTRAF FAQAT SHU SHOXDA TESKARI QAYTARILADI.
+         *
+         * Rollbackning uchta nishoni bor va ular bir xil EMAS:
+         *
+         *   WAITING        — sotuv butunlay bekor qilinadi, buyurtma
+         *                    yana kuryer ustida. Shtraf ham qaytariladi:
+         *                    aks holda bajarilmagan sotuv uchun kuryerda
+         *                    qarz qolib ketardi.
+         *   CANCELLED      — buyurtma TERMINAL va kech belgilangan holida
+         *   CANCELLED_SENT   qoladi. Bekor yo'li ham shtraf yozadi, ya'ni
+         *                    bu ikki shoxda shtraf QOLISHI kerak. Teskari
+         *                    qaytarilsa, rollback shtrafdan qutulish yo'li
+         *                    bo'lib qolardi — admin «bekorga qaytaraman»
+         *                    deb jazoni bekor qilardi.
+         *
+         * Asl daftar qatori o'chirilmaydi, ustiga teskari qator yoziladi
+         * — batafsil `reverseForOrder` izohida.
+         */
+        await this.courierPenalty.reverseForOrder(queryRunner.manager, {
+          orderId: order.id,
+          reason: 'sale_rolled_back',
+          actorId: user.id,
+        });
+
         order.status = Order_status.WAITING;
         order.cancelled_at = null;
         // ⚠️ Bekor pochtasidan AJRATILADI. Avval havola qolib ketardi: WAITING
@@ -5625,7 +5650,36 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .setParameter('addressType', Where_deliver.ADDRESS)
         .getRawOne();
 
-      const profit = Number(profitQuery?.profit) || 0;
+      /**
+       * ── KURYER SHTRAFI FOYDAGA QO'SHILADI ──────────────────────────
+       *
+       * Qulflangan qaror: shtraf pochta foydasiga tushadi. Bu — foydaning
+       * IKKINCHI, MUSTAQIL o'quvchisi (`getRevenueStats` dan ajralgan,
+       * davr bo'yicha bitta jami). Shtraf faqat bittasiga qo'shilsa,
+       * admin dashboardidagi «Foyda» investor sahifasidagi raqamdan farq
+       * qilib, «qaysi biri to'g'ri» savoli tug'ilardi.
+       *
+       * ⚠️ ALOHIDA SO'ROV, JOIN EMAS: yuqoridagi so'rov buyurtma
+       * qatorlarini jamlaydi, bitta buyurtmada esa bir nechta shtraf
+       * qatori bo'lishi mumkin — JOIN marjani ko'paytirib yuborardi.
+       *
+       * ⚠️ SHTRAFNING O'Z SANASI bo'yicha, `sold_at` bo'yicha EMAS:
+       * bekor yo'lidagi shtrafda `sold_at` umuman yo'q.
+       *
+       * ⚠️ Manba `financial_balance_history` — u yerga FAQAT haqiqiy pul
+       * harakati tushadi, soya yozuvlari UMUMAN yozilmaydi.
+       */
+      const [penaltyRow] = await this.orderRepo.query(
+        `SELECT COALESCE(SUM(amount), 0) AS penalty
+           FROM "financial_balance_history"
+          WHERE source_type = 'courier_penalty'
+            AND created_at BETWEEN $1 AND $2`,
+        [start, end],
+      );
+      const penaltyNet = Number(penaltyRow?.penalty) || 0;
+
+      const margin = Number(profitQuery?.profit) || 0;
+      const profit = margin + penaltyNet;
 
       return successRes(
         {
@@ -5633,6 +5687,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           cancelled,
           soldAndPaid,
           profit,
+          /** `profit` ICHIDA — «nega o'zgardi» savoliga javob uchun. */
+          penaltyNet,
           from: start,
           to: end,
         },
@@ -6079,21 +6135,123 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         [start, end],
       );
 
-      // Ma'lumotni formatlash
-      const formattedResult = result.map((item: any) => ({
-        period: item.period,
-        label: item.label,
-        ordersCount: Number(item.orders_count) || 0,
-        revenue: Number(item.revenue) || 0,
-      }));
+      /**
+       * ── KURYER SHTRAFI — POCHTA FOYDASINING BIR QISMI ──────────────
+       *
+       * Qulflangan qaror: shtraf pochta foydasiga tushadi va investor
+       * ulushiga ham ta'sir qiladi. Bu SQL esa investor hisobining
+       * YALPI-MARJA MANBAI (`investor-ledger.service.ts` uni
+       * `getRevenueStats('daily', …)` deb chaqiradi va har kun uchun
+       * `(revenue − opex) × bps` hisoblaydi), shuning uchun shtraf
+       * AYNAN shu yerga qo'shilishi kerak.
+       *
+       * ⚠️ NEGA ALOHIDA SO'ROV, `LEFT JOIN` EMAS.
+       *
+       * Yuqoridagi so'rov buyurtma qatorlarini `GROUP BY` bilan
+       * jamlaydi. Bitta buyurtmada esa bir nechta shtraf qatori
+       * bo'lishi mumkin (shtraf + uni bekor qilish). JOIN qilinsa
+       * o'sha buyurtmaning MARJASI ham shtraf qatorlari soniga
+       * KO'PAYIB ketardi — ya'ni foyda jimgina shishib chiqardi.
+       *
+       * ⚠️ NEGA `financial_balance_history`, `courier_penalty_entry` EMAS.
+       *
+       * FBH qatori FAQAT haqiqiy pul harakatida yoziladi; soya
+       * rejimidagi yozuvlar u yerga UMUMAN tushmaydi. Ya'ni «soyani
+       * chiqarib tashlash» filtrini qo'lda yozish kerak emas va uni
+       * unutib qo'yish xavfi yo'q. `amount` ishorali: musbat = shtraf
+       * (foyda oshadi), manfiy = bonus yoki bekor qilish (kamayadi).
+       *
+       * ⚠️ NEGA SHTRAFNING O'Z SANASI, `sold_at` EMAS.
+       *
+       * Ikki sabab: (1) shtraf BEKOR yo'lida ham yoziladi, bekor
+       * buyurtmada esa `sold_at` YO'Q — u jimgina tushib qolardi;
+       * (2) bekor qilish qatori asl shtrafdan kunlar keyin tug'iladi va
+       * `sold_at` ga bog'lansa YOPILGAN kunning investor ulushini
+       * retroaktiv o'zgartirardi.
+       */
+      const penaltyTz =
+        "TO_TIMESTAMP(h.created_at / 1000) AT TIME ZONE 'Asia/Tashkent'";
+      const penaltyGroup = groupFormat.replace(tzConvert, penaltyTz);
 
-      // Jami daromad
+      const penaltyRows = await this.orderRepo.query(
+        `
+        SELECT
+          ${penaltyGroup} as period,
+          TO_CHAR(
+            TO_TIMESTAMP(MIN(h.created_at) / 1000) AT TIME ZONE 'Asia/Tashkent',
+            '${labelFormat}'
+          ) as label,
+          COALESCE(SUM(h.amount), 0) as penalty
+        FROM "financial_balance_history" h
+        WHERE h.source_type = 'courier_penalty'
+          AND h.created_at >= $1
+          AND h.created_at <= $2
+        GROUP BY ${penaltyGroup}
+        `,
+        [start, end],
+      );
+
+      /**
+       * ⚠️ SHTRAFLI, LEKIN SOTUVSIZ KUN YO'QOLMASLIGI KERAK.
+       *
+       * `investor-ledger.service.ts` kunlar to'plamini `series ∪ opex ∪
+       * distribution` dan yasaydi. Agar shtraf shu seriyaga
+       * qo'shilmasa, sotuv bo'lmagan kundagi shtraf (bekor yo'li yoki
+       * dam olish kuni) hech qaysi kunga tushmay, investor hisobidan
+       * butunlay yo'qolardi. Shuning uchun birlashtirish — oddiy
+       * qo'shish emas, IKKI TOMONLAMA (union).
+       */
+      const byPeriod = new Map<
+        string,
+        { period: string; label: string; ordersCount: number; revenue: number; penalty: number }
+      >();
+
+      for (const item of result as any[]) {
+        byPeriod.set(String(item.period), {
+          period: String(item.period),
+          label: item.label,
+          ordersCount: Number(item.orders_count) || 0,
+          revenue: Number(item.revenue) || 0,
+          penalty: 0,
+        });
+      }
+
+      for (const row of penaltyRows as any[]) {
+        const key = String(row.period);
+        const penalty = Number(row.penalty) || 0;
+        const existing = byPeriod.get(key);
+        if (existing) {
+          existing.penalty = penalty;
+          existing.revenue += penalty;
+        } else {
+          byPeriod.set(key, {
+            period: key,
+            // Sotuvsiz kunda `MIN(o.sold_at)` yo'q — yorliq shtraf
+            // yozuvining sanasidan olinadi.
+            label: row.label ?? key,
+            ordersCount: 0,
+            revenue: penalty,
+            penalty,
+          });
+        }
+      }
+
+      const formattedResult = [...byPeriod.values()].sort((a, b) =>
+        a.period < b.period ? -1 : a.period > b.period ? 1 : 0,
+      );
+
+      // Jami daromad — shtraf allaqachon `revenue` ichida.
       const totalRevenue = formattedResult.reduce(
         (sum: number, item: any) => sum + item.revenue,
         0,
       );
       const totalOrders = formattedResult.reduce(
         (sum: number, item: any) => sum + item.ordersCount,
+        0,
+      );
+      /** Shaffoflik uchun alohida ham ko'rsatiladi. */
+      const totalPenalty = formattedResult.reduce(
+        (sum: number, item: any) => sum + item.penalty,
         0,
       );
 
@@ -6103,6 +6261,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           summary: {
             totalRevenue,
             totalOrders,
+            /**
+             * `totalRevenue` ICHIDA. Alohida chiqariladi, chunki
+             * «daromad nega o'zgardi» savoliga javob kerak bo'ladi.
+             */
+            totalPenalty,
             avgRevenue:
               formattedResult.length > 0
                 ? Math.round(totalRevenue / formattedResult.length)
