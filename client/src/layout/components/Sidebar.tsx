@@ -12,6 +12,7 @@ import {
   Settings,
   Megaphone,
   Warehouse,
+  Gavel,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
@@ -38,6 +39,7 @@ const Sidebar = () => {
     { to: "/products", icon: <Apple />, label: t("products") },
     { to: "/all-users", icon: <UserRound />, label: t("users") },
     { to: "/payments", icon: <CreditCard />, label: t("payments") },
+    { to: "/courier-penalty", icon: <Gavel />, label: t("courier_penalty") },
     { to: "/m-balance", icon: <Scale />, label: t("balance") },
     { to: "/regions", icon: <MapPinned />, label: t("region") },
     { to: "/send-message", icon: <Megaphone />, label: t("notifications") },
