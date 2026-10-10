@@ -10,7 +10,7 @@ import * as path from 'path';
  *
  *   market          — market kirib «Tasdiqlash» bosdi
  *   admin_override  — admin arbitraj qildi
- *   auto_backstop   — market 14 kun JAVOB BERMADI, tizim o'zi o'tkazdi
+ *   auto_backstop   — market 3 kun JAVOB BERMADI, tizim o'zi o'tkazdi
  *
  * Uchalasi ham kuryer kassasiga AYNI summani yozadi. Avval kassa izohi
  * ham bir xil edi — «Qo'shimcha xarajat tasdiqlandi». Ya'ni nizo

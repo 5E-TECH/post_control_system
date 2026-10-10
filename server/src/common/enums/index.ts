@@ -248,7 +248,7 @@ export enum ExtraCostDecisionMode {
   ADMIN_OVERRIDE = 'admin_override',
   /** Bayroq o'chiq yoki summa avto-tasdiq chegarasidan kichik. */
   AUTO_RULE = 'auto_rule',
-  /** Market 14 kun javob bermadi — oxirgi zaxira. */
+  /** Market 3 kun javob bermadi — oxirgi zaxira. */
   AUTO_BACKSTOP = 'auto_backstop',
   /** Tashqi provayder (Elchi) yetkazdi — bizning UI'dan isbot biriktirilmaydi. */
   EXTERNAL_AUTO = 'external_auto',

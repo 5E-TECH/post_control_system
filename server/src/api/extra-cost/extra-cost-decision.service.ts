@@ -85,7 +85,7 @@ export class ExtraCostDecisionService {
           status: ExtraCostStatus.APPROVED,
           reviewed_by: user.id,
           reviewed_at: now,
-          // ⚠️ AUDIT IZI ANIQ BO'LISHI SHART. Zaxira tasdiq (14 kun
+          // ⚠️ AUDIT IZI ANIQ BO'LISHI SHART. Zaxira tasdiq (3 kun
           // javobsizlik) market qarori kabi ko'rinmasligi kerak — aks holda
           // nizoda "market tasdiqlagan" deb ko'rsatilardi, holbuki market
           // umuman javob bermagan.
@@ -97,7 +97,7 @@ export class ExtraCostDecisionService {
           ...(opts.autoBackstop
             ? {
                 review_note:
-                  'Market 14 kun javob bermadi — avtomatik tasdiqlandi',
+                  'Market 3 kun javob bermadi — avtomatik tasdiqlandi',
               }
             : {}),
           updated_at: now,

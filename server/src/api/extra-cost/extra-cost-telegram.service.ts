@@ -185,6 +185,60 @@ export class ExtraCostTelegramService {
   // ═══════════════════════ TUGMALAR ═══════════════════════
 
   /** Asosiy qaror tugmalari. */
+  /**
+   * OXIRGI ESLATMA — avtomatik tasdiqdan BIR KUN OLDIN.
+   *
+   * ⚠️ NEGA KERAK. Market so'rov yaratilganda BITTA xabar oladi va
+   * boshqa hech narsa kelmaydi. Muddat uzoq bo'lganida bu muhim
+   * emasdi — bitta xabarni o'tkazib yuborsa ham vaqt ko'p edi. Muddat
+   * 3 kunga tushgach, o'tkazib yuborilgan bitta xabar = pul jimgina
+   * o'tib ketishi. U holda biz muammoni kuryerdan marketga ko'chirgan
+   * bo'lardik.
+   *
+   * ⚠️ TUGMALAR BILAN. Eslatma quruq matn bo'lsa, market ilovaga
+   * kirishi kerak bo'lardi — bu yana bir to'siq. Tugmalar shu yerda
+   * bo'lsa, qaror bir bosishda bo'ladi.
+   *
+   * ⚠️ HECH QACHON XATO TASHLAMAYDI — CRON ichidan chaqiriladi va
+   * bitta market botni bloklagani qolgan eslatmalarni to'xtatmasligi
+   * kerak.
+   */
+  async sendReminder(request: ExtraCostRequestEntity): Promise<boolean> {
+    try {
+      if (!request || request.status !== ExtraCostStatus.PENDING) return false;
+
+      const owner = await this.userRepo.findOne({
+        where: {
+          id: request.market_id,
+          role: Roles.MARKET,
+          is_deleted: false,
+        },
+        select: ['id', 'telegram_id'],
+      });
+      if (!owner?.telegram_id) return false;
+
+      const amount = Number(request.amount || 0).toLocaleString('uz-UZ');
+      const text =
+        `⏰ ESLATMA — javobingiz kutilmoqda\n\n` +
+        `Buyurtma #${request.order_number}\n` +
+        `Qo'shimcha xarajat: ${amount} so'm` +
+        (request.reason ? `\nSabab: ${request.reason}` : '') +
+        `\n\n⚠️ ERTAGA javob bo'lmasa bu xarajat AVTOMATIK tasdiqlanadi ` +
+        `va summa hisobingizdan yechiladi.`;
+
+      await this.bot.telegram.sendMessage(Number(owner.telegram_id), text, {
+        reply_markup: this.decisionKeyboard(request.id),
+      });
+      return true;
+    } catch (e) {
+      this.logger.warn(
+        `Eslatma yuborilmadi (${request?.id}): ` +
+          (e instanceof Error ? e.message : String(e)),
+      );
+      return false;
+    }
+  }
+
   decisionKeyboard(requestId: string) {
     return {
       inline_keyboard: [
