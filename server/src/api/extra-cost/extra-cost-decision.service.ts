@@ -224,14 +224,40 @@ export class ExtraCostDecisionService {
         );
       }
 
+      /**
+       * Tasdiq turi — kassa izohi uchun odam tilida.
+       *
+       * ⚠️ `auto_backstop` ni «tasdiqlandi» deb yozish YETARLI EMAS:
+       * market javob bermagani uchun o'tgan xarajat market tasdig'i
+       * bilan BIR XIL ko'rinardi.
+       */
+      const approvalLabel = opts.autoBackstop
+        ? "Qo'shimcha xarajat AVTOMATIK tasdiqlandi (market javob bermadi)"
+        : opts.adminOverride
+          ? "Qo'shimcha xarajat admin tomonidan tasdiqlandi"
+          : "Qo'shimcha xarajat market tomonidan tasdiqlandi";
+
       // ── 6-7. PUL + TARIX (atomik) ─────────────────────────────────────
       const historyIds = await this.applier.applyAtomic(queryRunner, {
         marketCashboxId: marketCashbox.id,
         courierCashboxId: courierCashbox.id,
         orderId: req.order_id,
         amount: req.amount,
+        /**
+         * ⚠️ IZOHDA «QANDAY TASDIQLANGANI» YOZILADI.
+         *
+         * Kassa yozuvi — pul harakatining YAGONA odam o'qiydigan izi.
+         * Avval u hamma holatda bir xil edi: «Qo'shimcha xarajat
+         * tasdiqlandi». Ya'ni market qarori bilan avtomatik tasdiq
+         * kassada bir xil ko'rinardi va nizo chiqqanda «buni kim
+         * tasdiqlagan» degan savolga javob yo'q edi — `decision_mode`
+         * faqat so'rov jadvalida qolib, kassa tarixiga chiqmasdi.
+         *
+         * Ayniqsa AVTO-TASDIQ muhim: u market javob BERMAGANI uchun
+         * yuzaga keladi, ya'ni bu market qarori EMAS.
+         */
         comment:
-          `Qo'shimcha xarajat tasdiqlandi — buyurtma #${req.order_number}` +
+          `${approvalLabel} — buyurtma #${req.order_number}` +
           (req.reason ? ` (${req.reason})` : ''),
         createdBy: user.id,
         marketId: req.market_id,
