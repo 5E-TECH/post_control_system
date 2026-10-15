@@ -52,6 +52,13 @@ const financialSourceLabels: Record<string, string> = {
   salary: "Maosh",
   correction: "Tuzatish (rollback)",
   bills: "Hisob-fakturalar",
+  /**
+   * ⚠️ `financial_balance_history_source_type_enum` da 7 qiymat bor,
+   * bu lug'atda esa 6 ta edi — shu sabab shtraf qatori «courier_penalty»
+   * deb chiqardi VA «Manba turi» filtri shu lug'atdan yasalgani uchun
+   * ro'yxatda umuman yo'q edi, ya'ni shtrafni ajratib ko'rib bo'lmasdi.
+   */
+  courier_penalty: "Kuryer shtrafi",
 };
 
 const financialSourceColors: Record<string, string> = {
@@ -61,6 +68,7 @@ const financialSourceColors: Record<string, string> = {
   salary: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
   correction: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
   bills: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
+  courier_penalty: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
 };
 
 const SkeletonBox = ({ className }: { className?: string }) => (

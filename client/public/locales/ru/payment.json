@@ -79,7 +79,8 @@
     "investor_earning": "Доход инвестора",
     "investor_allocate": "Доля инвестора",
     "investor_payout": "Выплата инвестору",
-    "investor_refund": "Возврат инвестиции"
+    "investor_refund": "Возврат инвестиции",
+    "courier_penalty": "Штраф курьера"
   },
   "tuman": "Район",
   "telefon_nomer": "Номер телефона",
