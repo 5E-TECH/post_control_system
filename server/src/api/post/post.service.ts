@@ -823,11 +823,19 @@ export class PostService {
 
       // Kuryerni o'zgartirish — update() ishlatamiz
       // save() da yuklangan courier relation yangi courier_id ni bekor qiladi
+      /**
+       * ⚠️ SHTRAF SOATI QAYTA BOSHLANADI (egasi qarori, 2026-10-15).
+       *
+       * Yangi kuryer pochtani ENDI oladi, shuning uchun avvalgi
+       * kuryerning kechikishi unga yozilmasligi kerak. `created_at`
+       * tegilmaydi — u hisobot va filtrlar uchun.
+       */
       await queryRunner.manager.update(
         PostEntity,
         { id: postId },
         {
           courier_id: newCourierId,
+          courier_assigned_at: Date.now(),
         },
       );
 
@@ -984,6 +992,12 @@ export class PostService {
         region_id: originalPost.region_id,
         status: Post_status.SENT,
         courier_id: courierId,
+        /**
+         * ⚠️ SHTRAF SOATINING LANGARI. `created_at` bilan ayni paytda
+         * qo'yiladi, lekin ALOHIDA ustun — pochta boshqa kuryerga
+         * o'tkazilganda faqat shu yangilanadi (`changeCourier`).
+         */
+        courier_assigned_at: Date.now(),
         qr_code_token: generateCustomToken(),
         order_quantity: postTotalInfo.total,
         post_total_price: postTotalInfo.sum,

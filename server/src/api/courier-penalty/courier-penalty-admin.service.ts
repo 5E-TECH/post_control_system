@@ -91,7 +91,9 @@ export class CourierPenaltyAdminService {
         'o.courier_tariff AS courier_tariff',
         'o.where_deliver AS where_deliver',
         'o.total_price AS total_price',
-        'p.created_at AS post_created_at',
+        // ⚠️ LANGAR: kuryerga biriktirilgan payt. `created_at` faqat
+        // fallback (eski pochtalar uchun backfill qilingan).
+        'COALESCE(p.courier_assigned_at, p.created_at) AS post_created_at',
         'p.region_id AS post_region_id',
         'c.id AS courier_id',
         'c.name AS courier_name',
