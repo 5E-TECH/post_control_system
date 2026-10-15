@@ -1,5 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { EntityManager } from 'typeorm';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
+import { EntityManager, IsNull, Not } from 'typeorm';
 import { CourierPenaltyConfigEntity } from 'src/core/entity/courier-penalty-config.entity';
 import { CourierPenaltyRuleEntity } from 'src/core/entity/courier-penalty-rule.entity';
 import { CourierPenaltyEntryEntity } from 'src/core/entity/courier-penalty-entry.entity';
@@ -93,6 +97,8 @@ export class CourierPenaltyService {
         | 'where_deliver'
         // Kassa izohida ko'rinadi — kuryer qaysi buyurtma ekanini bilsin.
         | 'order_number'
+        // Qisman sotuvning BOLA buyurtmasini ajratish uchun.
+        | 'parent_order_id'
       >;
       markedAt: number;
       actorId?: string | null;
@@ -108,9 +114,33 @@ export class CourierPenaltyService {
      */
     if (!order?.post_id) return null;
 
+    /**
+     * ⚠️ QISMAN SOTUVNING BOLA BUYURTMASI SHTRAFGA TUSHMAYDI.
+     *
+     * `partlySold` hisobni ikkiga bo'ladi va bola buyurtmani AYNI
+     * `post_id` bilan yaratadi — ya'ni bu bitta JISMONIY posilka.
+     * Ikkalasini ham jazolash kuryerdan bir posilka uchun ikki marta
+     * (tarifning ikki barobarigacha) undirardi.
+     *
+     * ⚠️ Ilgari bu faqat «bola alohida harakat emas» degan taxminga
+     * tayanardi va chaqiruv joyi darajasida hal qilingandi. Lekin
+     * rollback darvozasi CANCELLED ni o'tkazadi, ya'ni bolani WAITING ga
+     * qaytarib qayta belgilash MUMKIN — va o'shanda bola ALOHIDA
+     * harakatga aylanib, ikkinchi to'liq shtrafni oldirardi. Shuning
+     * uchun darvoza endi shu yerda, YAGONA kirish nuqtasida turadi
+     * (egasi qarori, 2026-10-15).
+     */
+    if (order.parent_order_id) return null;
+
     const post = await manager.findOne(PostEntity, {
       where: { id: order.post_id },
-      select: ['id', 'created_at', 'courier_id', 'region_id'],
+      select: [
+        'id',
+        'created_at',
+        'courier_assigned_at',
+        'courier_id',
+        'region_id',
+      ],
     });
     if (!post?.courier_id) return null;
 
@@ -172,7 +202,32 @@ export class CourierPenaltyService {
     ]);
 
     const result = computeCourierAdjustment({
-      dispatchedAt: post.created_at,
+      /**
+       * ⚠️ `post.created_at` — POCHTA YARATILGAN PAYT EMAS, KURYERGA
+       * JO'NATILGAN PAYT. Nom chalg'ituvchi, shuning uchun yozib
+       * qo'yiladi:
+       *
+       *   • `newPosts()` buyurtmalarni viloyat bo'yicha guruhlab
+       *     `status = NEW`, `courier_id = NULL` pochta yaratadi;
+       *   • jo'natishda esa YANGI pochta qatori tug'iladi
+       *     (`post.service.ts` → `sentPost`: `status = SENT`,
+       *     `courier_id` to'ldirilgan) va buyurtmalar o'sha qatorga
+       *     ko'chiriladi (`order.post_id = sentPost.id`).
+       *
+       * Ya'ni shtrafga tushadigan har qanday buyurtmaning pochtasi
+       * JO'NATISH paytida yaratilgan. Kuryersiz NEW pochtalar esa
+       * so'rovlardan `INNER JOIN users c ON c.id = p.courier_id` bilan
+       * chiqib ketadi. Baza dalili (2026-10-15): kuryerli 120 pochtaning
+       * hammasi sent/received, 12 ta NEW pochtaning birortasida kuryer
+       * yo'q.
+       *
+       * ⚠️ KURYER ALMASHSA SOAT QAYTA BOSHLANADI (egasi qarori,
+       * 2026-10-15): `changeCourier` `courier_assigned_at` ni yangilaydi,
+       * shuning uchun yangi kuryer avvalgisining kechikishini meros
+       * QILMAYDI. `created_at` esa fallback — eski pochtalarda ustun
+       * backfill qilingan, kelgusida hammasida to'ladi.
+       */
+      dispatchedAt: post.courier_assigned_at ?? post.created_at,
       markedAt: params.markedAt,
       baseTariff: this.baseTariffOf(order, courier),
       courierId: courier.id,
@@ -221,6 +276,46 @@ export class CourierPenaltyService {
      *   · ikkisi ham yozilmadi → tranzaksiya qaytdi, invariant toza
      */
     let active = !!config?.is_active;
+
+    /**
+     * ⚠️ HAQIQIYLIK MEROS QOLADI (egasi qarori, 2026-10-15).
+     *
+     * Modul O'CHIRILGAN paytda ham, agar AYNI buyurtmaning AYNI sababi
+     * bo'yicha avval HAQIQIY shtraf yozilib, u rollback bilan qaytarilgan
+     * bo'lsa — yangi yozuv ham HAQIQIY bo'ladi.
+     *
+     * Shusiz quyidagi ketma-ketlik shtrafni dalilsiz yuvib tashlardi:
+     *   modulni o'chirish → rollback (pul kuryerga QAYTARILADI, chunki
+     *   teskari yo'l asl qatorning holatiga qaraydi) → qayta belgilash
+     *   (endi faqat SOYA yoziladi) → modulni yoqish.
+     * Natijada kuryer pulni oldi, daftarda esa faqat soya qoldi — ya'ni
+     * «o'chirib-yoqish» ommaviy kechirim vositasiga aylanardi, aynan
+     * `setActive` izohi oldini olishga uringan holat.
+     *
+     * Faqat ROLLBACK qaytargan (`reversed_at` qo'yilgan) qatorlar
+     * hisobga olinadi: admin kechirimi uyani band qoldiradi, ya'ni bu
+     * yergacha umuman yetib kelinmaydi.
+     */
+    if (!active) {
+      const priorReal = await manager.findOne(CourierPenaltyEntryEntity, {
+        where: {
+          order_id: order.id,
+          reason: result.event as string,
+          shadow: false,
+          reversed_at: Not(IsNull()),
+        },
+        select: ['id'],
+      });
+      if (priorReal) {
+        active = true;
+        this.logger.log(
+          `[shtraf] buyurtma ${order.id}: avvalgi HAQIQIY shtraf rollback ` +
+            `bilan qaytarilgan — modul o'chiq bo'lsa ham yangi yozuv ` +
+            `haqiqiy qilib yoziladi.`,
+        );
+      }
+    }
+
     let applied = result.amount;
     let cashbox: CashEntity | null = null;
 
@@ -478,7 +573,9 @@ export class CourierPenaltyService {
         'o.order_number AS order_number',
         'o.courier_tariff AS courier_tariff',
         'o.where_deliver AS where_deliver',
-        'p.created_at AS post_created_at',
+        // ⚠️ LANGAR: kuryerga biriktirilgan payt. `created_at` faqat
+        // fallback (eski pochtalar uchun backfill qilingan).
+        'COALESCE(p.courier_assigned_at, p.created_at) AS post_created_at',
         'p.region_id AS post_region_id',
         'm.name AS market_name',
       ])
@@ -606,12 +703,31 @@ export class CourierPenaltyService {
    *   1. Daftar yig'indisi kassadagi yozuvlar yig'indisiga TENG turishi
    *      shart (invariant I-CP6). Asl qator o'chirilsa ikkisi ajralardi.
    *   2. `UQ_CP_ENTRY_ORDER_REASON` indeksi `kind <> 'waiver'` qatorlarga
-   *      qo'yilgan, ya'ni teskari qator unga urilmaydi — lekin ASL qator
-   *      o'z o'rnida qolgani uchun QAYTA SOTUVDA yangi shtraf
-   *      YOZILMAYDI. Bu ATAYLAB: rollback `post_id` ni tozalamaydi,
-   *      shuning uchun qayta hisob ASL jo'natish vaqtidan boshlanib,
-   *      kuryerni ADMINNING rollback kechikishi uchun jazolardi —
-   *      odatda to'g'ridan-to'g'ri tarif poligacha.
+   *      qo'yilgan, ya'ni teskari qator unga urilmaydi.
+   *
+   * ── QAYTA HAL QILINGANDA SHTRAF YANA YOZILADI (2026-10-15 QARORI) ────
+   *
+   * Asl qator `reversed_at` bilan belgilanadi va indeks uyasini
+   * BO'SHATADI, shuning uchun buyurtma qayta sotilsa/bekor qilinsa
+   * kechikish YANGITDAN hisoblanadi (langar — o'sha `post.created_at`).
+   *
+   * ⚠️ YANGI SUMMA ASLIDAN KATTA: `markedAt` yangi belgilash vaqti,
+   * ya'ni rollback oynasi ham kechikishga qo'shiladi (tarif poligacha).
+   * Bu ataylab — aks holda rollback soatni to'xtatib turish vositasi
+   * bo'lardi. Admin kechiktirgan holat `waive` bilan hal qilinadi.
+   *
+   * ⚠️ AVVAL BUNING TESKARISI QILINGAN EDI va u TESHIK bo'lib chiqdi:
+   * asl qator uyani band qilib turgani uchun qayta sotuvda insert jim
+   * o'tib ketardi va kuryer «sotildi» → rollback → haqiqiy status
+   * ketma-ketligi bilan shtrafdan BUTUNLAY qutulardi. Lokal dalil —
+   * buyurtma #100132: jo'natishdan 20 kun, sof shtraf 0.
+   *
+   * O'sha paytdagi xavotir (kuryer ADMINNING kechikkan rollbacki uchun
+   * jazolanadi) O'RINLI, lekin uning yechimi boshqa joyda: bunday holat
+   * `waive` bilan, MAJBURIY sabab va daftardagi dalil bilan bekor
+   * qilinadi. Arxitektura «shtraf yozildi-yu, yozilmasligi kerak edi»
+   * holatini kutgan; «yozilishi kerak edi-yu, jim yozilmadi» holatini
+   * esa kutmagan — asl nuqson aynan shu edi.
    *
    * ── SOYA QATORIGA PUL QAYTARILMAYDI ─────────────────────────────────
    *
@@ -641,10 +757,26 @@ export class CourierPenaltyService {
     const live = entries.filter((e) => e.kind !== 'waiver');
     if (!live.length) return 0;
 
-    // Allaqachon teskari qaytarilganlarni ikkinchi marta qaytarmaymiz —
-    // aks holda kuryer qarzi asossiz kamayardi.
+    /**
+     * Allaqachon teskari qaytarilganlarni ikkinchi marta qaytarmaymiz —
+     * aks holda kuryer qarzi asossiz kamayardi.
+     *
+     * ⚠️ TO'PLAM `where` DAN EMAS, BUYURTMA BO'YICHA ALOHIDA SO'ROVDAN.
+     * Ilgari u yuqoridagi `entries` dan yasalardi; `entryId` berilganda
+     * (qo'lda bekor qilish yo'li) `where.id` to'plamni BITTA shtraf
+     * qatoriga toraytirardi, uning `waives_entry_id` i esa null —
+     * ya'ni to'plam DOIM bo'sh bo'lib, tekshiruv hech qachon ishlamasdi.
+     * Endi mavjud waiverlar buyurtma bo'yicha to'liq o'qiladi.
+     *
+     * Ikkinchi qavat — `UQ_CP_ENTRY_WAIVES` unikal indeksi: poygada ikki
+     * tranzaksiya bir vaqtda o'qisa ham, ikkinchi insert DB darajasida
+     * rad etiladi.
+     */
+    const waivers = await manager.find(CourierPenaltyEntryEntity, {
+      where: { order_id: params.orderId, kind: 'waiver' },
+    });
     const already = new Set(
-      entries
+      waivers
         .map((e) => e.waives_entry_id)
         .filter((v): v is string => !!v),
     );
@@ -692,9 +824,25 @@ export class CourierPenaltyService {
           },
         });
         if (!cashbox) {
-          this.logger.error(
-            `[shtraf] teskari qaytarish: kuryer ${entry.courier_id} ` +
-              `kassasi topilmadi, yozuv ${entry.id} daftarda qoldi.`,
+          /**
+           * ⚠️ JIM O'TKAZIB YUBORISH MUMKIN EMAS — THROW.
+           *
+           * Ilgari bu yerda faqat `logger.error` bor edi: waiver baribir
+           * saqlanardi, pul esa qaytmasdi. Modul «ikkisi ham yozildi
+           * YOKI ikkisi ham yozilmadi» doktrinasiga tayanadi (yuqoridagi
+           * apply yo'li kassa topilmasa yozuvni SOYAGA tushiradi), bu
+           * shox esa uni buzardi: daftar «qaytardim» deb, kassa esa
+           * qarzni ushlab turardi — I-CP1 va I-CP6 abadiy qizil.
+           *
+           * `reversed_at` qo'shilgandan keyin bu yana xavfliroq bo'ldi:
+           * uya bo'shab, qayta sotuvda YANGI shtraf yozilardi va kuryer
+           * AYNI kechikish uchun ikki marta to'lardi (birinchisi
+           * qaytarilmagan, ikkinchisi yangi). Shuning uchun tranzaksiya
+           * to'xtaydi va odam ko'rib chiqadi.
+           */
+          throw new InternalServerErrorException(
+            `Kuryer kassasi topilmadi (${entry.courier_id}) — ` +
+              `shtrafni bekor qilib bo'lmadi, amal to'xtatildi.`,
           );
         } else {
           waiver.cashbox_history_id = await this.applyToCashbox(manager, {
@@ -710,6 +858,35 @@ export class CourierPenaltyService {
         }
       }
 
+      /**
+       * ⚠️ UYANI FAQAT ROLLBACK BO'SHATADI, ADMIN KECHIRIMI EMAS.
+       *
+       * `UQ_CP_ENTRY_ORDER_REASON` indeksi `reversed_at IS NULL` sharti
+       * bilan ishlaydi, ya'ni `reversed_at` qo'yilgan qator indeks
+       * uyasini BO'SHATADI va buyurtma qayta hal qilinganda kechikish
+       * YANA hisoblanadi. Ikki xil bekor qilish ikki xil ma'no tashiydi:
+       *
+       *   `sale_rolled_back` — SOTUV ORQAGA QAYTDI. Buyurtma yana hal
+       *      qilinmagan, ya'ni soat ishlashda davom etadi va yakuniy
+       *      belgilashda shtraf qaytadan yoziladi. Uya BO'SHAYDI —
+       *      shusiz kuryer «sotildi» → rollback → haqiqiy status
+       *      ketma-ketligi bilan shtrafdan butunlay qutulardi.
+       *
+       *   boshqa sabab      — ADMIN KECHIRIMI (yopiq ro'yxatdan, sabab
+       *      majburiy). Kechirim AYNI buyurtmaning AYNI kechikishiga
+       *      beriladi, shuning uchun uya BAND qoladi va o'sha buyurtmaga
+       *      shu sabab bilan boshqa shtraf yozilmaydi. Aks holda
+       *      rasmiylashtirilgan kechirim jimgina bekor bo'lib, kuryer
+       *      kechirilgan kechikish uchun qaytadan — ustiga KATTAROQ
+       *      summa — to'lardi (egasi qarori, 2026-10-15).
+       *
+       * Ikkisi BIR tranzaksiyada: waiver yozilib, asl qator belgilanmay
+       * qolsa, qochish yo'li ochiq qolardi.
+       */
+      if (params.reason === 'sale_rolled_back') {
+        entry.reversed_at = now;
+        await manager.save(entry);
+      }
       await manager.save(waiver);
       reversed += 1;
     }

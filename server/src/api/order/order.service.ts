@@ -5462,6 +5462,56 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.manager.save(order);
 
+      /**
+       * ⚠️ TERMINAL NISHONDA SHTRAF QAYD ETILADI — QOCHISH YO'LINI YOPADI.
+       *
+       * `CANCELLED` va `CANCELLED_SENT` — buyurtma TERMINAL holatga
+       * o'tadi, ya'ni bu BELGILASH: `cancelled_at` aynan shu yerda
+       * qo'yiladi. Ilgari bu ikki shox shtraf moduliga umuman ulanmagan
+       * edi va yuqoridagi izoh «shtraf QOLISHI kerak» deb taxmin
+       * qilardi — lekin birinchi belgilash MUHLAT ICHIDA bo'lsa daftarda
+       * hech qanday qator yo'q (`recordForOrder` 0 summada null
+       * qaytaradi). Natijada:
+       *
+       *   1-kuni «Sotildi» (muhlat ichida, shtraf yo'q)
+       *   → 30 kun ushlab turiladi
+       *   → `rollback` + `target_status: cancelled`
+       *   → TERMINAL, lekin shtraf 0.
+       *
+       * Ya'ni bu yo'l halol yo'ldan (30-kuni «Bekor» bosish) ARZON edi.
+       * Endi terminal nishon ham odatdagi belgilash kabi qayd etiladi.
+       *
+       * Allaqachon TIRIK shtraf bo'lsa, `UQ_CP_ENTRY_ORDER_REASON` uni
+       * to'sadi va chaqiruv jim o'tadi — ya'ni ikki marta jazo YO'Q,
+       * mavjud shtraf esa yuqoridagi izoh talab qilganidek JOYIDA qoladi.
+       */
+      if (
+        (targetStatus === RollbackTarget.CANCELLED ||
+          targetStatus === RollbackTarget.CANCELLED_SENT) &&
+        /**
+         * ⚠️ ALMASHTIRILAYOTGAN ESKI BUYURTMA ISTISNO.
+         *
+         * Kafolat-swapda eski buyurtma SOTILGAN holatda qoladi va faqat
+         * bayroq oladi (`is_replacement_return`) — ya'ni kuryer uni O'Z
+         * VAQTIDA yopgan, sotuv haqiqatan bo'lgan. Agar oylar o'tib
+         * o'sha sotuv bekor qilinsa, langar hamon DASTLABKI jo'natish
+         * bo'lgani uchun bu yerda to'liq tarif shtrafi yozilardi —
+         * kuryerning aybi bo'lmagan holat uchun.
+         *
+         * Qochish yo'li ochilmaydi: bayroq buyurtmaga faqat ALMASHTIRISH
+         * buyurtmasi yaratilganda qo'yiladi (`order.service.ts` —
+         * `replacedOrder.is_replacement_return = true`), kuryer uni o'zi
+         * qo'ya olmaydi.
+         */
+        !order.is_replacement_return
+      ) {
+        await this.courierPenalty.recordForOrder(queryRunner.manager, {
+          order,
+          markedAt: order.cancelled_at ?? Date.now(),
+          actorId: user.id,
+        });
+      }
+
       // === MARKETPLACE: ortga qaytarish ===
       //
       // ⚠️ Summa QAYTA HISOBLANMAYDI — kassadan aynan qancha yechilgan

@@ -250,6 +250,168 @@ describe('yozuv yozilmaydigan holatlar', () => {
   });
 });
 
+/**
+ * ⚠️ EGASI QARORLARI (2026-10-15) — uchta qulf.
+ */
+describe('egasi qarorlari — bola, kechirim, haqiqiylik merosi', () => {
+  /**
+   * Bitta JISMONIY posilka — bitta shtraf. Bola buyurtma ayni `post_id`
+   * bilan tug'iladi; rollback darvozasi CANCELLED ni o'tkazgani uchun uni
+   * qayta belgilash mumkin va ikkinchi to'liq shtraf yozilardi.
+   */
+  it('qisman sotuvning BOLA buyurtmasiga shtraf yozilmaydi', async () => {
+    const { manager, inserted } = makeManager();
+    const r = await service.recordForOrder(manager, {
+      order: order({ parent_order_id: 'ota-1' } as never),
+      markedAt: T0 + 30 * DAY,
+      actorId: ADMIN_ID,
+    });
+    expect(r).toBeNull();
+    expect(inserted).toHaveLength(0);
+  });
+
+  /**
+   * Admin kechirimi AYNI buyurtmaning AYNI kechikishiga beriladi:
+   * uya BAND qolishi shart, aks holda rollback + qayta belgilashda
+   * kechirilgan kechikish uchun yangi (va kattaroq) shtraf yozilardi.
+   */
+  it('admin kechirimi uyani BAND qoldiradi (reversed_at qo‘yilmaydi)', async () => {
+    const entry = {
+      id: 'e-9',
+      order_id: ORDER_ID,
+      courier_id: COURIER_ID,
+      rule_id: 'r-1',
+      kind: 'penalty',
+      reason: 'late_mark',
+      amount: 6000,
+      late_days: 3,
+      base_tariff: 50000,
+      shadow: false,
+      cashbox_history_id: 'hist-0',
+      waives_entry_id: null,
+      reversed_at: null as number | null,
+    };
+    const h = makeManager({ entries: [entry], courierBalance: 100000 });
+    const n = await service.reverseForOrder(h.manager, {
+      orderId: ORDER_ID,
+      entryId: 'e-9',
+      reason: 'system_fault',
+      actorId: ADMIN_ID,
+    });
+    expect(n).toBe(1);
+    expect(entry.reversed_at).toBeNull();
+  });
+
+  /** Rollback esa, aksincha, uyani BO'SHATADI. */
+  it('rollback uyani BO‘SHATADI (reversed_at qo‘yiladi)', async () => {
+    const entry = {
+      id: 'e-10',
+      order_id: ORDER_ID,
+      courier_id: COURIER_ID,
+      rule_id: 'r-1',
+      kind: 'penalty',
+      reason: 'late_mark',
+      amount: 6000,
+      late_days: 3,
+      base_tariff: 50000,
+      shadow: false,
+      cashbox_history_id: 'hist-0',
+      waives_entry_id: null,
+      reversed_at: null as number | null,
+    };
+    const h = makeManager({ entries: [entry], courierBalance: 100000 });
+    await service.reverseForOrder(h.manager, {
+      orderId: ORDER_ID,
+      reason: 'sale_rolled_back',
+      actorId: ADMIN_ID,
+    });
+    expect(entry.reversed_at).not.toBeNull();
+  });
+
+  /**
+   * «O'chirib qo'y → rollback → qayta belgila → yoqib qo'y» ketma-ketligi
+   * shtrafni dalilsiz yuvib tashlamasligi kerak: avval HAQIQIY bo'lgan
+   * shtraf rollback bilan qaytarilgan bo'lsa, yangi yozuv ham haqiqiy.
+   */
+  it('modul o‘chiq bo‘lsa ham avvalgi HAQIQIY shtraf merosi saqlanadi', async () => {
+    const h = makeManager({
+      config: { is_active: false, shadow_since: T0 - 90 * DAY },
+      courierBalance: 100000,
+    });
+    // Avval rollback bilan qaytarilgan HAQIQIY qator topiladi.
+    const realFindOne = h.manager.findOne as unknown as jest.Mock;
+    const orig = realFindOne.getMockImplementation()!;
+    realFindOne.mockImplementation(async (entity: unknown, opts?: any) => {
+      if (entity === CourierPenaltyEntryEntity) return { id: 'eski-haqiqiy' };
+      return orig(entity, opts);
+    });
+
+    const r = await service.recordForOrder(h.manager, {
+      order: order(),
+      markedAt: T0 + 10 * DAY,
+      actorId: ADMIN_ID,
+    });
+
+    expect(r).not.toBeNull();
+    // Soya EMAS va kassaga haqiqiy pul yozilgan.
+    expect(h.inserted[0].shadow).toBe(false);
+    expect(h.cashWrites).toHaveLength(1);
+    expect(h.cashWrites[0].operation_type).toBe('income');
+  });
+});
+
+/**
+ * ⚠️ LANGAR — `courier_assigned_at`, `created_at` EMAS.
+ *
+ * Pochta boshqa kuryerga o'tkazilsa (`changeCourier`) faqat shu ustun
+ * yangilanadi; `created_at` tegilmaydi (u hisobot va filtrlar uchun).
+ * Shu qator ishlamasa YANGI kuryer avvalgi kuryerning kechikishini meros
+ * qilib olardi — odatda to'g'ridan-to'g'ri tarif poligacha.
+ */
+describe('langar — kuryer almashganda soat qayta boshlanadi', () => {
+  it('courier_assigned_at ustun, created_at faqat fallback', async () => {
+    const { manager, inserted } = makeManager({
+      post: {
+        id: POST_ID,
+        created_at: T0, // pochta ancha oldin yaratilgan
+        courier_assigned_at: T0 + 20 * DAY, // yangi kuryerga BUGUN o'tdi
+        courier_id: COURIER_ID,
+        region_id: null,
+      },
+    });
+
+    await service.recordForOrder(manager, {
+      order: order(),
+      markedAt: T0 + 25 * DAY,
+      actorId: ADMIN_ID,
+    });
+
+    // 5 kun o'tdi → 4 kun muhlat → 2-kun → 4 000.
+    // Eski langar (created_at) bilan 25 kun bo'lib, tarif poliga urardi.
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0].late_days).toBe(2);
+    expect(inserted[0].amount).toBe(4000);
+  });
+
+  it('courier_assigned_at bo‘sh bo‘lsa created_at ishlatiladi', async () => {
+    const { manager, inserted } = makeManager({
+      post: {
+        id: POST_ID,
+        created_at: T0,
+        courier_assigned_at: null,
+        courier_id: COURIER_ID,
+        region_id: null,
+      },
+    });
+    await service.recordForOrder(manager, {
+      order: order(),
+      markedAt: T0 + 6 * DAY,
+      actorId: ADMIN_ID,
+    });
+    expect(inserted[0].late_days).toBe(3);
+  });
+});
+
 describe('daftar yozuvi', () => {
   it('3 kun kechikish → 6 000, soya rejimida', async () => {
     const { manager, inserted } = makeManager();
@@ -594,6 +756,7 @@ describe('reverseForOrder', () => {
     shadow: false,
     cashbox_history_id: 'hist-0',
     waives_entry_id: null,
+    reversed_at: null as number | null,
     ...over,
   });
 
@@ -671,6 +834,134 @@ describe('reverseForOrder', () => {
         actorId: ADMIN_ID,
       }),
     ).toBe(0);
+  });
+
+  /**
+   * ⚠️ PUL QAYTMASA, UYA HAM BO'SHAMASLIGI SHART.
+   *
+   * Kassa topilmasa ilgari faqat log yozilib, waiver BARIBIR saqlanardi:
+   * daftar «qaytardim» der, kassa esa qarzni ushlab turardi. `reversed_at`
+   * qo'shilgandan keyin bu yana xavfliroq bo'ldi — uya bo'shab, qayta
+   * sotuvda YANGI shtraf yozilardi va kuryer AYNI kechikish uchun IKKI
+   * MARTA to'lardi. Shuning uchun tranzaksiya to'xtaydi.
+   */
+  it('kassa topilmasa teskari qaytarish TO‘XTAYDI (uya bo‘shamaydi)', async () => {
+    const entry = realEntry();
+    const h = makeManager({ entries: [entry], cashbox: null });
+
+    await expect(
+      service.reverseForOrder(h.manager, {
+        orderId: ORDER_ID,
+        reason: 'sale_rolled_back',
+        actorId: ADMIN_ID,
+      }),
+    ).rejects.toThrow(/kassasi topilmadi|kassa/i);
+
+    // Belgi QO'YILMAGAN bo'lishi shart — aks holda qayta sotuvda ikkinchi
+    // shtraf yozilib, birinchisi qaytarilmagan holda qolardi.
+    expect(entry.reversed_at).toBeNull();
+    expect(h.cashWrites).toHaveLength(0);
+  });
+
+  /**
+   * ⚠️ ROLLBACK ORQALI QOCHISH YO'LINI YOPADIGAN QULF.
+   *
+   * Asl qatorga `reversed_at` qo'yilishi SHART: `UQ_CP_ENTRY_ORDER_REASON`
+   * indeksi `reversed_at IS NULL` sharti bilan ishlaydi, ya'ni aynan shu
+   * yozuv indeks uyasini bo'shatadi va buyurtma qayta hal qilinganda
+   * kechikish YANA hisoblanadi. Bu qator olib tashlansa, kuryer
+   * «sotildi» → rollback → haqiqiy status ketma-ketligi bilan shtrafdan
+   * butunlay qutulardi (lokal dalil: #100132, 20 kun, sof shtraf 0).
+   */
+  it('asl qatorga reversed_at qo‘yiladi — indeks uyasi bo‘shaydi', async () => {
+    const entry = realEntry();
+    const h = makeManager({ entries: [entry], courierBalance: 100000 });
+    const before = Date.now();
+
+    const n = await service.reverseForOrder(h.manager, {
+      orderId: ORDER_ID,
+      reason: 'sale_rolled_back',
+      actorId: ADMIN_ID,
+    });
+
+    expect(n).toBe(1);
+    expect(entry.reversed_at).toBeGreaterThanOrEqual(before);
+    // Asl qator AYNI chaqiruvda saqlanishi ham shart — aks holda belgi
+    // xotirada qolib, bazada uya band bo'lib qolardi.
+    const savedIds = (h.manager.save as unknown as jest.Mock).mock.calls
+      .map((c: unknown[]) => (c[1] ?? c[0]) as Record<string, unknown>)
+      .map((r) => r?.id);
+    expect(savedIds).toContain('e-1');
+  });
+});
+
+/**
+ * QO'SHALOQ BEKOR QILISH — `where` NI HURMAT QILADIGAN TAQLID BILAN.
+ *
+ * ⚠️ NEGA ALOHIDA TAQLID. Yuqoridagi `makeManager` `find` da `where` ni
+ * butunlay e'tiborsiz qoldiradi va HAR DOIM `rows.entries` ni qaytaradi.
+ * Shu sabab u nuqsonni ko'rsata olmasdi: `entryId` yo'lida haqiqiy bazada
+ * `where.id` to'plamni bitta shtraf qatoriga toraytirardi, uning
+ * `waives_entry_id` i null bo'lgani uchun «allaqachon qaytarilgan»
+ * tekshiruvi DOIM bo'sh to'plam bilan ishlardi va hech qachon
+ * to'smasdi — ya'ni ayni shtrafni ikki marta bekor qilib, kuryerga pulni
+ * IKKI MARTA qaytarish mumkin edi.
+ */
+describe('reverseForOrder — qo‘shaloq bekor qilish (where hurmat qilinadi)', () => {
+  it('entryId yo‘lida allaqachon bekor qilingan shtraf qayta qaytarilmaydi', async () => {
+    const penalty = {
+      id: 'e-1',
+      order_id: ORDER_ID,
+      courier_id: COURIER_ID,
+      rule_id: 'r-1',
+      kind: 'penalty',
+      reason: 'late_mark',
+      amount: 6000,
+      late_days: 3,
+      base_tariff: 50000,
+      shadow: false,
+      cashbox_history_id: 'hist-0',
+      waives_entry_id: null,
+      reversed_at: 1,
+    };
+    const waiver = {
+      id: 'w-1',
+      order_id: ORDER_ID,
+      kind: 'waiver',
+      waives_entry_id: 'e-1',
+      amount: -6000,
+    };
+    const all: Array<Record<string, unknown>> = [penalty, waiver];
+    const saved: Array<Record<string, unknown>> = [];
+
+    const manager = {
+      // `where` HURMAT QILINADI — haqiqiy TypeORM xulqi.
+      find: jest.fn(async (_e: unknown, opts?: any) => {
+        const w = opts?.where ?? {};
+        return all.filter((r) =>
+          Object.entries(w).every(([k, v]) => r[k] === v),
+        );
+      }),
+      findOne: jest.fn(async () => ({ id: 'cb-1', user_id: COURIER_ID })),
+      create: jest.fn((_e: unknown, d: Record<string, unknown>) => ({ ...d })),
+      save: jest.fn(async (a: unknown, b?: unknown) => {
+        const row = (b ?? a) as Record<string, unknown>;
+        saved.push(row);
+        return row;
+      }),
+      query: jest.fn(),
+    } as unknown as Parameters<typeof service.reverseForOrder>[0];
+
+    const n = await service.reverseForOrder(manager, {
+      orderId: ORDER_ID,
+      entryId: 'e-1',
+      reason: 'system_fault',
+      actorId: ADMIN_ID,
+    });
+
+    expect(n).toBe(0);
+    // Ikkinchi waiver ham, ikkinchi kassa yozuvi ham bo'lmasligi shart.
+    expect(saved.filter((r) => r.kind === 'waiver')).toHaveLength(0);
   });
 });
 
