@@ -197,8 +197,20 @@ export const useCourierPenaltyAdmin = () => {
       refetchInterval: 5 * 60_000,
     });
 
+  /**
+   * ⚠️ `from`/`to` MILLISEKUNDDA. Server `@IsInt()` kutadi va sekund
+   * yuborilsa xato bermay, jimgina BO'SH natija qaytaradi — shuning
+   * uchun sanani faqat `dayStartMs`/`dayEndMs` orqali uzating.
+   */
   const getEntries = (
-    params: { courierId?: string; kind?: string; page?: number; limit?: number } = {},
+    params: {
+      courierId?: string;
+      kind?: string;
+      page?: number;
+      limit?: number;
+      from?: number;
+      to?: number;
+    } = {},
   ) =>
     useQuery<{ total: number; page: number; limit: number; items: PenaltyEntry[] }>({
       queryKey: [courierPenaltyKey, "entries", params],

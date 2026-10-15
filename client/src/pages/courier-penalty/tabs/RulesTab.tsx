@@ -8,6 +8,7 @@ import {
 } from "../../../shared/api/hooks/useCourierPenalty";
 import { formatSum } from "../../../shared/lib/deadlineTone";
 import { useApiNotification } from "../../../shared/hooks/useApiNotification";
+import { TabError } from "../components/TabState";
 
 type Draft = {
   id?: string;
@@ -49,7 +50,7 @@ const RulesTab = () => {
 
   const { getRules, getCouriers, createRule, updateRule, deactivateRule } =
     useCourierPenaltyAdmin();
-  const { data: rules, isLoading } = getRules();
+  const { data: rules, isLoading, isError, refetch } = getRules();
   const { data: couriers } = getCouriers();
 
   const signed = (d: Draft) => {
@@ -109,6 +110,8 @@ const RulesTab = () => {
         </button>
       </div>
 
+      {isError && <TabError onRetry={() => refetch()} />}
+
       <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
         <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-gray-50 text-xs text-gray-500 dark:bg-[#231F35] dark:text-gray-400">
@@ -127,6 +130,19 @@ const RulesTab = () => {
               <tr>
                 <td colSpan={7} className="px-3 py-6 text-center text-gray-400">
                   …
+                </td>
+              </tr>
+            )}
+            {/*
+              ⚠️ BO'SH HOLAT QATORI. Ilgari ro'yxat bo'sh bo'lsa (yoki
+              so'rov yiqilsa) jadval faqat sarlavhadan iborat bo'lib
+              qolardi — ekranda hech qanday izoh yo'q, foydalanuvchi esa
+              «yuklanmadimi yoki qoida yo'qmi» degan savol bilan qolardi.
+            */}
+            {!isLoading && !isError && !rules?.length && (
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-sm text-gray-400">
+                  {t("rules.empty")}
                 </td>
               </tr>
             )}

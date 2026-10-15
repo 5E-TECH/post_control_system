@@ -24,7 +24,19 @@
     "penalty": "Penalty",
     "cap": "Cap",
     "immune": "Not applied",
-    "immuneHint": "Dispatched before the module went live — no penalty applies"
+    "immuneHint": "Dispatched before the module went live — no penalty applies",
+    "sort": "Sort",
+    "sortPenalty": "By penalty",
+    "sortLate": "By days late",
+    "sortName": "By name",
+    "testHint": "Test mode — no money deducted",
+    "emptyFilterHint": "The filter shows delays over {{days}} days. Try 0.",
+    "immuneCount": "{{count}} not penalised",
+    "call": "Call",
+    "dispatched": "Dispatched",
+    "deadline": "Deadline",
+    "capped": "Cap",
+    "cappedHint": "Penalty reached the courier tariff ({{cap}})"
   },
   "summary": {
     "live": "Module LIVE",
@@ -43,7 +55,10 @@
     "layerReal": "Real — posted to the cashbox",
     "layerRealHint": "{{count}} entries. Only this figure is reconciled against the courier cashbox.",
     "layerShadow": "Test — what it would have been",
-    "layerShadowHint": "{{count}} entries. Never reflected in the cashbox."
+    "layerShadowHint": "{{count}} entries. Never reflected in the cashbox.",
+    "breakdownTitle": "Computed — test and real together",
+    "couriersLabel": "Couriers",
+    "shadowEntries": "{{count}} test entries"
   },
   "ledger": {
     "all": "All",
@@ -62,7 +77,13 @@
     "notePlaceholder": "Optional detail",
     "waived": "Penalty waived",
     "waiveFailed": "Could not waive",
-    "alreadyWaived": "waived"
+    "alreadyWaived": "waived",
+    "from": "From",
+    "to": "To",
+    "reset": "Clear",
+    "found": "{{count}} entries",
+    "debtUp": "debt up",
+    "debtDown": "debt down"
   },
   "rules": {
     "add": "Add rule",
@@ -83,7 +104,8 @@
     "offTitle": "Turn the rule off?",
     "offHint": "The rule is not deleted — only turned off. Past entries keep showing which rule produced them.",
     "previewPenalty": "{{amount}} UZS penalty for every late day ({{unit}})",
-    "previewBonus": "{{amount}} UZS bonus when marked in time"
+    "previewBonus": "{{amount}} UZS bonus when marked in time",
+    "empty": "No rules yet"
   },
   "kind": {
     "penalty": "Penalty",
@@ -139,6 +161,21 @@
     "exemptHint": "An exempt courier is never penalised. External-provider couriers (Elchi/LDG) are exempt already.",
     "searchCourier": "Search courier",
     "exemptSaved": "Saved",
-    "noCouriers": "No courier found"
+    "noCouriers": "No courier found",
+    "anchorMeaning": "Orders dispatched before this date are never penalised — they show as “not penalised” in the list.",
+    "anchorOnEnable": "Turning the module ON moves the anchor to today: the count restarts and no new penalty appears for the first 5 days."
+  },
+  "state": {
+    "errorTitle": "Could not load data",
+    "errorHint": "The request failed. Check your connection or try again.",
+    "retry": "Try again"
+  },
+  "status": {
+    "live": "Live",
+    "test": "Test",
+    "liveHint": "Penalties are really posted to the courier cashbox.",
+    "testHint": "The calculation runs, but no money is posted to the courier cashbox.",
+    "anchor": "Anchor",
+    "anchorHint": "Orders dispatched before this date are never penalised"
   }
 }

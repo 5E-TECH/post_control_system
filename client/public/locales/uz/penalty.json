@@ -24,7 +24,19 @@
     "penalty": "Shtraf",
     "cap": "Chegara",
     "immune": "Tegilmaydi",
-    "immuneHint": "Modul yoqilishidan oldin jo'natilgan — shtrafga tushmaydi"
+    "immuneHint": "Modul yoqilishidan oldin jo'natilgan — shtrafga tushmaydi",
+    "sort": "Saralash",
+    "sortPenalty": "Shtraf bo'yicha",
+    "sortLate": "Kechikish bo'yicha",
+    "sortName": "Nomi bo'yicha",
+    "testHint": "Sinov rejimi — pul yechilmaydi",
+    "emptyFilterHint": "Filtr {{days}} kundan ko'p kechikkanlarni ko'rsatmoqda. 0 ga tushirib ko'ring.",
+    "immuneCount": "{{count}} ta tegilmaydi",
+    "call": "Qo'ng'iroq",
+    "dispatched": "Jo'natilgan",
+    "deadline": "Muddat",
+    "capped": "Chegara",
+    "cappedHint": "Shtraf kuryer tarifiga ({{cap}}) yetib to'xtadi"
   },
   "summary": {
     "live": "Modul YOQILGAN",
@@ -43,7 +55,10 @@
     "layerReal": "Haqiqiy — kassaga yozilgan",
     "layerRealHint": "{{count}} ta yozuv. Faqat shu son kuryer kassasi bilan solishtiriladi.",
     "layerShadow": "Soya — yoqilganda qancha bo'lardi",
-    "layerShadowHint": "{{count}} ta yozuv. Kassada aks etmaydi."
+    "layerShadowHint": "{{count}} ta yozuv. Kassada aks etmaydi.",
+    "breakdownTitle": "Hisoblangan — sinov va haqiqiy birga",
+    "couriersLabel": "Kuryerlar",
+    "shadowEntries": "{{count}} ta sinov yozuvi"
   },
   "ledger": {
     "all": "Hammasi",
@@ -62,7 +77,13 @@
     "notePlaceholder": "Ixtiyoriy tafsilot",
     "waived": "Shtraf bekor qilindi",
     "waiveFailed": "Bekor qilib bo'lmadi",
-    "alreadyWaived": "bekor qilingan"
+    "alreadyWaived": "bekor qilingan",
+    "from": "Dan",
+    "to": "Gacha",
+    "reset": "Tozalash",
+    "found": "{{count}} ta yozuv",
+    "debtUp": "qarz oshdi",
+    "debtDown": "qarz kamaydi"
   },
   "rules": {
     "add": "Qoida qo'shish",
@@ -83,7 +104,8 @@
     "offTitle": "Qoidani so'ndirasizmi?",
     "offHint": "Qoida o'chirilmaydi — faqat so'ndiriladi. Eski yozuvlar qaysi qoida bo'yicha yozilgani ko'rinib qoladi.",
     "previewPenalty": "Kechikkan har kun uchun {{amount}} so'm shtraf ({{unit}})",
-    "previewBonus": "Muddatida belgilansa {{amount}} so'm bonus"
+    "previewBonus": "Muddatida belgilansa {{amount}} so'm bonus",
+    "empty": "Hali qoida qo'shilmagan"
   },
   "kind": {
     "penalty": "Shtraf",
@@ -139,6 +161,21 @@
     "exemptHint": "Istisno qilingan kuryerga shtraf umuman yozilmaydi. Tashqi provayder kuryerlari (Elchi/LDG) allaqachon istisno.",
     "searchCourier": "Kuryerni qidiring",
     "exemptSaved": "Saqlandi",
-    "noCouriers": "Kuryer topilmadi"
+    "noCouriers": "Kuryer topilmadi",
+    "anchorMeaning": "Shu sanadan oldin jo'natilgan buyurtmalar hech qachon shtrafga tushmaydi — ro'yxatda «Tegilmaydi» deb ko'rinadi.",
+    "anchorOnEnable": "Modulni YOQQANDA langar bugunga suriladi, ya'ni hisob noldan boshlanadi va dastlabki 5 kun ichida yangi shtraf chiqmaydi."
+  },
+  "state": {
+    "errorTitle": "Ma'lumotni yuklab bo'lmadi",
+    "errorHint": "So'rov xato qaytardi. Aloqani tekshiring yoki qayta urinib ko'ring.",
+    "retry": "Qayta urinish"
+  },
+  "status": {
+    "live": "Yoqilgan",
+    "test": "Sinov",
+    "liveHint": "Shtraflar kuryer kassasiga haqiqatan yozilmoqda.",
+    "testHint": "Hisob ishlayapti, lekin kuryer kassasiga pul yozilmaydi.",
+    "anchor": "Langar",
+    "anchorHint": "Shu sanadan oldin jo'natilgan buyurtmalar shtrafga tushmaydi"
   }
 }
