@@ -43,7 +43,19 @@ const run = (over: Partial<Parameters<typeof computeCourierAdjustment>[0]> = {})
 
 describe('lateDaysOf — kalendar kun', () => {
   it('muddat ichida 0 qaytaradi', () => {
-    expect(lateDaysOf(T0, T0 + 4 * DAY, 4)).toBe(0);
+    // 3 kun 23 soat — hali muddat ichida.
+    expect(lateDaysOf(T0, T0 + 3 * DAY + 23 * 3600_000, 4)).toBe(0);
+  });
+
+  /**
+   * ⚠️ MUDDAT TO'LGAN ZAHOTI BIRINCHI KUN. `deadlineDays = 4` degani
+   * jo'natilgandan 4 kun o'tgach kechikish boshlanadi — egasi qarori
+   * (2026-10-15): «3 kun 23 soatu 59 daqiqadan keyin ... bu 4 kun o'tib
+   * bo'ldi degani». Avval bu yerda 0 qaytardi, ya'ni muhlat amalda
+   * 5 kun bo'lib qolgandi.
+   */
+  it('muddat to\u2018lgan zahoti 1-kun boshlanadi', () => {
+    expect(lateDaysOf(T0, T0 + 4 * DAY, 4)).toBe(1);
   });
 
   /**
@@ -52,8 +64,9 @@ describe('lateDaysOf — kalendar kun', () => {
    * kechqurun belgilagan odam «bir kun kechikdi» deb hisoblanardi.
    */
   it('qisman kun kechikish deb sanalmaydi', () => {
-    expect(lateDaysOf(T0, T0 + 4 * DAY + 23 * 3600_000, 4)).toBe(0);
-    expect(lateDaysOf(T0, T0 + 5 * DAY, 4)).toBe(1);
+    // 4 kun 23 soat — hamon 1-kun; 2-kun faqat 5 kun to'lganda.
+    expect(lateDaysOf(T0, T0 + 4 * DAY + 23 * 3600_000, 4)).toBe(1);
+    expect(lateDaysOf(T0, T0 + 5 * DAY, 4)).toBe(2);
   });
 
   it('teskari/buzuq vaqtda 0', () => {
@@ -65,13 +78,14 @@ describe('lateDaysOf — kalendar kun', () => {
 
 describe('shtraf hisobi — asosiy qoida', () => {
   it('muddat ichida tuzatish yo‘q', () => {
-    const r = run({ markedAt: T0 + 4 * DAY });
+    const r = run({ markedAt: T0 + 3 * DAY + 23 * 3600_000 });
     expect(r.amount).toBe(0);
     expect(r.kind).toBeNull();
   });
 
   it('2 kun kechikish → 4 000', () => {
-    const r = run({ markedAt: T0 + 6 * DAY });
+    // 4 kun — 1-kun, 5 kun — 2-kun.
+    const r = run({ markedAt: T0 + 5 * DAY });
     expect(r.lateDays).toBe(2);
     expect(r.amount).toBe(4000);
     expect(r.kind).toBe('penalty');
@@ -85,7 +99,7 @@ describe('shtraf hisobi — asosiy qoida', () => {
    */
   it('shtraf TARIFDAN OSHMAYDI — pol 0', () => {
     const r = run({ markedAt: T0 + 30 * DAY });
-    expect(r.lateDays).toBe(26);
+    expect(r.lateDays).toBe(27);
     // 26 × 2 000 = 52 000, lekin tarif 20 000
     expect(r.amount).toBe(20000);
     expect(r.cappedByTariff).toBe(true);
@@ -140,13 +154,13 @@ describe('grandfathering — eski buyurtmalar tegilmaydi', () => {
       markedAt: T0 + 9 * DAY,
       activatedAt: T0 + DAY,
     });
-    expect(r.lateDays).toBe(3);
-    expect(r.amount).toBe(6000);
+    expect(r.lateDays).toBe(4);
+    expect(r.amount).toBe(8000);
   });
 
   it('yoqilmagan bo‘lsa (soya) hisob baribir ishlaydi', () => {
     const r = run({ markedAt: T0 + 6 * DAY, activatedAt: null });
-    expect(r.amount).toBe(4000);
+    expect(r.amount).toBe(6000);
   });
 });
 
@@ -328,9 +342,10 @@ describe('deadlineStateOf — kuryer sanog‘i', () => {
     expect(deadlineStateOf(null, T0, 4)).toBeNull();
   });
 
-  it('shtraf boshlanish payti = jo‘natish + (muddat + 1) kun', () => {
+  it('shtraf boshlanish payti = jo‘natish + muddat kun', () => {
+    // 2026-10-15: avval `muddat + 1` edi, ya'ni muhlat bir kun uzun edi.
     const st = deadlineStateOf(T0, T0, 4)!;
-    expect(st.penaltyStartsAt).toBe(T0 + 5 * DAY);
+    expect(st.penaltyStartsAt).toBe(T0 + 4 * DAY);
   });
 
   /**
@@ -340,31 +355,31 @@ describe('deadlineStateOf — kuryer sanog‘i', () => {
    */
   it('sanoq va lateDaysOf AYNI chegarani ko‘rsatadi', () => {
     // Bir ms oldin: kechikish 0, muddat hali o'tmagan
-    const before = T0 + 5 * DAY - 1;
+    const before = T0 + 4 * DAY - 1;
     expect(lateDaysOf(T0, before, 4)).toBe(0);
     expect(deadlineStateOf(T0, before, 4)!.msLeft).toBeGreaterThan(0);
 
     // Ayni chegarada: kechikish 1, muddat o'tgan
-    const at = T0 + 5 * DAY;
+    const at = T0 + 4 * DAY;
     expect(lateDaysOf(T0, at, 4)).toBe(1);
     expect(deadlineStateOf(T0, at, 4)!.msLeft).toBeLessThanOrEqual(0);
   });
 
   it('qolgan to‘liq kunlar', () => {
-    expect(deadlineStateOf(T0, T0, 4)!.daysLeft).toBe(5);
-    expect(deadlineStateOf(T0, T0 + 3 * DAY, 4)!.daysLeft).toBe(2);
+    expect(deadlineStateOf(T0, T0, 4)!.daysLeft).toBe(4);
+    expect(deadlineStateOf(T0, T0 + 3 * DAY, 4)!.daysLeft).toBe(1);
   });
 
   it('muddat o‘tgan bo‘lsa daysLeft null, lateDays musbat', () => {
     const st = deadlineStateOf(T0, T0 + 7 * DAY, 4)!;
     expect(st.daysLeft).toBeNull();
-    expect(st.lateDays).toBe(3);
+    expect(st.lateDays).toBe(4);
   });
 
   /** «Bugun muddati tugaydi» — oxirgi sutka ichida. */
   it('dueToday faqat oxirgi sutkada', () => {
-    expect(deadlineStateOf(T0, T0 + 4 * DAY, 4)!.dueToday).toBe(true);
-    expect(deadlineStateOf(T0, T0 + 3 * DAY, 4)!.dueToday).toBe(false);
+    expect(deadlineStateOf(T0, T0 + 3 * DAY, 4)!.dueToday).toBe(true);
+    expect(deadlineStateOf(T0, T0 + 2 * DAY, 4)!.dueToday).toBe(false);
     expect(deadlineStateOf(T0, T0 + 6 * DAY, 4)!.dueToday).toBe(false);
   });
 });

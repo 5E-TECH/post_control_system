@@ -181,8 +181,20 @@ export function pickRule(
 /**
  * Kechikkan KALENDAR kunlar soni (muddat ayirilgan, manfiy bo'lmaydi).
  *
- * ⚠️ `floor` — 4 kun 23 soat hali 4-kun. Kuryer soat farqi uchun
- * jazolanmasligi kerak.
+ * ── MUDDAT TO'LGAN ZAHOTI BIRINCHI KUN BOSHLANADI (2026-10-15 QARORI) ──
+ *
+ * `deadlineDays = 4` degani: jo'natilgandan 4 kun o'tgach kechikish
+ * BOSHLANADI. Ya'ni 3 kun 23 soat 59 daqiqa — hali muddat ichida (0),
+ * 4 kun to'lgan zahoti esa BIRINCHI kechikkan kun (1).
+ *
+ * ⚠️ AVVAL BIR KUN KECH BOSHLANARDI: formula `elapsed - deadline` edi va
+ * 4 kunda 0, 5 kunda 1 berardi — ya'ni amalda muhlat 5 kun bo'lib
+ * qolgandi. Egasi buni 2026-10-15 da tuzatishni so'radi: «3 kun 23 soatu
+ * 59 daqiqadan keyin hisoblanib boshlanishi kerak, chunki bu 4 kun o'tib
+ * bo'ldi degani».
+ *
+ * ⚠️ `floor` SAQLANADI — soat farqi uchun jazolanmaydi: 4 kun 23 soat
+ * ham 1-kun (5 kun to'lmaguncha 2-kun boshlanmaydi).
  */
 export function lateDaysOf(
   dispatchedAt: number | null | undefined,
@@ -193,7 +205,7 @@ export function lateDaysOf(
   const to = int(markedAt);
   if (from <= 0 || to <= 0 || to < from) return 0;
   const elapsed = Math.floor((to - from) / DAY_MS);
-  return Math.max(0, elapsed - Math.max(0, int(deadlineDays)));
+  return Math.max(0, elapsed - Math.max(0, int(deadlineDays)) + 1);
 }
 
 /**
@@ -233,11 +245,15 @@ export function deadlineStateOf(
 
   const deadline = Math.max(0, int(deadlineDays));
   /**
-   * `(muddat + 1)` — chunki `lateDaysOf` `floor` ishlatadi: o'tgan vaqt
-   * ayni `muddat` kun bo'lganda kechikish hali 0. Shtraf keyingi kun
-   * to'lgandagina boshlanadi.
+   * Shtraf muddat TO'LGAN zahoti boshlanadi: `muddat = 4` bo'lsa
+   * jo'natilgandan 4 kun o'tgan daqiqada birinchi kechikkan kun
+   * yoziladi. `lateDaysOf` bilan AYNI chegara — ikkisi ajralib qolsa
+   * kuryerga ko'rsatilgan sanoq daftardagi summadan farq qilardi.
+   *
+   * ⚠️ Avval `(muddat + 1)` edi va amalda muhlat bir kun uzun bo'lib
+   * qolgandi; 2026-10-15 da egasi qarori bilan tuzatildi.
    */
-  const penaltyStartsAt = from + (deadline + 1) * DAY_MS;
+  const penaltyStartsAt = from + deadline * DAY_MS;
   const msLeft = penaltyStartsAt - int(now);
   const lateDays = lateDaysOf(from, now, deadline);
 

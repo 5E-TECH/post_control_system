@@ -251,7 +251,7 @@ describe('yozuv yozilmaydigan holatlar', () => {
 });
 
 describe('daftar yozuvi', () => {
-  it('2 kun kechikish → 4 000, soya rejimida', async () => {
+  it('3 kun kechikish → 6 000, soya rejimida', async () => {
     const { manager, inserted } = makeManager();
     const r = await service.recordForOrder(manager, {
       order: order(),
@@ -262,10 +262,10 @@ describe('daftar yozuvi', () => {
     expect(r).not.toBeNull();
     expect(inserted).toHaveLength(1);
     const row = inserted[0];
-    expect(row.amount).toBe(4000);
+    expect(row.amount).toBe(6000);
     expect(row.kind).toBe('penalty');
     expect(row.reason).toBe('late_mark');
-    expect(row.late_days).toBe(2);
+    expect(row.late_days).toBe(3);
     expect(row.base_tariff).toBe(20000);
     // ⚠️ FAZA 1 SHARTNOMASI: pulga tegilmaydi.
     expect(row.shadow).toBe(true);
@@ -405,9 +405,9 @@ describe('yoqilgan rejim — kassaga yozish', () => {
      * bo'lib qolardi.
      */
     expect(h.cashWrites[0].operation_type).toBe('income');
-    expect(h.cashWrites[0].amount).toBe(4000);
+    expect(h.cashWrites[0].amount).toBe(6000);
     expect(h.cashWrites[0].source_type).toBe('courier_penalty');
-    expect(h.balance).toBe(104000);
+    expect(h.balance).toBe(106000);
   });
 
   /** Daftar qatori kassa yozuviga BOG'LANISHI shart (invariant I-CP1). */
@@ -430,7 +430,7 @@ describe('yoqilgan rejim — kassaga yozish', () => {
     });
     expect(h.fbhWrites).toHaveLength(1);
     expect(h.fbhWrites[0].source_type).toBe('courier_penalty');
-    expect(h.fbhWrites[0].amount).toBe(4000);
+    expect(h.fbhWrites[0].amount).toBe(6000);
   });
 
   /**
@@ -755,7 +755,7 @@ describe('bekor yo‘li — qulflangan qaror', () => {
       markedAt: T0 + 7 * DAY,
     });
     expect(inserted).toHaveLength(1);
-    expect(inserted[0].amount).toBe(6000); // 3 kun × 2 000
+    expect(inserted[0].amount).toBe(8000); // 4 kun × 2 000
   });
 
   /**
