@@ -967,13 +967,23 @@ export class CourierPenaltyService {
    * tushunarsiz holat tug'dirardi.
    */
   async loadRules(manager: EntityManager): Promise<PenaltyRule[]> {
+    /**
+     * ⚠️ `order` MAJBURIY. `ORDER BY` siz Postgres qatorlarni heap
+     * tartibida qaytaradi va u begona `UPDATE` dan keyin o'zgaradi —
+     * ya'ni teng qoidalar orasidagi g'olib (demak kuryerdan yechiladigan
+     * summa) so'rovdan so'rovga o'zgarib ketardi. Tanlov mantig'ining
+     * o'zida ham yakuniy tie-break bor (`courier-penalty.util.ts`), bu
+     * esa ikkinchi devor: kirish tartibi ham barqaror bo'lsin.
+     */
     const rows = await manager.find(CourierPenaltyRuleEntity, {
       where: { is_active: true },
+      order: { created_at: 'ASC', id: 'ASC' },
     });
     return rows.map((r) => ({
       id: r.id,
       scope_type: r.scope_type,
       scope_id: r.scope_id,
+      scope_ids: r.scope_ids ?? null,
       event: r.event,
       threshold_days: Number(r.threshold_days),
       calc: r.calc,

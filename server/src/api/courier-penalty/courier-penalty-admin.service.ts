@@ -425,37 +425,75 @@ export class CourierPenaltyAdminService {
       order: { is_active: 'DESC', created_at: 'DESC' },
     });
 
-    /** Qamrov nomlari — ekranda uuid emas, odam o'qiydigan nom kerak. */
-    const scopeIds = rules
-      .map((r) => r.scope_id)
-      .filter((v): v is string => !!v);
-    const users = scopeIds.length
+    /**
+     * Qamrov nomlari — ekranda uuid emas, odam o'qiydigan nom kerak.
+     *
+     * ⚠️ BITTA SO'ROV. Qoida endi ko'p kuryer qamrashi mumkin, shuning
+     * uchun hamma qoidaning hamma nishoni bir ro'yxatga yig'ilib, bitta
+     * `IN (...)` bilan olinadi — aks holda har qoida uchun alohida
+     * so'rov (N+1) bo'lardi.
+     */
+    const targetsOf = (r: CourierPenaltyRuleEntity): string[] => {
+      const many = (r.scope_ids ?? []).filter(Boolean);
+      if (many.length) return many;
+      return r.scope_id ? [r.scope_id] : [];
+    };
+
+    const allIds = [
+      ...new Set(
+        rules.flatMap((r) =>
+          r.scope_type === CourierPenaltyScope.GLOBAL ? [] : targetsOf(r),
+        ),
+      ),
+    ];
+    const users = allIds.length
       ? await this.manager.find(UserEntity, {
-          where: { id: In(scopeIds) },
+          where: { id: In(allIds) },
           select: ['id', 'name', 'phone_number'],
         })
       : [];
     const userMap = new Map(users.map((u) => [u.id, u] as const));
 
-    return rules.map((r) => ({
-      ...r,
-      amount: Number(r.amount),
-      max_amount: r.max_amount == null ? null : Number(r.max_amount),
-      scope_name:
-        r.scope_type === CourierPenaltyScope.COURIER && r.scope_id
-          ? (userMap.get(r.scope_id)?.name ?? null)
-          : null,
-    }));
+    return rules.map((r) => {
+      const targets =
+        r.scope_type === CourierPenaltyScope.COURIER ? targetsOf(r) : [];
+      /**
+       * ⚠️ O'CHIRILGAN KURYER TASHLAB KETILMAYDI. Massivda eskirgan id
+       * qolishi mumkin (FK yo'q, bu ataylab). Nomi topilmasa ham qator
+       * sanoqqa kiradi, aks holda ekrandagi «3 kuryer» bazadagi 4 ta
+       * nishondan farq qilib, admin sababini topa olmasdi.
+       */
+      const names = targets.map((id) => userMap.get(id)?.name ?? null);
+      return {
+        ...r,
+        amount: Number(r.amount),
+        max_amount: r.max_amount == null ? null : Number(r.max_amount),
+        /** Eski maydon — bitta nishonli qoidalar uchun saqlanadi. */
+        scope_name: targets.length === 1 ? (names[0] ?? null) : null,
+        /** Yangi: ko'p nishonli qoida uchun to'liq ro'yxat. */
+        scope_names: names,
+        scope_count: targets.length,
+      };
+    });
   }
 
   async createRule(dto: Partial<CourierPenaltyRuleEntity>, actorId: string) {
-    this.assertRule(dto);
+    /**
+     * ⚠️ `active_from` DEFAULTI TEKSHIRUVDAN OLDIN QO'YILADI.
+     *
+     * Ilgari `assertRule` xom `dto` ni ko'rardi va unda `active_from`
+     * bo'lmasa «tugash sanasi boshlanishdan keyin bo'lsin» sharti 0 ga
+     * nisbatan baholanardi — ya'ni O'TMISHDAGI `active_to` bilan qoida
+     * jim yaratilib, dvigatel uchun darhol O'LIK bo'lardi. Admin uni
+     * ekranda «faol» deb ko'rib, nega ishlamayotganini topa olmasdi.
+     */
     const now = Date.now();
+    const payload = { ...dto, active_from: dto.active_from ?? now };
+    this.assertRule(payload);
     const rule = this.manager.create(CourierPenaltyRuleEntity, {
-      ...dto,
+      ...payload,
       created_at: now,
       updated_at: now,
-      active_from: dto.active_from ?? now,
       created_by: actorId,
     } as CourierPenaltyRuleEntity);
     const saved = await this.manager.save(rule);
@@ -467,6 +505,8 @@ export class CourierPenaltyAdminService {
       new_value: {
         event: saved.event,
         scope_type: saved.scope_type,
+        // Dalil: qoida QAYSI kuryerlarga qo'yilgani keyin so'raladi.
+        scope_ids: saved.scope_ids ?? null,
         threshold_days: saved.threshold_days,
         calc: saved.calc,
         amount: Number(saved.amount),
@@ -583,14 +623,31 @@ export class CourierPenaltyAdminService {
     )
       throw new BadRequestException('Shtraf summasi MANFIY bo‘lishi kerak');
 
+    /**
+     * ⚠️ QAMROV NISHONLARI — `courier` da KO'P, `region` da BITTA.
+     *
+     * `courier` qamrovi endi ro'yxat qabul qiladi (`scope_ids`); eski
+     * qoidalar `scope_id` bilan qolgani uchun ikkalasi ham hisobga
+     * olinadi. Bo'sh ro'yxat JIM O'TKAZILMAYDI: aks holda «kuryerlarga»
+     * deb saqlangan qoida hech kimga tegmay, admin esa uni ishlayapti
+     * deb o'ylardi.
+     */
+    const courierTargets = (dto.scope_ids ?? []).filter(Boolean);
+    if (dto.scope_type === CourierPenaltyScope.COURIER) {
+      if (!courierTargets.length && !dto.scope_id)
+        throw new BadRequestException(
+          'Kamida bitta kuryer tanlanishi shart',
+        );
+      /** Takror id — qamrovni kengaytirmaydi, lekin «torlik» tartibini buzadi. */
+      if (new Set(courierTargets.map(String)).size !== courierTargets.length)
+        throw new BadRequestException('Kuryerlar ro‘yxatida takror bor');
+    }
+    if (dto.scope_type === CourierPenaltyScope.REGION && !dto.scope_id)
+      throw new BadRequestException('Viloyat qamrovida nishon tanlanishi shart');
     if (
-      dto.scope_type !== CourierPenaltyScope.GLOBAL &&
-      !dto.scope_id
+      dto.scope_type === CourierPenaltyScope.GLOBAL &&
+      (dto.scope_id || courierTargets.length)
     )
-      throw new BadRequestException(
-        'Kuryer yoki viloyat qamrovida nishon tanlanishi shart',
-      );
-    if (dto.scope_type === CourierPenaltyScope.GLOBAL && dto.scope_id)
       throw new BadRequestException('Global qoidada nishon bo‘lmaydi');
 
     if (Number(dto.threshold_days ?? 0) < 0)

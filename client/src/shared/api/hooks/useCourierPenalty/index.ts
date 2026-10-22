@@ -157,8 +157,15 @@ export interface PenaltyCourier {
 export interface PenaltyRule {
   id: string;
   scope_type: "global" | "courier" | "region";
+  /** Viloyat nishoni yoki ESKI bitta kuryer qoidasi. */
   scope_id: string | null;
+  /** Bitta nishonli qoida uchun nom (eski maydon). */
   scope_name: string | null;
+  /** `courier` qamrovida KO'P nishon — bitta qoida, bir nechta kuryer. */
+  scope_ids?: string[] | null;
+  /** Nishon nomlari; o'chirilgan kuryer uchun `null` element qoladi. */
+  scope_names?: Array<string | null>;
+  scope_count?: number;
   event: "late_mark" | "early_mark" | "damage";
   threshold_days: number;
   calc: "per_day" | "once";

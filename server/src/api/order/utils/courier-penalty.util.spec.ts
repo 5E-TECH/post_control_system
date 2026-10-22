@@ -185,6 +185,119 @@ describe('istisno va buzuq ma‘lumot', () => {
 /**
  * Qamrov aniqligi — «falon kuryerga boshqacha muddat» talabi aynan shu.
  */
+/**
+ * ⚠️ BITTA QOIDA — KO'P KURYER (egasi talabi, 2026-10-15).
+ *
+ * Qamrov `scope_ids` massivi bilan beriladi; `scope_id` eski qoidalar
+ * uchun fallback bo'lib qoladi.
+ */
+describe('qamrov — bitta qoidaga ko‘p kuryer', () => {
+  const OTHER = 'courier-999';
+
+  it('ro‘yxatdagi kuryerga tegadi', () => {
+    const picked = pickRule(
+      [
+        rule({
+          id: 'ko‘p',
+          scope_type: CourierPenaltyScope.COURIER,
+          scope_ids: [OTHER, COURIER],
+        }),
+      ],
+      CourierPenaltyEvent.LATE_MARK,
+      T0,
+      COURIER,
+      REGION,
+    );
+    expect(picked?.id).toBe('ko‘p');
+  });
+
+  it('ro‘yxatdan tashqaridagi kuryerga TEGMAYDI', () => {
+    const picked = pickRule(
+      [
+        rule({
+          id: 'ko‘p',
+          scope_type: CourierPenaltyScope.COURIER,
+          scope_ids: [OTHER],
+        }),
+      ],
+      CourierPenaltyEvent.LATE_MARK,
+      T0,
+      COURIER,
+      REGION,
+    );
+    // `pickRule` mos qoida bo'lmasa `null` qaytaradi.
+    expect(picked).toBeNull();
+  });
+
+  /**
+   * ⚠️ TORROQ QAMROV USTUN. Ikkalasi ham `courier` darajasida bo'lgani
+   * uchun ilgari tanlov `priority` ga, u teng bo'lsa «eng yangisi» ga
+   * qolardi — admin uchun taxmin qilib bo'lmaydigan natija.
+   */
+  it('bitta kuryerlik qoida ko‘p kuryerlik qoidadan ustun', () => {
+    const picked = pickRule(
+      [
+        rule({
+          id: 'ko‘p',
+          scope_type: CourierPenaltyScope.COURIER,
+          scope_ids: [COURIER, OTHER, 'c-3'],
+        }),
+        rule({
+          id: 'bitta',
+          scope_type: CourierPenaltyScope.COURIER,
+          scope_ids: [COURIER],
+        }),
+      ],
+      CourierPenaltyEvent.LATE_MARK,
+      T0,
+      COURIER,
+      REGION,
+    );
+    expect(picked?.id).toBe('bitta');
+  });
+
+  it('ko‘p kuryerlik qoida viloyat va global qoidadan ustun', () => {
+    const picked = pickRule(
+      [
+        rule({ id: 'g' }),
+        rule({
+          id: 'r',
+          scope_type: CourierPenaltyScope.REGION,
+          scope_id: REGION,
+        }),
+        rule({
+          id: 'ko‘p',
+          scope_type: CourierPenaltyScope.COURIER,
+          scope_ids: [COURIER, OTHER],
+        }),
+      ],
+      CourierPenaltyEvent.LATE_MARK,
+      T0,
+      COURIER,
+      REGION,
+    );
+    expect(picked?.id).toBe('ko‘p');
+  });
+
+  /** Eski qoidalar `scope_id` bilan qolgan — ular ham ishlashda davom etadi. */
+  it('eski bitta nishonli qoida (`scope_id`) hamon ishlaydi', () => {
+    const picked = pickRule(
+      [
+        rule({
+          id: 'eski',
+          scope_type: CourierPenaltyScope.COURIER,
+          scope_id: COURIER,
+        }),
+      ],
+      CourierPenaltyEvent.LATE_MARK,
+      T0,
+      COURIER,
+      REGION,
+    );
+    expect(picked?.id).toBe('eski');
+  });
+});
+
 describe('qoida tanlash — aniqroq qamrov ustun', () => {
   it('kuryer qoidasi viloyat va global qoidadan ustun', () => {
     const picked = pickRule(

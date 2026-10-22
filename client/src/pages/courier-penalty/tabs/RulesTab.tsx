@@ -9,11 +9,14 @@ import {
 import { formatSum } from "../../../shared/lib/deadlineTone";
 import { useApiNotification } from "../../../shared/hooks/useApiNotification";
 import { TabError } from "../components/TabState";
+import CourierPicker from "../components/CourierPicker";
 
 type Draft = {
   id?: string;
   scope_type: PenaltyRule["scope_type"];
   scope_id: string | null;
+  /** `courier` qamrovida tanlangan kuryerlar — bitta qoida, ko'p nishon. */
+  scope_ids: string[];
   event: PenaltyRule["event"];
   threshold_days: number;
   calc: PenaltyRule["calc"];
@@ -25,6 +28,7 @@ type Draft = {
 const EMPTY: Draft = {
   scope_type: "global",
   scope_id: null,
+  scope_ids: [],
   event: "late_mark",
   threshold_days: 4,
   calc: "per_day",
@@ -63,7 +67,13 @@ const RulesTab = () => {
     if (!draft) return;
     const body = {
       scope_type: draft.scope_type,
-      scope_id: draft.scope_type === "global" ? null : draft.scope_id,
+      /**
+       * ⚠️ `scope_id` FAQAT viloyat uchun. Kuryer qamrovi endi ro'yxat
+       * yuboradi; eski bitta-kuryer qoidasi tahrirlanganda ham ro'yxatga
+       * aylanadi, shuning uchun bu yerda `null` ketadi.
+       */
+      scope_id: draft.scope_type === "region" ? draft.scope_id : null,
+      scope_ids: draft.scope_type === "courier" ? draft.scope_ids : null,
       event: draft.event,
       threshold_days: Number(draft.threshold_days) || 0,
       calc: draft.calc,
@@ -89,6 +99,13 @@ const RulesTab = () => {
       id: r.id,
       scope_type: r.scope_type,
       scope_id: r.scope_id,
+      // Eski bitta-nishonli qoida ham ro'yxat sifatida ochiladi.
+      scope_ids:
+        r.scope_ids?.length
+          ? r.scope_ids
+          : r.scope_type === "courier" && r.scope_id
+            ? [r.scope_id]
+            : [],
       event: r.event,
       threshold_days: r.threshold_days,
       calc: r.calc,
@@ -148,12 +165,33 @@ const RulesTab = () => {
             )}
             {rules?.map((r) => (
               <tr key={r.id} className={r.is_active ? "" : "opacity-50"}>
+                {/*
+                  ⚠️ KO'P NISHONDA SON + NOMLAR. Faqat son («3 kuryer»)
+                  bo'lsa admin qaysi kuryerlar ekanini bilish uchun har
+                  qoidani ochishga majbur bo'lardi; faqat nomlar bo'lsa
+                  uzun ro'yxat jadvalni yorib yuborardi. Shuning uchun
+                  son — sarlavha, nomlar — ostida va qisqartirilgan.
+                */}
                 <td className="px-3 py-2 text-gray-700 dark:text-gray-200">
-                  {t(`scope.${r.scope_type}`)}
-                  {r.scope_name && (
-                    <span className="ml-1 text-xs text-gray-400">
-                      · {r.scope_name}
-                    </span>
+                  <div>
+                    {t(`scope.${r.scope_type}`)}
+                    {(r.scope_count ?? 0) > 1 && (
+                      <span className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium tabular-nums text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                        {t("rules.courierCount", { count: r.scope_count })}
+                      </span>
+                    )}
+                  </div>
+                  {!!r.scope_names?.length && (
+                    <div
+                      className="max-w-[16rem] truncate text-xs text-gray-400"
+                      title={r.scope_names
+                        .map((n) => n ?? t("rules.deletedCourier"))
+                        .join(", ")}
+                    >
+                      {r.scope_names
+                        .map((n) => n ?? t("rules.deletedCourier"))
+                        .join(", ")}
+                    </div>
                   )}
                 </td>
                 <td className="px-3 py-2 text-gray-700 dark:text-gray-200">
@@ -219,12 +257,15 @@ const RulesTab = () => {
       <Modal
         open={!!draft}
         onCancel={() => setDraft(null)}
+        cancelText={t("rules.cancel")}
         onOk={submit}
         okText={t("rules.save")}
         okButtonProps={{
           loading: createRule.isPending || updateRule.isPending,
           disabled:
-            !!draft && draft.scope_type !== "global" && !draft.scope_id,
+            !!draft &&
+            draft.scope_type === "courier" &&
+            !draft.scope_ids.length,
         }}
         title={draft?.id ? t("rules.edit") : t("rules.add")}
       >
@@ -261,6 +302,7 @@ const RulesTab = () => {
                       ...draft,
                       scope_type: e.target.value as Draft["scope_type"],
                       scope_id: null,
+                      scope_ids: [],
                     })
                   }
                   className="h-10 w-full rounded-lg border border-gray-300 bg-white px-2 text-sm dark:border-gray-600 dark:bg-[#2A263D] dark:text-white"
@@ -274,26 +316,23 @@ const RulesTab = () => {
               </label>
             </div>
 
+            {/*
+              ⚠️ KO'P KURYER. Ilgari bu yerda oddiy `<select>` turardi va
+              qoidani faqat BITTA kuryerga qo'yish mumkin edi — o'n
+              kuryerga bir xil shart kerak bo'lsa admin o'nta bir xil
+              qoida yaratardi, keyin birini o'zgartirib qolganini unutardi.
+            */}
             {draft.scope_type === "courier" && (
-              <label className="block text-sm">
+              <div className="text-sm">
                 <span className="mb-1 block text-gray-700 dark:text-gray-200">
-                  {t("courier")} *
+                  {t("rules.couriers")} *
                 </span>
-                <select
-                  value={draft.scope_id ?? ""}
-                  onChange={(e) =>
-                    setDraft({ ...draft, scope_id: e.target.value || null })
-                  }
-                  className="h-10 w-full rounded-lg border border-gray-300 bg-white px-2 text-sm dark:border-gray-600 dark:bg-[#2A263D] dark:text-white"
-                >
-                  <option value="">—</option>
-                  {couriers?.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} · {c.phone_number}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <CourierPicker
+                  couriers={couriers ?? []}
+                  value={draft.scope_ids}
+                  onChange={(next) => setDraft({ ...draft, scope_ids: next })}
+                />
+              </div>
             )}
 
             <div className="grid grid-cols-2 gap-3">
@@ -374,13 +413,43 @@ const RulesTab = () => {
               Ekranda manfiy son so'ralmaydi — ishorani `event` belgilaydi.
               Admin nima bo'lishini oldindan ko'rib tursin.
             */}
-            <div className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-gray-800/50 dark:text-gray-300">
-              {draft.event === "early_mark"
-                ? t("rules.previewBonus", { amount: formatSum(Math.abs(draft.amount)) })
-                : t("rules.previewPenalty", {
-                    amount: formatSum(Math.abs(draft.amount)),
-                    unit: t(`calc.${draft.calc}`),
-                  })}
+            {/*
+              ⚠️ UCHALA HODISA UCHUN ALOHIDA MATN. Ilgari `early_mark`
+              bo'lmagan hamma narsa «Kechikkan har kun uchun…» deb
+              ko'rsatilardi — ya'ni ZARAR qoidasi ham kechikish shtrafi
+              deb tasvirlanardi va admin nima saqlayotganini noto'g'ri
+              tushunardi.
+            */}
+            <div
+              className={`rounded-lg px-3 py-2 text-xs ${
+                draft.event === "early_mark"
+                  ? "bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-300"
+                  : "bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-300"
+              }`}
+            >
+              {draft.event === "early_mark" &&
+                t("rules.previewBonus", {
+                  amount: formatSum(Math.abs(draft.amount)),
+                  days: draft.threshold_days,
+                })}
+              {draft.event === "late_mark" &&
+                t("rules.previewPenalty", {
+                  amount: formatSum(Math.abs(draft.amount)),
+                  unit: t(`calc.${draft.calc}`),
+                  days: draft.threshold_days,
+                })}
+              {draft.event === "damage" &&
+                t("rules.previewDamage", {
+                  amount: formatSum(Math.abs(draft.amount)),
+                  unit: t(`calc.${draft.calc}`),
+                })}
+              {/* Qamrov — kimga tegishi ham oldindan ko'rinsin. */}
+              <span className="ml-1 opacity-80">
+                ·{" "}
+                {draft.scope_type === "global"
+                  ? t("rules.previewAll")
+                  : t("rules.courierCount", { count: draft.scope_ids.length })}
+              </span>
             </div>
           </div>
         )}

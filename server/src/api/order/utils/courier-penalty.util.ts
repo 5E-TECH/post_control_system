@@ -56,6 +56,8 @@ export interface PenaltyRule {
   id: string;
   scope_type: string;
   scope_id: string | null;
+  /** `courier` qamrovida KO'P nishon; `scope_id` eski qoidalar fallbacki. */
+  scope_ids?: string[] | null;
   event: string;
   threshold_days: number;
   calc: string;
@@ -136,6 +138,39 @@ function scopeRank(scope: string): number {
   return 0;
 }
 
+/**
+ * Qoida qamragan kuryerlar ro'yxati (yagona manba).
+ *
+ * `scope_ids` ustun keladi; bo'sh bo'lsa eski `scope_id` ga tushadi —
+ * migratsiya mavjud qoidalarni massivga ko'chirgan, lekin ikki devor
+ * saqlanadi: xom SQL bilan kiritilgan qator ham ishlashda davom etsin.
+ */
+function courierTargetsOf(rule: PenaltyRule): string[] {
+  const many = (rule.scope_ids ?? []).filter(Boolean).map(String);
+  if (many.length) return many;
+  return rule.scope_id ? [String(rule.scope_id)] : [];
+}
+
+/**
+ * QAMROV TORLIGI — kichik ro'yxat ustun keladi.
+ *
+ * ⚠️ NEGA KERAK. `courier` qamrovi endi BIR NECHTA kuryerni qamrashi
+ * mumkin, ya'ni bitta kuryer ikkala qoidaga ham tushishi mumkin:
+ * «mana shu 10 kuryerga» va «aynan mana shu kuryerga». Ikkalasi ham
+ * `scopeRank = 3` bo'lgani uchun tanlov `priority` ga, u teng bo'lsa
+ * esa «eng yangisi» ga qolardi — admin uchun bu TAXMIN QILIB
+ * BO'LMAYDIGAN natija.
+ *
+ * Shuning uchun ayni darajada TOR ro'yxat ustun: 1 kuryerlik qoida
+ * 10 kuryerlik qoidani yengadi. Bu intuitiv («aniqrog'i ustun keladi»)
+ * va deterministik.
+ */
+function scopeWidth(rule: PenaltyRule): number {
+  if (rule.scope_type !== CourierPenaltyScope.COURIER) return Number.MAX_SAFE_INTEGER;
+  const n = courierTargetsOf(rule).length;
+  return n > 0 ? n : Number.MAX_SAFE_INTEGER;
+}
+
 /** Qoida shu kuryer/viloyat va shu paytga tegishlimi. */
 function matches(
   rule: PenaltyRule,
@@ -151,7 +186,7 @@ function matches(
 
   if (rule.scope_type === CourierPenaltyScope.GLOBAL) return true;
   if (rule.scope_type === CourierPenaltyScope.COURIER)
-    return String(rule.scope_id) === String(courierId);
+    return courierTargetsOf(rule).includes(String(courierId));
   if (rule.scope_type === CourierPenaltyScope.REGION)
     return regionId != null && String(rule.scope_id) === String(regionId);
   return false;
@@ -173,8 +208,19 @@ export function pickRule(
   return found.sort(
     (a, b) =>
       scopeRank(b.scope_type) - scopeRank(a.scope_type) ||
+      // Ayni darajada TOR qamrov ustun: 1 kuryerlik qoida 10 kuryerlikni yengadi.
+      scopeWidth(a) - scopeWidth(b) ||
       int(b.priority) - int(a.priority) ||
-      int(b.active_from) - int(a.active_from),
+      int(b.active_from) - int(a.active_from) ||
+      /**
+       * ⚠️ YAKUNIY, ANIQ TIE-BREAK. Shusiz hamma kalit teng bo'lgan ikki
+       * qoidadan qaysi biri g'olib bo'lishini massiv tartibi, ya'ni
+       * amalda Postgres heap tartibi hal qilardi — begona `UPDATE` dan
+       * keyin `ctid` o'zgarsa kuryerdan yechiladigan summa ham
+       * o'zgarardi. Ko'p kuryerli ro'yxatlar KESISHISHI normal hol,
+       * shuning uchun bu endi nazariy emas.
+       */
+      String(a.id).localeCompare(String(b.id)),
   )[0];
 }
 
@@ -353,8 +399,12 @@ export function computeCourierAdjustment(
     .sort(
       (a, b) =>
         scopeRank(b.scope_type) - scopeRank(a.scope_type) ||
+        // Kechikish zanjiridagi bilan AYNI qoida: tor qamrov ustun.
+        scopeWidth(a) - scopeWidth(b) ||
         int(a.threshold_days) - int(b.threshold_days) ||
-        int(b.priority) - int(a.priority),
+        int(b.priority) - int(a.priority) ||
+        // Yakuniy, aniq tie-break — `pickRule` dagi bilan bir xil sabab.
+        String(a.id).localeCompare(String(b.id)),
     );
 
   const bonusRule = bonusRules[0];
