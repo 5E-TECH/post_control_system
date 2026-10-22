@@ -7460,8 +7460,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         const deliveryPriceNum = Number(deliveryPrice) || 0;
         const finalTotalPrice = productPriceNum + deliveryPriceNum;
 
-        // QR kod token (tashqi QR koddan foydalanish)
-        const qrCodeToken = qrCode || generateCustomToken();
+        // QR kod token (tashqi QR koddan foydalanish). Ichki skan qidiruvlari
+        // (findByQrCode, kuryer skaneri, receiveWithScaner) kirishni
+        // normalizeQrToken bilan KICHIK harfga o'tkazib, aniq tenglik bilan
+        // izlaydi — shuning uchun tokenni ham shu shaklda saqlaymiz. Aks holda
+        // aralash registrli tashqi QR (masalan Butsy `pc_17zVBH...`) hech qachon
+        // topilmaydi.
+        const qrCodeToken = qrCode
+          ? normalizeQrToken(String(qrCode))
+          : generateCustomToken();
 
         // Izoh yaratish
         const orderComment = [
