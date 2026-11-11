@@ -57,6 +57,7 @@ import {
 } from './guards/carrier-throttler.guard';
 import { CarrierExceptionFilter } from './filters/carrier-exception.filter';
 import {
+  CARRIER_ORDER_STATUS_EXAMPLES,
   CARRIER_UUID_RE,
   CarrierCashboxQueryDto,
   CarrierCashboxResponseDto,
@@ -242,11 +243,18 @@ export class CarrierPublicController {
     description:
       'MAJBURIY (≤255 belgi). Har YANGI urinish (niyat) uchun YANGI kalit (masalan UUID). ' +
       'Ayni kalitni faqat shu so‘rovni qayta yuborishda ishlating (javob kelmadi, 409/429/5xx/504). ' +
-      'Ayni kalit boshqa amal/buyurtma/tana bilan → 422; eski urinish kaliti → 409 CARRIER_IDEMPOTENCY_KEY_STALE.',
+      'Ayni kalit boshqa amal/buyurtma/tana bilan → 422; eski urinish kaliti → 409 CARRIER_IDEMPOTENCY_KEY_STALE.' +
+      ' Swagger’da har sinov uchun YANGI UUID kiriting (masalan terminalda `uuidgen`) — maydon ataylab bo‘sh: bir kalitni takrorlasangiz 422/409 olasiz.',
+    // Misol ataylab YO'Q: "Try it out" maydonini doimiy kalit bilan to'ldirsa,
+    // sinovchi uni takrorlab 422/409 oladi.
+    schema: { type: 'string' },
   })
   @ApiOperation({
-    summary: 'Yetkazish natijasi: sold | partly_sold | cancelled | rollback',
+    summary:
+      'Buyurtma holatini yuborish: sotildi (sold), qisman (partly_sold), bekor (cancelled), rollback',
     description:
+      'Kuryeringiz posilkani topshirganda yoki topshira olmaganda shu so‘rovni yuboring — ' +
+      'bizda buyurtma holati darhol o‘zgaradi. ' +
       '`sold`, `partly_sold`, `cancelled` — faqat `waiting` holatida (avval `/carrier/scan`). ' +
       '`partly_sold` da `items` buyurtmaning HAR BIR qatorini va undan sotilgan donani o‘z ichiga ' +
       'oladi; `total_price` — mijoz olgan tovarlar qiymati. ' +
@@ -279,6 +287,9 @@ export class CarrierPublicController {
         },
       ],
     },
+    // Nomli misollar — Swagger UI'da "Examples" ro'yxati. Faqat JSON'da
+    // qoladi (`splitMultipartProofBodies` multipart'dan olib tashlaydi).
+    examples: CARRIER_ORDER_STATUS_EXAMPLES,
   })
   @ApiOkResponse({ type: CarrierStatusResponseDto })
   @ApiBadRequestResponse({
