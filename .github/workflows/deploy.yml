@@ -18,6 +18,8 @@ jobs:
   #     invariantini muhofaza qiladi (himoyalangan endpoint @AcceptRoles'siz qolmasin).
   #   • bekor-qaytarish darvozasi testlari — BLOKLOVCHI (yashil): bekor posilka
   #     market ruxsatisiz CLOSED bo'lmasligi invariantini muhofaza qiladi.
+  #   • Carrier API testlari — BLOKLOVCHI: tashqi yetkazuvchining pul amallari
+  #     (idempotentlik, egalik, qisman sotuv) va Elchi bilan umumiy kontrakt.
   #   • To'liq `npm test` — hozircha INFORMATSION (continue-on-error).
   #     ⚠️ 2026-10-05 holati: to'liq to'plam YASHIL (84 suite / 1080 test).
   #     Avvalgi izohdagi "3 ta suite oldindan qizil" ESKIRGAN edi. Bloklovchi
@@ -65,6 +67,19 @@ jobs:
         # qulflangan. Informatsion to'plamga qoldirilsa, yarim buzilgan
         # modul YASHIL deploy bilan prodga chiqib ketardi.
         run: npx jest src/api/courier-penalty src/api/order/utils/courier-penalty.util.spec.ts src/api/order/courier-penalty-wiring.spec.ts --ci
+
+      - name: 💼 Carrier API testlari (BLOKLOVCHI)
+        working-directory: server
+        # ⚠️ PULGA TEGADIGAN TASHQI API. Tashqi yetkazuvchi /api/v1/carrier/*
+        # orqali kuryer nomidan sotadi, bekor qiladi va rollback qiladi.
+        # Bu testlarda qulflangan: Idempotency-Key (bir kalit — bitta pul
+        # yozuvi, eski kalit — 409), egalik (begona buyurtma — 404),
+        # qisman sotuv qoidalari (yashirin narx tushirish yo'q), kalit/IP/
+        # kuryer faolligi guardi, xato kodlari va statik OpenAPI fayli
+        # (docs/carrier-openapi.json) koddan ajralmaganligi. Informatsion
+        # to'plamga qoldirilsa, provayder bilan kontrakt jimgina buzilib
+        # YASHIL deploy bilan prodga chiqib ketardi.
+        run: npx jest src/api/carrier src/api/post/post-carrier-receive.spec.ts --ci
 
       - name: 🧪 To'liq test to'plami (informatsion)
         working-directory: server
