@@ -6,6 +6,11 @@ import { Operation_type, Source_type } from 'src/common/enums';
 import { applyCashboxDelta } from 'src/common/database/cashbox-delta.util';
 import type { CashEntity } from 'src/core/entity/cash-box.entity';
 import { computeSellCashboxLegs, legFromDelta } from './sell-cashbox-legs.util';
+import {
+  computeMarketSettlement,
+  planMarketPayment,
+  SettlementStatusAction,
+} from './market-settlement.util';
 
 /**
  * `sellOrder`/`partlySold` dagi `updateCashbox` bilan AYNAN bir xil yo'l.
@@ -207,6 +212,89 @@ describe('computeSellCashboxLegs', () => {
         }
       }
     }
+  });
+});
+
+/**
+ * SOTUVDAN «TO'LANDI» GACHA — tuzatish to'lov oqimiga halaqit bermasin.
+ *
+ * Marketga to'lov `planMarketPayment` (`market_net`/`market_settled`)
+ * va CLICK_TO_MARKET (`to_be_paid`) orqali yopiladi. Ikkalasi ham bir xil
+ * summani ko'rishi SHART — aks holda biri buyurtmani 0 so'mga «to'langan»
+ * qilib, market puli kassada egasiz qolardi.
+ */
+describe("sotuvdan keyin market to'lovi buyurtmani yopadi", () => {
+  // Jonli holat: 40 000, market tarifi 0, kuryer tarifi narxdan yuqori.
+  const price = 40_000;
+  const marketTariff = 0;
+  const legs = computeSellCashboxLegs({
+    price,
+    marketTariff,
+    courierTariff: 45_000,
+  });
+  const marketNet = computeMarketSettlement({
+    total_price: price,
+    market_tariff: marketTariff,
+  });
+
+  it('to_be_paid market_net va kassa kirimi bilan bir xil', () => {
+    expect(legs.to_be_paid).toBe(marketNet);
+    expect(legs.market.delta).toBe(marketNet);
+  });
+
+  it("to'liq to'lov — PAID, qoldiq yo'q", () => {
+    const { plans, leftover } = planMarketPayment(
+      [
+        {
+          id: 'o1',
+          market_net: marketNet,
+          market_settled: 0,
+          paid_amount: 0,
+          is_open_status: true,
+        },
+      ],
+      legs.market.delta,
+    );
+    expect(plans).toEqual([
+      expect.objectContaining({
+        id: 'o1',
+        market_settled: 40_000,
+        paid_amount: 40_000,
+        status: SettlementStatusAction.CLOSE,
+      }),
+    ]);
+    expect(leftover).toBe(0);
+  });
+
+  it("bo'lib to'lash — avval PARTLY_PAID, keyin PAID", () => {
+    const first = planMarketPayment(
+      [
+        {
+          id: 'o1',
+          market_net: marketNet,
+          market_settled: 0,
+          paid_amount: 0,
+          is_open_status: true,
+        },
+      ],
+      15_000,
+    ).plans[0];
+    expect(first.status).toBe(SettlementStatusAction.PARTIAL);
+
+    const second = planMarketPayment(
+      [
+        {
+          id: 'o1',
+          market_net: marketNet,
+          market_settled: first.market_settled,
+          paid_amount: first.paid_amount,
+          is_open_status: true,
+        },
+      ],
+      25_000,
+    ).plans[0];
+    expect(second.status).toBe(SettlementStatusAction.CLOSE);
+    expect(second.paid_amount).toBe(40_000);
   });
 });
 
