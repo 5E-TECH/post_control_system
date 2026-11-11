@@ -4,6 +4,8 @@ import { Modal, Switch } from "antd";
 import { AlertTriangle, Power, ShieldOff } from "lucide-react";
 import { useCourierPenaltyAdmin } from "../../../shared/api/hooks/useCourierPenalty";
 import { useApiNotification } from "../../../shared/hooks/useApiNotification";
+import { formatDate, formatDateTime } from "../lib/penaltyFormat";
+import { TabError, TabLoading } from "../components/TabState";
 
 /**
  * MODULNI BOSHQARISH — yoqish/o'chirish va kuryer istisnolari.
@@ -24,7 +26,7 @@ const SettingsTab = () => {
 
   const { getConfig, getCouriers, setActive, setExempt } =
     useCourierPenaltyAdmin();
-  const { data: config, isLoading } = getConfig();
+  const { data: config, isLoading, isError, refetch } = getConfig();
   const { data: couriers } = getCouriers();
 
   const toggle = (next: boolean) => {
@@ -56,7 +58,8 @@ const SettingsTab = () => {
       .includes(search.trim().toLowerCase()),
   );
 
-  if (isLoading) return <div className="p-6 text-sm text-gray-500">…</div>;
+  if (isError) return <TabError onRetry={() => refetch()} />;
+  if (isLoading) return <TabLoading />;
 
   const active = !!config?.is_active;
 
@@ -107,7 +110,7 @@ const SettingsTab = () => {
             {t("settings.shadowSince")}:{" "}
             <b>
               {config?.shadow_since
-                ? new Date(config.shadow_since).toLocaleDateString()
+                ? formatDate(config.shadow_since)
                 : "—"}
             </b>
           </div>
@@ -120,10 +123,32 @@ const SettingsTab = () => {
             {t("settings.activatedAt")}:{" "}
             <b>
               {config?.activated_at
-                ? new Date(config.activated_at).toLocaleString()
+                ? formatDateTime(config.activated_at)
                 : "—"}
             </b>
           </div>
+        </div>
+
+        {/*
+          ⚠️ LANGAR OQIBATI OCHIQ YOZILADI. Ilgari bu yerda ikkita sana
+          turardi-yu, ular NIMANI anglatishi hech qayerda aytilmasdi.
+          Natijada modul yoqilgach ekran bo'sh ko'rinib, «ishlamayapti»
+          degan xulosa chiqarilardi — aslida langardan oldin jo'natilgan
+          buyurtmalar ataylab chetda qolgan edi. Ikkinchi jumla ham shu
+          qadar muhim: YOQISH tugmasi langarni BUGUNGA suradi, ya'ni
+          yoqilgan zahoti hisob noldan boshlanadi.
+        */}
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-900/50 dark:bg-amber-900/15">
+          <div className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+            {t("status.anchor")}:{" "}
+            <span className="tabular-nums">
+              {formatDate(config?.activated_at ?? config?.shadow_since ?? null)}
+            </span>
+          </div>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-amber-800/90 dark:text-amber-300/90">
+            <li>{t("settings.anchorMeaning")}</li>
+            <li>{t("settings.anchorOnEnable")}</li>
+          </ul>
         </div>
 
         {active && (

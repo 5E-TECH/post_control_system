@@ -14,6 +14,7 @@ import LedgerTab from "./tabs/LedgerTab";
 import RulesTab from "./tabs/RulesTab";
 import SummaryTab from "./tabs/SummaryTab";
 import SettingsTab from "./tabs/SettingsTab";
+import ModuleStatusBar from "./components/ModuleStatusBar";
 
 type TabKey = "overdue" | "summary" | "ledger" | "rules" | "settings";
 
@@ -59,13 +60,19 @@ const CourierPenaltyPage = () => {
           </div>
         </div>
 
-        <div className="mb-4 flex flex-wrap gap-2">
+        {/*
+          ⚠️ Tablar tor ekranda O'RALMAYDI, SURILADI. Beshta tab 390px
+          kenglikda ikki qatorga tushib, sarlavha bilan kontent orasini
+          ochib yuborardi; surilish tartibni saqlaydi va «yana tab bormi»
+          degan savolni ham yo'qotadi.
+        */}
+        <div className="-mx-1 mb-4 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => setParams({ tab: tab.key }, { replace: true })}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
+              className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
                 active === tab.key
                   ? "bg-purple-500 text-white shadow"
                   : "bg-white text-gray-600 hover:bg-gray-50 dark:bg-[#2A263D] dark:text-gray-300 dark:hover:bg-[#332D4A]"
@@ -76,6 +83,14 @@ const CourierPenaltyPage = () => {
             </button>
           ))}
         </div>
+
+        {/*
+          ⚠️ HOLAT SATRI HAR TABDA. Modulning sinov rejimi va langar sanasi
+          — ekranning bo'sh ko'rinishini tushuntiradigan ikki fakt; ular
+          avval faqat «Sozlamalar» tabida, ya'ni hech kim qaramaydigan
+          joyda turardi.
+        */}
+        <ModuleStatusBar />
 
         {active === "overdue" && <OverdueTab />}
         {active === "summary" && <SummaryTab />}

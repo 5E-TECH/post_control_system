@@ -97,9 +97,9 @@ describe('kechikkanlar ro‘yxati', () => {
     const r = await s.overdue({}, NOW);
     expect(r.couriers).toHaveLength(1);
     expect(r.couriers[0].overdue_count).toBe(2);
-    expect(r.couriers[0].oldest_late_days).toBe(6);
-    // 2 × (6 kun × 2 000)
-    expect(r.summary.penalty_now).toBe(24000);
+    expect(r.couriers[0].oldest_late_days).toBe(7);
+    // 2 × (7 kun × 2 000)
+    expect(r.summary.penalty_now).toBe(28000);
   });
 
   it('muddat ichidagilar ro‘yxatga tushmaydi', async () => {

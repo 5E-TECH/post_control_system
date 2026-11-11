@@ -15,6 +15,7 @@ interface ApiErrorResponse {
 }
 import { ExternalIntegrationService } from '../external-integration/external-integration.service';
 import { ExternalIntegrationEntity } from 'src/core/entity/external-integration.entity';
+import { qrFindUrl } from '../external-integration/utils/integration-url.util';
 
 @Injectable()
 export class ExternalProxyService {
@@ -63,17 +64,9 @@ export class ExternalProxyService {
         );
       }
 
-      // api_url to'g'ridan-to'g'ri ishlatiladi (masalan: https://api.adosh.uz)
-      // /qrorder/find qo'shiladi
-      let searchUrl: string;
-      const apiUrl = integration.api_url.replace(/\/+$/, ''); // Oxirgi / ni olib tashlash
-
-      // Agar api_url da /qrorder/find mavjud bo'lsa, qayta qo'shmaslik
-      if (apiUrl.includes('/qrorder/find')) {
-        searchUrl = apiUrl;
-      } else {
-        searchUrl = `${apiUrl}/qrorder/find`;
-      }
+      // api_url baza manzil (masalan: https://api.adosh.uz) — /qrorder/find
+      // qo'shiladi; api_url da allaqachon bo'lsa, qayta qo'shilmaydi
+      const searchUrl = qrFindUrl(integration.api_url);
 
       // Eslatma: ilgari bu yerda QR kod va token preview console'ga chiqarilardi —
       // bu maxfiy ma'lumot (token/PII) stdout'ga sizib chiqishi sabab olib tashlandi.
@@ -117,10 +110,7 @@ export class ExternalProxyService {
             );
           }
 
-          const apiUrl = integration.api_url.replace(/\/+$/, '');
-          const searchUrl = apiUrl.includes('/qrorder/find')
-            ? apiUrl
-            : `${apiUrl}/qrorder/find`;
+          const searchUrl = qrFindUrl(integration.api_url);
 
           const retryResponse = await firstValueFrom(
             this.httpService.post(

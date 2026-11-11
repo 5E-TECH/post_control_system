@@ -7,6 +7,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsArray,
   IsUUID,
   MaxLength,
   Min,
@@ -105,10 +106,21 @@ export class UpsertRuleDto {
   @IsEnum(CourierPenaltyScope)
   scope_type: CourierPenaltyScope;
 
-  @ApiPropertyOptional({ description: 'kuryer yoki viloyat id' })
+  @ApiPropertyOptional({ description: 'viloyat id (yoki eski bitta kuryer)' })
   @IsOptional()
   @IsUUID()
   scope_id?: string | null;
+
+  /**
+   * ⚠️ KO'P KURYER. `scope_type = courier` da shu ro'yxat ishlatiladi va
+   * BO'SH BO'LMASLIGI shart (`assertRule` tekshiradi). `scope_id` eski
+   * qoidalar uchun qolgan — yangi yozuvlar bu yerdan keladi.
+   */
+  @ApiPropertyOptional({ type: [String], description: 'kuryer id lari' })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  scope_ids?: string[] | null;
 
   @ApiProperty({ enum: CourierPenaltyEvent })
   @IsEnum(CourierPenaltyEvent)

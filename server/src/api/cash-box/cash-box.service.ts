@@ -3229,6 +3229,12 @@ export class CashBoxService
       [Source_type.BILLS]: "To'lovlar",
       [Source_type.INVESTOR_PAYOUT]: 'Investorga to\'lov',
       /**
+       * ⚠️ Klient lug'ati bilan BIR XIL so'z: `client/src/shared/const/
+       * source-type-labels.ts`. Yorliqsiz Excel eksportida shtraf
+       * qatori xom `courier_penalty` bo'lib ketardi.
+       */
+      [Source_type.COURIER_PENALTY]: 'Kechikish shtrafi',
+      /**
        * ⚠️ ESKI MA'LUMOT. Bu uch qiymat `cashbox_history_source_type_enum`
        * da bor va real qatorlar mavjud (asosiy kassada `investor_allocate`
        * — 5 qator, 2026-03), lekin hozirgi kodda ularni YOZADIGAN joy

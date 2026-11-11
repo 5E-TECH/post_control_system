@@ -176,6 +176,57 @@ const CHECKS: Check[] = [
       WHERE COALESCE(l.ledger_sum, 0) <> COALESCE(c.cash_sum, 0)
     `,
   },
+  {
+    code: 'I-CP7',
+    title: '`reversed_at` FAQAT rollback bekor qilishida qo\u2018yiladi',
+    why:
+      "`reversed_at` indeks uyasini BO'SHATADI, ya'ni buyurtma qayta hal " +
+      "qilinganda shtraf yangitdan yoziladi. Ikki xil bekor qilish ikki " +
+      "xil ma'no tashiydi: `sale_rolled_back` — sotuv qaytdi, soat davom " +
+      "etadi (uya bo'shaydi); boshqa sabab — ADMIN KECHIRIMI, u o'sha " +
+      "kechikishga berilgan va uya BAND qolishi kerak. Chalkashsa yo " +
+      "kechirim jim bekor bo'ladi, yo rollback orqali qochish yo'li " +
+      "qayta ochiladi.",
+    sql: `
+      SELECT e.id::text AS id, d.detail
+      FROM courier_penalty_entry e
+      JOIN LATERAL (
+        SELECT CASE
+          WHEN e.reversed_at IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM courier_penalty_entry w
+            WHERE w.waives_entry_id = e.id AND w.reason = 'sale_rolled_back')
+            THEN 'reversed_at bor, lekin sale_rolled_back waiveri YO''Q'
+          WHEN e.reversed_at IS NULL AND EXISTS (
+            SELECT 1 FROM courier_penalty_entry w
+            WHERE w.waives_entry_id = e.id AND w.reason = 'sale_rolled_back')
+            THEN 'rollback waiveri bor, lekin reversed_at BO''SH'
+          WHEN e.reversed_at IS NOT NULL AND EXISTS (
+            SELECT 1 FROM courier_penalty_entry w
+            WHERE w.waives_entry_id = e.id AND w.reason <> 'sale_rolled_back')
+            THEN 'admin kechirimi, lekin uya BO''SHATILGAN'
+          ELSE NULL END AS detail
+      ) d ON d.detail IS NOT NULL
+      WHERE e.kind <> 'waiver'
+    `,
+  },
+  {
+    code: 'I-CP8',
+    title: 'Bitta buyurtmada AYNI sababli IKKITA tirik shtraf yo‘q',
+    why:
+      "Bu `UQ_CP_ENTRY_ORDER_REASON` indeksining mazmuni. Indeks " +
+      "tasodifan tashlansa yoki sharti ozgarsa, takroriy sorov " +
+      "kuryerni AYNI kechikish uchun ikki marta jazolardi — darvoza esa " +
+      "buni sezmasdi, chunki daftar va kassa ikkalasi ham bir xil " +
+      "xato bolib teng qolardi.",
+    sql: `
+      SELECT (order_id::text || '/' || reason) AS id,
+             'tirik shtraf soni=' || COUNT(*) AS detail
+      FROM courier_penalty_entry
+      WHERE kind <> 'waiver' AND reversed_at IS NULL
+      GROUP BY order_id, reason
+      HAVING COUNT(*) > 1
+    `,
+  },
 ];
 
 async function main(): Promise<void> {

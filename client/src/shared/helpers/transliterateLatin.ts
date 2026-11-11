@@ -73,13 +73,46 @@ export function transliterateLatin(input: string | null | undefined): string {
 }
 
 /**
- * Skaner buffer regex'i uchun: belgi qabul qilinishi mumkinmi (Latin harf,
- * raqam, yoki Cyrillic harf).
+ * Skaner buffer regex'i uchun: belgi qabul qilinishi mumkinmi (bo'shliqsiz
+ * har qanday ko'rinadigan ASCII belgi, yoki Cyrillic harf).
+ *
+ * ⚠️ Tinish belgilarini TASHLAB YUBORMANG: tashqi saytlar QR qiymati o'zi
+ * kalit (masalan Butsy: `pc_17zVBH...-cTQ`, base64url). Avval faqat
+ * `[a-zA-Z0-9]` qabul qilinardi — `_` va `-` jimgina tushib qolib, tashqi API
+ * har skanga 404 qaytarardi.
  */
 export function isAcceptableScanChar(ch: string): boolean {
   if (ch.length !== 1) return false;
-  if (/[a-zA-Z0-9]/.test(ch)) return true;
+  if (/[\x21-\x7E]/.test(ch)) return true;
   // Cyrillic harflar — transliteratsiya orqali Latin'ga aylantirib qabul qilamiz
   if (RU_TO_EN_LOWER[ch.toLowerCase()]) return true;
   return false;
+}
+
+type ScanKeyEvent = Pick<KeyboardEvent, "key" | "code" | "shiftKey"> & {
+  getModifierState?: (key: string) => boolean;
+};
+
+/**
+ * `keydown` hodisasidan skaner bufferiga qo'shiladigan belgi (yoki `null`).
+ *
+ * Caps Lock yoqiq bo'lsa OS harf registrini teskari qiladi: skaner "A" uchun
+ * Shift+A yuboradi, ekranga "a" chiqadi. Registrga sezgir tashqi QR'lar
+ * (Butsy base64url) shunda 404 bo'lardi. Shu holatda harfni jismoniy tugma
+ * (`e.code` = `KeyA`) va Shift'dan tiklaymiz — bu RU layout'ni ham qoplaydi.
+ *
+ * Caps Lock o'chiq bo'lsa `e.key` o'zgarmasdan qaytadi (eski xatti-harakat).
+ * Eslatma: Caps Lock'ni o'zi kompensatsiya qiladigan ("autocaps") skanerda
+ * bu tuzatish registrni teskari qiladi — shuning uchun banner qoladi.
+ */
+export function scanCharFromKeyEvent(e: ScanKeyEvent): string | null {
+  if (e.key.length !== 1 || !isAcceptableScanChar(e.key)) return null;
+  const capsOn =
+    typeof e.getModifierState === "function" &&
+    e.getModifierState("CapsLock");
+  const letter = /^Key([A-Z])$/.exec(e.code || "");
+  if (capsOn && letter) {
+    return e.shiftKey ? letter[1] : letter[1].toLowerCase();
+  }
+  return e.key;
 }

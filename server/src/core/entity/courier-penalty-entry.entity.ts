@@ -52,6 +52,21 @@ export class CourierPenaltyEntryEntity extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   waives_entry_id: string | null;
 
+  /**
+   * Shtraf teskari qaytarilgan payt (ms). Bekor qilish qatori yozilganda
+   * ASL qatorga qo'yiladi.
+   *
+   * ⚠️ BU FAQAT BELGI EMAS — IDEMPOTENTLIK KALITINING BIR QISMI.
+   * `UQ_CP_ENTRY_ORDER_REASON` indeksi `reversed_at IS NULL` sharti bilan
+   * ishlaydi: tirik shtraf uyani band qiladi (takroriy so'rov ikkinchi
+   * marta jazolay olmaydi), bekor qilingani esa uyani bo'shatadi (qayta
+   * hal qilinganda kechikish yana hisoblanadi). Shu sababli uni faqat
+   * `reverseForOrder` qo'yadi — boshqa joydan yozilsa qochish yo'li
+   * ochilib ketadi.
+   */
+  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformer })
+  reversed_at: number | null;
+
   @Column({ type: 'uuid', nullable: true })
   applied_by: string | null;
 

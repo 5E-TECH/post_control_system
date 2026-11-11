@@ -56,6 +56,8 @@ export interface PenaltyRule {
   id: string;
   scope_type: string;
   scope_id: string | null;
+  /** `courier` qamrovida KO'P nishon; `scope_id` eski qoidalar fallbacki. */
+  scope_ids?: string[] | null;
   event: string;
   threshold_days: number;
   calc: string;
@@ -136,6 +138,39 @@ function scopeRank(scope: string): number {
   return 0;
 }
 
+/**
+ * Qoida qamragan kuryerlar ro'yxati (yagona manba).
+ *
+ * `scope_ids` ustun keladi; bo'sh bo'lsa eski `scope_id` ga tushadi —
+ * migratsiya mavjud qoidalarni massivga ko'chirgan, lekin ikki devor
+ * saqlanadi: xom SQL bilan kiritilgan qator ham ishlashda davom etsin.
+ */
+function courierTargetsOf(rule: PenaltyRule): string[] {
+  const many = (rule.scope_ids ?? []).filter(Boolean).map(String);
+  if (many.length) return many;
+  return rule.scope_id ? [String(rule.scope_id)] : [];
+}
+
+/**
+ * QAMROV TORLIGI — kichik ro'yxat ustun keladi.
+ *
+ * ⚠️ NEGA KERAK. `courier` qamrovi endi BIR NECHTA kuryerni qamrashi
+ * mumkin, ya'ni bitta kuryer ikkala qoidaga ham tushishi mumkin:
+ * «mana shu 10 kuryerga» va «aynan mana shu kuryerga». Ikkalasi ham
+ * `scopeRank = 3` bo'lgani uchun tanlov `priority` ga, u teng bo'lsa
+ * esa «eng yangisi» ga qolardi — admin uchun bu TAXMIN QILIB
+ * BO'LMAYDIGAN natija.
+ *
+ * Shuning uchun ayni darajada TOR ro'yxat ustun: 1 kuryerlik qoida
+ * 10 kuryerlik qoidani yengadi. Bu intuitiv («aniqrog'i ustun keladi»)
+ * va deterministik.
+ */
+function scopeWidth(rule: PenaltyRule): number {
+  if (rule.scope_type !== CourierPenaltyScope.COURIER) return Number.MAX_SAFE_INTEGER;
+  const n = courierTargetsOf(rule).length;
+  return n > 0 ? n : Number.MAX_SAFE_INTEGER;
+}
+
 /** Qoida shu kuryer/viloyat va shu paytga tegishlimi. */
 function matches(
   rule: PenaltyRule,
@@ -151,7 +186,7 @@ function matches(
 
   if (rule.scope_type === CourierPenaltyScope.GLOBAL) return true;
   if (rule.scope_type === CourierPenaltyScope.COURIER)
-    return String(rule.scope_id) === String(courierId);
+    return courierTargetsOf(rule).includes(String(courierId));
   if (rule.scope_type === CourierPenaltyScope.REGION)
     return regionId != null && String(rule.scope_id) === String(regionId);
   return false;
@@ -173,16 +208,39 @@ export function pickRule(
   return found.sort(
     (a, b) =>
       scopeRank(b.scope_type) - scopeRank(a.scope_type) ||
+      // Ayni darajada TOR qamrov ustun: 1 kuryerlik qoida 10 kuryerlikni yengadi.
+      scopeWidth(a) - scopeWidth(b) ||
       int(b.priority) - int(a.priority) ||
-      int(b.active_from) - int(a.active_from),
+      int(b.active_from) - int(a.active_from) ||
+      /**
+       * ⚠️ YAKUNIY, ANIQ TIE-BREAK. Shusiz hamma kalit teng bo'lgan ikki
+       * qoidadan qaysi biri g'olib bo'lishini massiv tartibi, ya'ni
+       * amalda Postgres heap tartibi hal qilardi — begona `UPDATE` dan
+       * keyin `ctid` o'zgarsa kuryerdan yechiladigan summa ham
+       * o'zgarardi. Ko'p kuryerli ro'yxatlar KESISHISHI normal hol,
+       * shuning uchun bu endi nazariy emas.
+       */
+      String(a.id).localeCompare(String(b.id)),
   )[0];
 }
 
 /**
  * Kechikkan KALENDAR kunlar soni (muddat ayirilgan, manfiy bo'lmaydi).
  *
- * ⚠️ `floor` — 4 kun 23 soat hali 4-kun. Kuryer soat farqi uchun
- * jazolanmasligi kerak.
+ * ── MUDDAT TO'LGAN ZAHOTI BIRINCHI KUN BOSHLANADI (2026-10-15 QARORI) ──
+ *
+ * `deadlineDays = 4` degani: jo'natilgandan 4 kun o'tgach kechikish
+ * BOSHLANADI. Ya'ni 3 kun 23 soat 59 daqiqa — hali muddat ichida (0),
+ * 4 kun to'lgan zahoti esa BIRINCHI kechikkan kun (1).
+ *
+ * ⚠️ AVVAL BIR KUN KECH BOSHLANARDI: formula `elapsed - deadline` edi va
+ * 4 kunda 0, 5 kunda 1 berardi — ya'ni amalda muhlat 5 kun bo'lib
+ * qolgandi. Egasi buni 2026-10-15 da tuzatishni so'radi: «3 kun 23 soatu
+ * 59 daqiqadan keyin hisoblanib boshlanishi kerak, chunki bu 4 kun o'tib
+ * bo'ldi degani».
+ *
+ * ⚠️ `floor` SAQLANADI — soat farqi uchun jazolanmaydi: 4 kun 23 soat
+ * ham 1-kun (5 kun to'lmaguncha 2-kun boshlanmaydi).
  */
 export function lateDaysOf(
   dispatchedAt: number | null | undefined,
@@ -193,7 +251,7 @@ export function lateDaysOf(
   const to = int(markedAt);
   if (from <= 0 || to <= 0 || to < from) return 0;
   const elapsed = Math.floor((to - from) / DAY_MS);
-  return Math.max(0, elapsed - Math.max(0, int(deadlineDays)));
+  return Math.max(0, elapsed - Math.max(0, int(deadlineDays)) + 1);
 }
 
 /**
@@ -233,11 +291,15 @@ export function deadlineStateOf(
 
   const deadline = Math.max(0, int(deadlineDays));
   /**
-   * `(muddat + 1)` — chunki `lateDaysOf` `floor` ishlatadi: o'tgan vaqt
-   * ayni `muddat` kun bo'lganda kechikish hali 0. Shtraf keyingi kun
-   * to'lgandagina boshlanadi.
+   * Shtraf muddat TO'LGAN zahoti boshlanadi: `muddat = 4` bo'lsa
+   * jo'natilgandan 4 kun o'tgan daqiqada birinchi kechikkan kun
+   * yoziladi. `lateDaysOf` bilan AYNI chegara — ikkisi ajralib qolsa
+   * kuryerga ko'rsatilgan sanoq daftardagi summadan farq qilardi.
+   *
+   * ⚠️ Avval `(muddat + 1)` edi va amalda muhlat bir kun uzun bo'lib
+   * qolgandi; 2026-10-15 da egasi qarori bilan tuzatildi.
    */
-  const penaltyStartsAt = from + (deadline + 1) * DAY_MS;
+  const penaltyStartsAt = from + deadline * DAY_MS;
   const msLeft = penaltyStartsAt - int(now);
   const lateDays = lateDaysOf(from, now, deadline);
 
@@ -337,8 +399,12 @@ export function computeCourierAdjustment(
     .sort(
       (a, b) =>
         scopeRank(b.scope_type) - scopeRank(a.scope_type) ||
+        // Kechikish zanjiridagi bilan AYNI qoida: tor qamrov ustun.
+        scopeWidth(a) - scopeWidth(b) ||
         int(a.threshold_days) - int(b.threshold_days) ||
-        int(b.priority) - int(a.priority),
+        int(b.priority) - int(a.priority) ||
+        // Yakuniy, aniq tie-break — `pickRule` dagi bilan bir xil sabab.
+        String(a.id).localeCompare(String(b.id)),
     );
 
   const bonusRule = bonusRules[0];

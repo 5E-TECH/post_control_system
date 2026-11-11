@@ -17,6 +17,7 @@ import {
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { Order_status } from 'src/common/enums';
 import { ExternalIntegrationService } from '../external-integration/external-integration.service';
+import { statusSyncUrl } from '../external-integration/utils/integration-url.util';
 import { successRes, catchError } from 'src/infrastructure/lib/response';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { JwtPayload } from 'src/common/utils/types/user.type';
@@ -335,16 +336,14 @@ export class IntegrationSyncService {
       const token =
         await this.externalIntegrationService.getValidToken(integration);
 
-      // API endpoint ni tayyorlash
+      // API endpoint ni tayyorlash (api_url da /qrorder/find qolgan bo'lsa ham
+      // baza manzilga ulanadi — qarang integration-url.util)
       const config = integration.status_sync_config;
-      let endpoint = config.endpoint.replace('{id}', job.external_order_id);
-
-      // Agar endpoint / bilan boshlanmasa, qo'shish
-      if (!endpoint.startsWith('/')) {
-        endpoint = '/' + endpoint;
-      }
-
-      const url = integration.api_url.replace(/\/+$/, '') + endpoint;
+      const url = statusSyncUrl(
+        integration.api_url,
+        config.endpoint,
+        job.external_order_id,
+      );
 
       this.logger.log(
         `🌐 Sync request: ${config.method} ${url} | Order: #${job.external_order_id} | Payload: ${JSON.stringify(job.payload)}`,
