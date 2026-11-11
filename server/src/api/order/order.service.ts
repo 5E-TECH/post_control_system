@@ -11,6 +11,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { RollbackOrderDto, RollbackTarget } from './dto/rollback-order.dto';
 import { computeMarketSettlement } from './utils/market-settlement.util';
+import { computeSellCashboxLegs } from './utils/sell-cashbox-legs.util';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrderEntity } from 'src/core/entity/order.entity';
@@ -3028,101 +3029,50 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           : [],
       );
 
-      let to_be_paid = 0;
-      let courier_to_be_paid = 0;
-
       const price = Number(order.total_price);
 
-      // === CASE 1: 0 so'mlik ===
-      if (price === 0) {
-        await updateCashbox(
-          marketCashbox,
-          Operation_type.EXPENSE,
-          marketTarif,
-          order.id,
-          Source_type.SELL,
-          '0 so‘mlik mahsulot sotuvi',
-          courier.id,
-        );
-        await updateCashbox(
-          courierCashbox,
-          Operation_type.EXPENSE,
-          courierTarif,
-          order.id,
-          Source_type.SELL,
-          '0 so‘mlik mahsulot sotuvi',
-          courier.id,
-        );
-      }
-      // === CASE 2: total_price < courierTarif ===
-      else if (price < courierTarif) {
-        await updateCashbox(
-          marketCashbox,
-          Operation_type.EXPENSE,
-          marketTarif - price,
-          order.id,
-          Source_type.SELL,
-          `${price} so'mlik mahsulot sotuvi`,
-          courier.id,
-        );
-        await updateCashbox(
-          courierCashbox,
-          Operation_type.EXPENSE,
-          courierTarif - price,
-          order.id,
-          Source_type.SELL,
-          `${price} so'mlik mahsulot sotuvi`,
-          courier.id,
-        );
-      }
-      // === CASE 3: total_price < marketTarif ===
-      else if (price < marketTarif) {
-        courier_to_be_paid = price - courierTarif;
-        await updateCashbox(
-          marketCashbox,
-          Operation_type.EXPENSE,
-          marketTarif - price,
-          order.id,
-          Source_type.SELL,
-          `${price} so'mlik mahsulot sotuvi`,
-          courier.id,
-        );
-        await updateCashbox(
-          courierCashbox,
-          Operation_type.INCOME,
-          courier_to_be_paid,
-          order.id,
-          Source_type.SELL,
-          `${price} so'mlik mahsulot sotuvi`,
-          courier.id,
-        );
-      }
-      // === CASE 4: Normal case ===
-      else {
-        to_be_paid = price - marketTarif;
-        courier_to_be_paid = price - courierTarif;
+      /**
+       * ⚠️ YO'NALISH `narx − tarif` ISHORASIDAN HOSIL QILINADI.
+       *
+       * Avval to'rt shox yo'nalishni qotirib yozardi va «arzon» shox market
+       * tarifini kuryer tarifidan kichik deb faraz qilardi. Kuryer tarifi
+       * > narx > market tarifi bo'lganda (masalan market tarifi 0) market
+       * oyog'i manfiy `EXPENSE` bo'lib, ishora darvozasi BUTUN sotuvni
+       * yiqitardi. Batafsil: `sell-cashbox-legs.util.ts`.
+       */
+      const legs = computeSellCashboxLegs({
+        price,
+        marketTariff: marketTarif,
+        courierTariff: courierTarif,
+      });
+      const legComment =
+        legs.kind === 'zero'
+          ? '0 so‘mlik mahsulot sotuvi'
+          : legs.kind === 'below_tariff'
+            ? `${price} so'mlik mahsulot sotuvi`
+            : finalComment;
 
-        await updateCashbox(
-          marketCashbox,
-          Operation_type.INCOME,
-          to_be_paid,
-          order.id,
-          Source_type.SELL,
-          finalComment,
-          courier.id,
-        );
-        await updateCashbox(
-          courierCashbox,
-          Operation_type.INCOME,
-          courier_to_be_paid,
-          order.id,
-          Source_type.SELL,
-          finalComment,
-          courier.id,
-        );
-      }
+      // Tartib muhim: MARKET birinchi — `marketCashboxWrite` langari.
+      await updateCashbox(
+        marketCashbox,
+        legs.market.operation,
+        legs.market.amount,
+        order.id,
+        Source_type.SELL,
+        legComment,
+        courier.id,
+      );
+      await updateCashbox(
+        courierCashbox,
+        legs.courier.operation,
+        legs.courier.amount,
+        order.id,
+        Source_type.SELL,
+        legComment,
+        courier.id,
+      );
 
-      const netToBePaid = Math.max(Number(to_be_paid) || 0, 0); // target summa o'zgarmaydi
+      const netToBePaid = legs.to_be_paid; // target summa o'zgarmaydi
       const currentPaid = Math.min(
         Math.max(Number(order.paid_amount) || 0, 0),
         netToBePaid,
@@ -4043,8 +3993,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       // 5️⃣ Common vars
       const price = Number(totalPrice);
-      let to_be_paid = 0;
-      let courier_to_be_paid = 0;
 
       const finalComment = generateComment(
         order.comment || '',
@@ -4175,91 +4123,47 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         }
       }
 
-      // 7️⃣ Cashbox logikasi (o‘zgarmagan)
-      if (price === 0) {
-        await updateCashbox(
-          marketCashbox,
-          Operation_type.EXPENSE,
-          marketTarif,
-          order.id,
-          Source_type.SELL,
-          `0 so‘mlik mahsulot qisman sotuvi`,
-          courier.id,
-        );
-        await updateCashbox(
-          courierCashbox,
-          Operation_type.EXPENSE,
-          courierTarif,
-          order.id,
-          Source_type.SELL,
-          `0 so‘mlik mahsulot qisman sotuvi`,
-          courier.id,
-        );
-      } else if (price < courierTarif) {
-        await updateCashbox(
-          marketCashbox,
-          Operation_type.EXPENSE,
-          marketTarif - price,
-          order.id,
-          Source_type.SELL,
-          `${price} so‘mlik mahsulot qisman sotuvi`,
-          courier.id,
-        );
-        await updateCashbox(
-          courierCashbox,
-          Operation_type.EXPENSE,
-          courierTarif - price,
-          order.id,
-          Source_type.SELL,
-          `${price} so‘mlik mahsulot qisman sotuvi`,
-          courier.id,
-        );
-      } else if (price < marketTarif) {
-        courier_to_be_paid = price - courierTarif;
-        await updateCashbox(
-          marketCashbox,
-          Operation_type.EXPENSE,
-          marketTarif - price,
-          order.id,
-          Source_type.SELL,
-          `${price} so‘mlik mahsulot qisman sotuvi`,
-          courier.id,
-        );
-        await updateCashbox(
-          courierCashbox,
-          Operation_type.INCOME,
-          courier_to_be_paid,
-          order.id,
-          Source_type.SELL,
-          `${price} so‘mlik mahsulot qisman sotuvi`,
-          courier.id,
-        );
-      } else {
-        to_be_paid = price - marketTarif;
-        courier_to_be_paid = price - courierTarif;
+      // 7️⃣ Cashbox logikasi — `sellOrder` bilan BIR XIL util.
+      //
+      // ⚠️ Yo'nalish `narx − tarif` ishorasidan hosil qilinadi. Avval bu
+      // yerda `sellOrder` dagi to'rt shoxning aynan nusxasi turardi va
+      // kuryer tarifi > narx > market tarifi bo'lganda market oyog'i manfiy
+      // `EXPENSE` bo'lib, qisman sotuv ham yiqilardi.
+      // Batafsil: `sell-cashbox-legs.util.ts`.
+      const legs = computeSellCashboxLegs({
+        price,
+        marketTariff: marketTarif,
+        courierTariff: courierTarif,
+      });
+      const legComment =
+        legs.kind === 'zero'
+          ? `0 so‘mlik mahsulot qisman sotuvi`
+          : legs.kind === 'below_tariff'
+            ? `${price} so‘mlik mahsulot qisman sotuvi`
+            : finalComment;
 
-        await updateCashbox(
-          marketCashbox,
-          Operation_type.INCOME,
-          to_be_paid,
-          order.id,
-          Source_type.SELL,
-          finalComment,
-          courier.id,
-        );
-        await updateCashbox(
-          courierCashbox,
-          Operation_type.INCOME,
-          courier_to_be_paid,
-          order.id,
-          Source_type.SELL,
-          finalComment,
-          courier.id,
-        );
-      }
+      // Tartib muhim: MARKET birinchi — `marketCashboxWrite` langari.
+      await updateCashbox(
+        marketCashbox,
+        legs.market.operation,
+        legs.market.amount,
+        order.id,
+        Source_type.SELL,
+        legComment,
+        courier.id,
+      );
+      await updateCashbox(
+        courierCashbox,
+        legs.courier.operation,
+        legs.courier.amount,
+        order.id,
+        Source_type.SELL,
+        legComment,
+        courier.id,
+      );
 
       // 8️⃣ Order update
-      const netToBePaid = Math.max(Number(to_be_paid) || 0, 0); // target summa o'zgarmaydi
+      const netToBePaid = legs.to_be_paid; // target summa o'zgarmaydi
       const currentPaid = Math.min(
         Math.max(Number(order.paid_amount) || 0, 0),
         netToBePaid,
