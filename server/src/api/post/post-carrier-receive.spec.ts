@@ -366,7 +366,13 @@ describe('PostService.reassignCourier — carrier qoidasi', () => {
     expect(manager.update).toHaveBeenCalledWith(
       PostEntity,
       { id: POST_ID },
-      { courier_id: id(62) },
+      {
+        courier_id: id(62),
+        // Shtraf soati yangi kuryer uchun qayta boshlanadi (2026-10-15,
+        // `4c5d2d17`). Carrier qoidasiga aloqasi yo'q — oddiy qayta
+        // biriktirishning bir qismi.
+        courier_assigned_at: expect.any(Number),
+      },
     );
     expect(qr.commitTransaction).toHaveBeenCalled();
     // Log ham avvalgidek — carrier metadata'siz.
