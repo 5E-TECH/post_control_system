@@ -218,6 +218,15 @@ kontraktini yozishdan oldin bittasi tanlanishi shart.
 > PCS'dagi LDG virtual-kuryer modeli **o'zgartirilmaydi** — u prod'da ishlayapti.
 > Qaror faqat **yangi carrier kontrakti** uchun.
 
+> **2026-11 yangilanish.** Yangi carrier kontrakti uchun **PCS modeli
+> (kuryer-kassa)** tanlandi (Q12): tashqi yetkazuvchi BeePost'da bitta kuryer,
+> sotuv puli uning `FOR_COURIER` kassasiga yoziladi va naqd topshirilganda
+> chiqim bo'ladi. Elchi'ning o'zi chiqargan Carrier API ham aynan shu modelda
+> ishlaydi, shuning uchun provayder ikkala tizimga bitta kod bilan ulanadi.
+> Yuqoridagi tavsiya (status-only qarz daftari) shu kontraktga qo'llanmaydi;
+> jadval tarix uchun qoldirildi. Batafsil:
+> [`15-carrier-api.md`](15-carrier-api.md).
+
 ---
 
 ## 7. Bosqichlar
@@ -239,6 +248,13 @@ kontraktini yozishdan oldin bittasi tanlanishi shart.
 (kabinasiz operatorlar integratsiyani boshqara olmaydi). E — birinchi tashqi cargo so'ralganda.
 
 **Kritik yo'l:** A va B parallel ketishi mumkin (turli odam). C — B tugagach.
+
+> **2026-11 yangilanish.** E bosqichidagi carrier e'loni PCS'da ham
+> qilindi: alohida `PCS_CARRIER_API.md` yozilmadi — uning o'rniga Elchi
+> Carrier API'ning BeePost nashri [`CARRIER_API.md`](../../CARRIER_API.md)
+> (SPEC rejimi, pull: provayder bizning `/api/v1/carrier/*` ni chaqiradi).
+> Push yo'nalishidagi Elchi/LDG ko'prigiga tegilmadi. Reja va arxitektura:
+> [`15-carrier-api.md`](15-carrier-api.md).
 
 ---
 

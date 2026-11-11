@@ -71,6 +71,10 @@ import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { Group_type } from 'src/common/enums';
 import { cancelReturnStage } from 'src/common/utils/cancel-return.util';
+import {
+  CARRIER_COURIER_LOGIN_MESSAGE,
+  CARRIER_EXTERNAL_PROVIDER,
+} from '../carrier/carrier-account.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { DistrictEntity } from 'src/core/entity/district.entity';
 import { DistrictRepository } from 'src/core/repository/district.repository';
@@ -1761,6 +1765,18 @@ export class UserService implements OnModuleInit {
       if (!courier) {
         throw new NotFoundException('User not found');
       }
+      /**
+       * ⚠️ Carrier kuryeriga parol QO'YILMAYDI: bog'lashda u ataylab hech
+       * kim bilmaydigan qiymatga almashtirilgan. Ma'lum parol UI orqali
+       * kalitsiz amal qilish yo'lini qayta ochardi. Boshqa maydonlar
+       * (nom, telefon, tarif, hudud) avvalgidek o'zgaradi.
+       */
+      if (password && courier.external_provider === CARRIER_EXTERNAL_PROVIDER) {
+        throw new BadRequestException(
+          "Carrier API ga bog'langan kuryerga parol o'rnatib bo'lmaydi — u faqat API kaliti bilan ishlaydi. " +
+            "Kerak bo'lsa avval carrier akkauntini o'chiring (DELETE /api/v1/carrier-accounts/:id)",
+        );
+      }
       const beforeStatus = courier.status;
 
       // Update qilganda telefon nomer databasada bor yoki yo'qligini tekshirish
@@ -2064,6 +2080,15 @@ export class UserService implements OnModuleInit {
       const { password, ...otherFields } = selfUpdateDto;
       const myProfile = await this.userRepo.findOne({ where: { id: user.id } });
       if (!myProfile) throw new NotFoundException('Your infos not found');
+      /**
+       * ⚠️ Carrier kuryerining qonuniy UI sessiyasi YO'Q. Bog'lashdan oldin
+       * ochilib qolgan access token bilan bu yerda eski parolsiz yangi parol
+       * qo'yib, doimiy login olish mumkin edi (kalit, IP ro'yxati va
+       * akkaunt o'chirgichini chetlab o'tadigan yo'l).
+       */
+      if (myProfile.external_provider === CARRIER_EXTERNAL_PROVIDER) {
+        throw new ForbiddenException(CARRIER_COURIER_LOGIN_MESSAGE);
+      }
       if (otherFields.phone_number) {
         const phoneNumber = await this.userRepo.findOne({
           where: {
@@ -2184,7 +2209,12 @@ export class UserService implements OnModuleInit {
   }
 
   private logFailedLogin(
-    reason: 'unknown_phone' | 'blocked' | 'wrong_password' | 'market_blocked',
+    reason:
+      | 'unknown_phone'
+      | 'blocked'
+      | 'wrong_password'
+      | 'market_blocked'
+      | 'carrier_api_only',
     phone: string,
     req?: Request,
     userId?: string,
@@ -2398,6 +2428,21 @@ export class UserService implements OnModuleInit {
         this.logFailedLogin('wrong_password', phone_number, req, user.id);
         throw new BadRequestException('Phone number or password incorrect');
       }
+      /**
+       * ⚠️ CARRIER KURYERI UI'GA KIRMAYDI. Tashqi yetkazuvchi faqat
+       * `X-Api-Key` bilan ishlaydi (`/api/v1/carrier/*`): kalit, IP ro'yxati,
+       * akkaunt o'chirgichi, Idempotency-Key va adapter pul qoidalari
+       * (qo'shimcha xarajat taqiqi, qisman sotuv chegaralari) FAQAT o'sha
+       * yo'lda. Kuryer sessiyasi esa `/order/sell/:id` va h.k. orqali
+       * ularning hammasini aylanib o'tadi — `external_provider` bo'lgani
+       * uchun `extraCost` isbotsiz va market tasdig'isiz kassaga yozilardi.
+       * Tekshiruv parol mos kelgandan KEYIN: parolni bilmagan odam bu raqam
+       * carrier'niki ekanini bilib olmasin.
+       */
+      if (user.external_provider === CARRIER_EXTERNAL_PROVIDER) {
+        this.logFailedLogin('carrier_api_only', phone_number, req, user.id);
+        throw new BadRequestException(CARRIER_COURIER_LOGIN_MESSAGE);
+      }
       const { id, role, status } = user;
       const payload: JwtPayload = { id, role, status };
       const accessToken = await this.token.generateAccessToken(payload);
@@ -2579,6 +2624,16 @@ export class UserService implements OnModuleInit {
       if (!user || user.status === Status.INACTIVE) {
         res.clearCookie('refreshToken');
         throw new UnauthorizedException('User not found or inactive');
+      }
+      /**
+       * ⚠️ Carrier'ga bog'lashdan OLDIN ochilgan sessiya (masalan admin
+       * kuryer akkauntini sinab ko'rgan) bog'lashdan keyin ham refresh
+       * cookie bilan yangi access token olib turardi — parol almashgani
+       * stateless JWT'ga ta'sir qilmaydi. Endi bu yerda uziladi.
+       */
+      if (user.external_provider === CARRIER_EXTERNAL_PROVIDER) {
+        res.clearCookie('refreshToken');
+        throw new UnauthorizedException(CARRIER_COURIER_LOGIN_MESSAGE);
       }
       /**
        * ⚠️ BU DARVOZA TIRIK SESSIYANI UZADI.

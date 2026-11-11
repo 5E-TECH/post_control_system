@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -14,6 +15,7 @@ import { OrderRepository } from 'src/core/repository/order.repository';
 import {
   Between,
   DataSource,
+  EntityManager,
   In,
   IsNull,
   Not,
@@ -52,6 +54,7 @@ import { MarketplaceEventType } from '../marketplace/marketplace.enums';
 import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
 import { RegionEntity } from 'src/core/entity/region.entity';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
+import { CARRIER_EXTERNAL_PROVIDER } from '../carrier/carrier-account.service';
 
 // Eski pochtalar (old posts) ro'yxatiga beriladigan filtrlar.
 export interface OldPostsFilter {
@@ -72,6 +75,44 @@ function buildCreatedAtRange(startDate?: string, endDate?: string) {
     toUzbekistanTimestamp(from, false),
     toUzbekistanTimestamp(to, true),
   );
+}
+
+/** Super kuryerning pochta hududi uchun muzlatiladigan kuryer tariflari. */
+interface SuperCourierTariffs {
+  home: number | null;
+  center: number | null;
+}
+
+/** Buyurtma yetkazish turiga mos muzlatiladigan tarif (oddiy kuryerda `null`). */
+function pickSuperCourierTariff(
+  tariffs: SuperCourierTariffs | null,
+  whereDeliver: Where_deliver | string | null | undefined,
+): number | null {
+  if (!tariffs) return null;
+  return whereDeliver === Where_deliver.CENTER ? tariffs.center : tariffs.home;
+}
+
+/**
+ * Carrier reassign: muzlatilgan `courier_tariff` carrier uchun BEGONAmi.
+ * `null` — sotuv carrier'ning o'z `users.tariff_*` ini oladi; `0` —
+ * marketplace ko'p qutili buyurtmaning to'lovsiz qutisi (buyurtma xossasi,
+ * kuryerga bog'liq emas); carrier'ning o'z stavkasiga teng qiymat — zararsiz.
+ * Qolgan har qanday qiymat boshqa kuryer uchun muzlatilgan.
+ */
+function isForeignFrozenTariff(
+  frozen: number | string | null | undefined,
+  own: number | string | null | undefined,
+): boolean {
+  if (frozen === null || frozen === undefined) return false;
+  const value = Number(frozen);
+  if (value === 0) return false;
+  return own === null || own === undefined || value !== Number(own);
+}
+
+/** Xato xabari uchun eng ko'pi 5 ta buyurtma namunasi (+ qolganlari soni). */
+function sampleOrders<T>(rows: T[], label: (row: T) => string): string {
+  const sample = rows.slice(0, 5).map(label).join(', ');
+  return rows.length > 5 ? `${sample} va yana ${rows.length - 5} ta` : sample;
 }
 
 // Pochta LDG'ga jo'natilganda buyurtmalar orasidagi pauza (ms).
@@ -821,6 +862,18 @@ export class PostService {
         );
       }
 
+      // Carrier (tashqi yetkazuvchi) ishtirok etsa — qo'shimcha qoidalar.
+      // Oddiy kuryerlar orasidagi o'tkazishda bu shox UMUMAN ishlamaydi.
+      const carrierReassign =
+        oldCourier?.external_provider === CARRIER_EXTERNAL_PROVIDER ||
+        newCourier.external_provider === CARRIER_EXTERNAL_PROVIDER
+          ? await this.prepareCarrierReassign(
+              queryRunner.manager,
+              post,
+              newCourier,
+            )
+          : null;
+
       // Kuryerni o'zgartirish — update() ishlatamiz
       // save() da yuklangan courier relation yangi courier_id ni bekor qiladi
       await queryRunner.manager.update(
@@ -842,6 +895,15 @@ export class PostService {
         new_value: { courier_id: newCourierId, courier_name: newCourier.name },
         description: `Pochta kuryer o'zgartirildi: ${oldCourier?.name || '-'} → ${newCourier.name}`,
         user,
+        // Faqat carrier shoxida — oddiy o'tkazishning logi o'zgarmaydi.
+        ...(carrierReassign
+          ? {
+              metadata: {
+                carrier_reassign: true,
+                courier_tariff_refrozen: carrierReassign.tariffRefrozen,
+              },
+            }
+          : {}),
       });
 
       // Pochta ichidagi har bir buyurtma uchun ham log
@@ -873,6 +935,173 @@ export class PostService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /**
+   * CARRIER ISHTIROKIDAGI O'TKAZISH QOIDALARI (`reassignCourier` ichidan,
+   * o'sha tranzaksiyada). Faqat eski YOKI yangi kuryer `external_provider =
+   * 'carrier'` bo'lganda chaqiriladi — oddiy kuryerlar xulqi o'zgarmaydi.
+   *
+   * 0) Avval POCHTA, keyin buyurtmalar qulflanadi. Tartib qabul yo'llari
+   *    (`receiveSingleOrderForCourier`, `receivePost`: post FOR UPDATE →
+   *    buyurtma yozuvi) bilan BIR XIL bo'lishi shart: teskari tartibda
+   *    (buyurtmalar → post UPDATE) carrier skanerlayotgan pochtani o'tkazish
+   *    Postgres deadlock'iga (40P01) olib kelardi — biri admin'ga 500,
+   *    ikkinchisi carrier'ga 503. Qulf ostida SENT holati va kuryer qayta
+   *    tekshiriladi (`reassignCourier` dagi o'qish qulfsiz edi).
+   *
+   * 1) Buyurtmalar QULFLANADI va hammasi `yo'lda` / `kutilmoqda` bo'lishi
+   *    SHART. Sabab: qaytarish (`rollbackOrderToWaiting`) pulni pochtaning
+   *    JORIY kuryeridan yechadi. Sotilgan buyurtmali pochta carrier'dan
+   *    olinsa (yoki unga berilsa), sotuv puli bir kassada, qaytarish
+   *    tuzatmasi boshqasida qolardi — tashqi kompaniya bilan hisob buzilardi.
+   *    Qulf parallel sotuvni tekshiruv va tarif yozuvi orasiga kiritmaydi.
+   *
+   * 2) Yangi kuryer carrier bo'lsa — `courier_tariff` QAYTA MUZLATILADI,
+   *    `sendPost` bilan AYNAN bir xil yo'l (`resolveSuperCourierTariffs`).
+   *    Aks holda sotuvda eski kuryerning muzlatilgan hudud tarifi carrier'ga
+   *    to'lanardi (tashqi kompaniya boshqa stavka bilan hisoblaydi).
+   *
+   * 3) Qayta muzlatilmaydigan buyurtma (carrier super kuryer emas yoki shu
+   *    yetkazish turi uchun tarifi yo'q) da BEGONA muzlatilgan tarif bo'lsa
+   *    — RAD. Sotuv `order.courier_tariff` ni carrier'ning o'z
+   *    `users.tariff_*` idan USTUN ko'radi, ya'ni u carrier'ga to'lanib
+   *    ketardi. Qaror BUYURTMALARGA qarab qilinadi, eski kuryerga emas:
+   *    begona qiymat eski kuryer super bo'lmasa ham bo'ladi — sotilib
+   *    rollback qilingan buyurtma sotuvchi kuryer tarifini saqlaydi
+   *    (`rollbackOrderToWaiting` uni tozalamaydi), yoki pochta avval super
+   *    kuryerdan oddiy kuryerga o'tib, keyin carrier'ga o'tgan (S → A → C).
+   *    Begona EMAS: `null` (sotuv carrier tarifini oladi), `0` (marketplace
+   *    ko'p qutili buyurtmaning to'lovsiz qutisi — buyurtma xossasi) va
+   *    carrier'ning o'z stavkasiga teng qiymat. Asl (muzlatishdan oldingi)
+   *    qiymatni tiklab bo'lmaydi — chiqish yo'li: carrier kuryerini super
+   *    kuryer qilish (hudud tariflari bilan), shunda 2-band qayta muzlatadi.
+   */
+  private async prepareCarrierReassign(
+    manager: EntityManager,
+    post: PostEntity,
+    newCourier: UserEntity,
+  ): Promise<{ tariffRefrozen: number }> {
+    const lockedPost = await manager.findOne(PostEntity, {
+      where: { id: post.id },
+      select: ['id', 'status', 'courier_id'],
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!lockedPost || lockedPost.status !== Post_status.SENT) {
+      throw new BadRequestException(
+        "Faqat jo'natilgan pochtani o'tkazish mumkin",
+      );
+    }
+    if ((lockedPost.courier_id ?? null) !== (post.courier_id ?? null)) {
+      throw new ConflictException(
+        "Pochta kuryeri hozirgina o'zgardi — sahifani yangilab qayta urining",
+      );
+    }
+
+    const orders = await manager.find(OrderEntity, {
+      where: { post_id: post.id },
+      select: [
+        'id',
+        'order_number',
+        'status',
+        'where_deliver',
+        'courier_tariff',
+      ],
+      lock: { mode: 'pessimistic_write' },
+    });
+
+    const blocked = orders.filter(
+      (o) =>
+        o.status !== Order_status.ON_THE_ROAD &&
+        o.status !== Order_status.WAITING,
+    );
+    if (blocked.length) {
+      throw new BadRequestException(
+        "Carrier kuryeri ishtirok etgan pochtani faqat barcha buyurtmalari «yo'lda» yoki " +
+          `«kutilmoqda» holatida o'tkazish mumkin. Mos kelmaydi: ${sampleOrders(
+            blocked,
+            (o) => `#${o.order_number} (${o.status})`,
+          )}`,
+      );
+    }
+
+    if (newCourier.external_provider !== CARRIER_EXTERNAL_PROVIDER) {
+      return { tariffRefrozen: 0 };
+    }
+
+    const tariffs = await this.resolveSuperCourierTariffs(
+      manager,
+      newCourier,
+      post.region_id,
+    );
+
+    // Bir xil tarifli buyurtmalar bitta UPDATE bilan (pochtada yuzlab bo'lishi mumkin).
+    const idsByTariff = new Map<number, string[]>();
+    const foreign: OrderEntity[] = [];
+    for (const order of orders) {
+      const t = pickSuperCourierTariff(tariffs, order.where_deliver);
+      if (t != null) {
+        const ids = idsByTariff.get(t) ?? [];
+        ids.push(order.id);
+        idsByTariff.set(t, ids);
+        continue;
+      }
+      const own =
+        order.where_deliver === Where_deliver.CENTER
+          ? newCourier.tariff_center
+          : newCourier.tariff_home;
+      if (isForeignFrozenTariff(order.courier_tariff, own)) {
+        foreign.push(order);
+      }
+    }
+    if (foreign.length) {
+      throw new BadRequestException(
+        `Carrier kuryeriga o'tkazib bo'lmaydi: ${foreign.length} ta buyurtmada boshqa kuryer ` +
+          `uchun muzlatilgan tarif bor — u carrier'ga to'lanib ketardi (${sampleOrders(
+            foreign,
+            (o) => `#${o.order_number} — ${Number(o.courier_tariff)} so'm`,
+          )}). Carrier kuryerini super kuryer qiling va pochta hududi uchun ikkala ` +
+          "yetkazish turining tarifini kiriting — o'tkazishda tarif carrier stavkasiga " +
+          'qayta muzlatiladi',
+      );
+    }
+
+    let tariffRefrozen = 0;
+    for (const [tariff, ids] of idsByTariff) {
+      await manager.update(
+        OrderEntity,
+        { id: In(ids) },
+        { courier_tariff: tariff, updated_at: Date.now() },
+      );
+      tariffRefrozen += ids.length;
+    }
+    return { tariffRefrozen };
+  }
+
+  /**
+   * Super kuryer uchun pochta hududining kuryer tarifi (SNAPSHOT manbai).
+   * Hudud tarifi bo'lsa (`courier_regions`) — shu, yo'q bo'lsa kuryerning
+   * umumiy flat tarifiga (`users.tariff_*`) fallback. Oddiy kuryer — `null`
+   * (muzlatish yo'q, sotuv `users.tariff_*` ni o'zi oladi).
+   *
+   * `sendPost` va carrier `reassignCourier` ning YAGONA manbai — ikkalasi
+   * bir xil qiymatni muzlatishi shart.
+   */
+  private async resolveSuperCourierTariffs(
+    manager: EntityManager,
+    courier: UserEntity,
+    regionId: string | null | undefined,
+  ): Promise<SuperCourierTariffs | null> {
+    if (!courier.is_super_courier) return null;
+    const cr = regionId
+      ? await manager.findOne(CourierRegionEntity, {
+          where: { courier_id: courier.id, region_id: regionId },
+        })
+      : null;
+    return {
+      home: cr?.tariff_home ?? courier.tariff_home ?? null,
+      center: cr?.tariff_center ?? courier.tariff_center ?? null,
+    };
   }
 
   async sendPost(
@@ -997,20 +1226,11 @@ export class PostService {
        * oqimlari `order.courier_tariff` ni ustun ko'radi — shuning uchun bu
        * snapshot multi-region tarifni to'g'ri qo'llaydi (moliyaviy yadro o'zgarmaydi).
        */
-      let superTariffHome: number | null = null;
-      let superTariffCenter: number | null = null;
-      if (courier.is_super_courier) {
-        const cr = originalPost.region_id
-          ? await queryRunner.manager.findOne(CourierRegionEntity, {
-              where: {
-                courier_id: courierId,
-                region_id: originalPost.region_id,
-              },
-            })
-          : null;
-        superTariffHome = cr?.tariff_home ?? courier.tariff_home ?? null;
-        superTariffCenter = cr?.tariff_center ?? courier.tariff_center ?? null;
-      }
+      const superTariffs = await this.resolveSuperCourierTariffs(
+        queryRunner.manager,
+        courier,
+        originalPost.region_id,
+      );
 
       /**
        * 6️⃣ Tanlangan orderlarni yangi sentPost ga ko'chirish va ON_THE_ROAD qilish
@@ -1025,13 +1245,8 @@ export class PostService {
           status: { from: Order_status.RECEIVED, to: 'IN_TRANSIT' },
           actor: { type: 'operator' },
         });
-        if (courier.is_super_courier) {
-          const t =
-            order.where_deliver === Where_deliver.CENTER
-              ? superTariffCenter
-              : superTariffHome;
-          if (t != null) order.courier_tariff = t;
-        }
+        const t = pickSuperCourierTariff(superTariffs, order.where_deliver);
+        if (t != null) order.courier_tariff = t;
         await queryRunner.manager.save(order);
       }
 
@@ -1397,20 +1612,84 @@ export class PostService {
    * QR token oladi — frontend skanerdan to'g'ridan-to'g'ri token kelganda qulay.
    */
   async receiveOrderByQrTokenForCourier(token: string, user: JwtPayload) {
+    return this.receiveSingleOrderForCourier(
+      // Tokenga qarab buyurtmani topamiz — faqat qaysi pochta ekanini bilish
+      // uchun (Caps Lock / RU layout uchun normalize). Lock keyin postda.
+      (manager) =>
+        manager.findOne(OrderEntity, {
+          where: { qr_code_token: normalizeQrToken(token) },
+          select: ['id', 'post_id'],
+        }),
+      user,
+      {
+        notFoundMessage: 'QR koddagi buyurtma topilmadi',
+        description: `Kuryer QR skaner orqali bittalab qabul qildi`,
+        metadata: {
+          source: 'scanner',
+          scan_target: 'order',
+          token,
+        },
+      },
+    );
+  }
+
+  /**
+   * Buyurtmani ID bo'yicha bittalab qabul qilish — `receiveOrderByQrTokenForCourier`
+   * bilan AYNAN bir xil qoidalar (post SENT va shu kuryerniki, buyurtma
+   * ON_THE_ROAD → WAITING, marketplace OUT_FOR_DELIVERY hodisasi, oxirgisida
+   * post RECEIVED), faqat buyurtma id bo'yicha topiladi.
+   *
+   * NEGA KERAK (Carrier API). `qr_code_token` NOYOB EMAS (marketplace va
+   * tashqi integratsiya buyurtmalarida hamkor yorlig'i turadi). Token
+   * variantining o'zi egasiz qidiradi va takroriy tokenda BOSHQA qatorni
+   * olib "Pochta topilmadi" berardi. Carrier adapteri buyurtmani avval O'ZI
+   * egalik filtri bilan topadi, keyin aynan shu id bilan qabul qiladi.
+   */
+  async receiveOrderForCourierById(orderId: string, user: JwtPayload) {
+    return this.receiveSingleOrderForCourier(
+      (manager) =>
+        manager.findOne(OrderEntity, {
+          where: { id: orderId },
+          select: ['id', 'post_id'],
+        }),
+      user,
+      {
+        notFoundMessage: 'Buyurtma topilmadi',
+        description: `Kuryer buyurtmani bittalab qabul qildi (id bo'yicha)`,
+        metadata: {
+          source: 'scanner',
+          scan_target: 'order',
+          lookup: 'order_id',
+        },
+      },
+    );
+  }
+
+  /**
+   * Bittalab qabul qilishning YAGONA amalga oshirilishi (token va id
+   * variantlari uchun). Qidiruv usuli, 404 matni va audit yozuvigina farq
+   * qiladi — status mashinasi, qulflar va qaytadigan qiymat bir xil.
+   */
+  private async receiveSingleOrderForCourier(
+    locate: (
+      manager: EntityManager,
+    ) => Promise<Pick<OrderEntity, 'id' | 'post_id'> | null>,
+    user: JwtPayload,
+    audit: {
+      notFoundMessage: string;
+      description: string;
+      metadata: Record<string, unknown>;
+    },
+  ) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      // 1) Tokenga qarab buyurtmani topamiz — faqat qaysi pochta ekanini bilish
-      //    uchun (Caps Lock / RU layout uchun normalize). Lock keyin postda.
-      const normToken = normalizeQrToken(token);
-      const orderRef = await queryRunner.manager.findOne(OrderEntity, {
-        where: { qr_code_token: normToken },
-        select: ['id', 'post_id'],
-      });
+      // 1) Buyurtma havolasi (id + post_id) — lock keyin postda.
+      const orderRef = await locate(queryRunner.manager);
       if (!orderRef) {
-        throw new NotFoundException('QR koddagi buyurtma topilmadi');
+        throw new NotFoundException(audit.notFoundMessage);
       }
       if (!orderRef.post_id) {
         throw new BadRequestException(
@@ -1444,7 +1723,7 @@ export class PostService {
         relations: ['customer'],
       });
       if (!order) {
-        throw new NotFoundException('QR koddagi buyurtma topilmadi');
+        throw new NotFoundException(audit.notFoundMessage);
       }
       if (order.status !== Order_status.ON_THE_ROAD) {
         throw new BadRequestException(
@@ -1490,13 +1769,9 @@ export class PostService {
           status: Order_status.WAITING,
           post_id: post.id,
         },
-        description: `Kuryer QR skaner orqali bittalab qabul qildi`,
+        description: audit.description,
         user,
-        metadata: {
-          source: 'scanner',
-          scan_target: 'order',
-          token,
-        },
+        metadata: audit.metadata,
       });
 
       return successRes(
