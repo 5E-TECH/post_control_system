@@ -36,7 +36,11 @@ kuryerdagidek. Yangi narsalar faqat tashqi qatlamda: kalit jadvali, guard,
 idempotentlik daftari, xato filtri, ko'rinishlar (allowlist), alohida Swagger,
 admin endpointlar.
 
-**Bu fazada YO'Q:** admin UI (dizayn tasdig'idan keyin), per-buyurtma kuryer
+**Admin UI:** Integratsiyalar → Yetkazuvchilar → «Carrier API» (Akkauntlar · Sozlamalar ·
+Kalit · Faollik); pochta sahifasidagi kuryer tanlashda carrier kuryeri
+«Carrier API» belgisi bilan ajratiladi.
+
+**Bu fazada YO'Q:** per-buyurtma kuryer
 hisob-kitobi (FIFO), `cancel_reason` ustuni, akkaunt bo'yicha tuman ro'yxati,
 ochiq `GET order/qr-code/:token` ni yopish (alohida vazifa).
 
@@ -351,7 +355,7 @@ yadrosi va deploy invariantlariga tegadi).
 | R6 | Throttler xotirada | Bir nechta instans bo'lsa limit instanslar soniga ko'payadi | Hozir bitta systemd unit (`deploy.yml:392`); cluster rejimi tekshirilmagan |
 | R7 | IP ro'yxati nginx'ga bog'liq | (a) carrier blokida `X-Forwarded-For` uzatilmasa hamma so'rov `127.0.0.1` dan ko'rinadi → ro'yxatli akkaunt 403. (b) Express yo'llari registrga sezgir emas: `/api/v1/CARRIER/…` nginx carrier blokini chetlab umumiy `/api/` blokiga tushadi; u blok XFF ni qayta yozmasa mijoz yuborgan XFF `req.ip` bo'ladi — bu **ochiq** (soxta IP ro'yxatdan o'tadi), yopiq emas | (b) ilovada yopilgan: kanonik bo'lmagan yo'l 404 (`isCanonicalCarrierPath`, ikkala guard). `DEPLOY-CHECKLIST.md` §3.5 (XFF ni `server{}` darajasida ham) va smoke #16, #19 |
 | R8 | SOATO to'liqligi | `soato_code: null` — provayder geo'ni moslay olmaydi | Pilotdan oldin provayder tumanlari bo'yicha `district.sato_code`/`region.sato_code` ni tekshirish (`1749600002000-DistrictSatoBackfill.ts:7-9`: backfill'gacha 184 dan 71 tasida kod bor edi) |
-| R9 | Carrier kuryeri kuryer tanlash ro'yxatlarida ko'rinadi (super-kuryer bo'lsa — har hududda) | Xodim adashib unga ichki pochta jo'natadi | Kuryer nomini aniq qo'ying (masalan "[Carrier] BTS Express"); admin UI fazasida belgilash |
+| R9 | Carrier kuryeri kuryer tanlash ro'yxatlarida ko'rinadi (super-kuryer bo'lsa — har hududda) | Xodim adashib unga ichki pochta jo'natadi | Kuryer nomini aniq qo'ying (masalan "[Carrier] BTS Express"); pochta sahifasidagi kuryer tanlashda «Carrier API» belgisi (`CarrierApiChip`) |
 | R10 | Tuman ro'yxati yo'q (O5) | Provayder xizmat qilmaydigan hududga pochta jo'natilishi mumkin | Hozircha operator tartibi; kerak bo'lsa akkauntga SOATO allowlist (§10) |
 | R11 | Filtrdan tashqaridagi xatolar | Noma'lum yo'l, buzilgan JSON — `code`/`trace_id` siz | Ilova A23 da hujjatlangan |
 | R12 | Activity log best-effort | Audit yozuvi yo'qolishi mumkin | Pul haqiqati — kassa tarixi va idempotentlik daftari, log emas |
@@ -507,7 +511,7 @@ kalitlariga qarshi tekshiradi.
 | Q3 | Hudud bo'yicha haq va naqd qabul qiladigan filial | Shartnoma bo'yicha; super-kuryer + `courier_regions` |
 | Q9 | Provayder ikkala tizimda bo'lsa, qaysi posilka qaysi yo'l bilan? | Pochta/buyurtma darajasida operator tanlaydi |
 | Q10 | Qaytarishni qaysi markaz qabul qiladi? | Naqd qabul qiladigan filial bilan bir xil |
-| UI | Admin panel (akkauntlar, kalitni bir marta ko'rsatish, IP, faollik) | Dizayn tasdig'idan keyin; `registry.tsx` dagi "yangi cargo faqat Elchi orqali" izohi ham o'shanda yangilanadi |
+| UI | Admin panel (akkauntlar, kalitni bir marta ko'rsatish, IP, faollik) | Bajarildi: Integratsiyalar → Yetkazuvchilar → «Carrier API» (`client/src/pages/integrations/components/carrier`); `registry.tsx` da carrier yozuvi o'z izohi bilan |
 | R6 | PCS bitta instansdami? | Ha bo'lsa — hozirgi throttler yetarli |
 | T1 | Pochta carrier'dan **ichki** kuryerga o'tkazilsa, carrier'ning muzlatilgan hudud tarifi buyurtmalarda qoladi va ichki kuryerga o'sha stavka to'lanadi | Ichki kuryerlar orasidagi o'tkazishdagi mavjud xulq bilan bir xil (u ham tarifga tegmaydi). Tuzatish kerak bo'lsa — barcha `reassignCourier` uchun yagona qoida (alohida vazifa) |
 | T2 | `sendPost` (va unga teng carrier `reassign`) super kuryerga jo'natishda marketplace ko'p qutili buyurtmaning `courier_tariff = 0` ini hudud tarifiga almashtiradi — har quti uchun haq to'lanadi | PCS'dagi mavjud xulq (carrier'dan oldin ham). Tuzatish `sendPost` da — alohida vazifa, carrier spec "sendPost bilan aynan bir xil" talab qilgani uchun bu yerda o'zgartirilmadi |
