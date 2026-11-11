@@ -83,6 +83,7 @@ const DATE_ONLY_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 const EXAMPLE_ORDER_ID = '3f6c2a9e-8b1d-4c7e-9a2f-1d5b8e7c4a90';
 const EXAMPLE_ORDER_ID_2 = '7b2e4d3c-1a9f-4e6b-8c5d-2f3a4b5c6d7e';
 const EXAMPLE_ITEM_ID = 'c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f';
+const EXAMPLE_ITEM_ID_2 = '8e4b1f7a-2c3d-4e5f-9a6b-7c8d9e0f1a2b';
 const EXAMPLE_PRODUCT_ID = '5a6b7c8d-9e0f-4a1b-8c2d-3e4f5a6b7c8d';
 
 // ===== So'rovlar: /carrier/* =====
@@ -276,6 +277,65 @@ export class CarrierOrderStatusRequestDto {
   @IsBoolean()
   old_item_collected?: boolean;
 }
+
+/**
+ * `POST /carrier/orders/{id}/status` — Swagger "Try it out" dagi NOMLI
+ * misollar (OpenAPI `examples`, faqat `application/json`; multipart'da
+ * Swagger UI ularni yaxshi ko'rsatmaydi — `splitMultipartProofBodies`).
+ * Kalitlar, tartib va sarlavhalar Elchi bilan bir xil; id'lar BeePost'niki
+ * (UUID). `partly_sold` — 2 qatorli buyurtma: har bir qator va undan
+ * sotilgan dona (0 — bu qatordan hech narsa sotilmadi).
+ *
+ * ⚠️ Har bir misol endpointning AYNI validatsiyasidan (global
+ * ValidationPipe + controller + `CarrierService` kontrakt shartlari)
+ * o'tishi `carrier-status-examples.spec.ts` da qulflangan — yaroqsiz misol
+ * qo'shilsa test yiqiladi.
+ */
+export const CARRIER_ORDER_STATUS_EXAMPLES: Record<
+  string,
+  { summary: string; value: CarrierOrderStatusRequestDto }
+> = {
+  sold: {
+    summary: 'Sotildi',
+    value: { status: CarrierOrderStatus.SOLD, comment: 'Mijoz qabul qildi' },
+  },
+  sold_exchange: {
+    summary: 'Sotildi (almashtirish, eski tovar olindi)',
+    value: { status: CarrierOrderStatus.SOLD, old_item_collected: true },
+  },
+  partly_sold: {
+    summary: 'Qisman sotildi (har bir qator + sotilgan dona)',
+    value: {
+      status: CarrierOrderStatus.PARTLY_SOLD,
+      total_price: 150000,
+      items: [
+        { order_item_id: EXAMPLE_ITEM_ID, quantity: 1 },
+        { order_item_id: EXAMPLE_ITEM_ID_2, quantity: 0 },
+      ],
+      comment: 'Mijoz faqat bitta tovarni oldi',
+    },
+  },
+  cancelled: {
+    summary: 'Bekor qilindi (mijoz rad etdi)',
+    value: {
+      status: CarrierOrderStatus.CANCELLED,
+      reason: CancelReason.CUSTOMER_REFUSED,
+      comment: 'Mijoz rad etdi',
+    },
+  },
+  cancelled_other: {
+    summary: 'Bekor qilindi (boshqa sabab — izoh majburiy)',
+    value: {
+      status: CarrierOrderStatus.CANCELLED,
+      reason: CancelReason.OTHER,
+      comment: 'Mijoz boshqa shaharga ko‘chib ketgan',
+    },
+  },
+  rollback: {
+    summary: 'Xato natijani bekor qilish (rollback)',
+    value: { status: CarrierOrderStatus.ROLLBACK },
+  },
+};
 
 /**
  * `GET /carrier/orders?status=` uchun ruxsat etilgan qiymatlar — Elchi
