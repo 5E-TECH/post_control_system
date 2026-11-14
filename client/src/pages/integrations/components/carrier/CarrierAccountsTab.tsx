@@ -9,6 +9,7 @@ import {
   formatDate,
   formatTime,
   ipRules,
+  isRollbackEnabled,
 } from "./carrierLib";
 
 interface Props {
@@ -102,8 +103,8 @@ export const CarrierAccountsTab = ({ accounts, onCreate, onOpen }: Props) => {
               Pochtalar unga oddiy kuryerga jo'natilgandek jo'natiladi. Kompaniya
               dasturchilari <Code>/api/v1/carrier/*</Code> ga{" "}
               <Code>X-Api-Key</Code> bilan murojaat qiladi: QR skan, natija
-              (sotildi, qisman sotildi, bekor qilindi, orqaga qaytarish —
-              rollback), bekor qilingan posilkalarni qaytarish va kassa. Sotuv
+              (sotildi, qisman sotildi, bekor qilindi), bekor qilingan
+              posilkalarni qaytarish va kassa. Sotuv
               puli shu kuryer kassasiga yoziladi — naqdni xodim oddiy kuryer
               kassasi orqali qabul qiladi.
             </>
@@ -183,6 +184,12 @@ export const CarrierAccountsTab = ({ accounts, onCreate, onOpen }: Props) => {
                     {accountState(a) === "courier_blocked" && (
                       <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                         so'rovlar 403 oladi
+                      </div>
+                    )}
+                    {/* Sukut o'chiq — faqat yoqilganda ko'rinadi (jadval to'lmasin). */}
+                    {isRollbackEnabled(a) && (
+                      <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                        rollback yoqilgan
                       </div>
                     )}
                   </div>

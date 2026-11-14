@@ -26,6 +26,7 @@ const acc = (over: Partial<CarrierAccount>): CarrierAccount => ({
   api_key_masked: "bpc_…0000",
   ip_allowlist: null,
   is_active: true,
+  rollback_enabled: false,
   last_used_at: null,
   created_at: Date.UTC(2026, 10, 2, 6, 2),
   updated_at: Date.UTC(2026, 10, 10, 4, 15),

@@ -1,5 +1,5 @@
 import { Alert, Button, Switch, Tag, Tooltip } from "antd";
-import { Network, Pencil, PlugZap, Trash2, Truck, Wallet } from "lucide-react";
+import { Network, Pencil, PlugZap, Trash2, Truck, Undo2, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   CARRIER_IP_ALLOWLIST_MAX,
@@ -13,31 +13,41 @@ import {
   ipKind,
   ipRules,
   isCourierBlocked,
+  isRollbackEnabled,
+  ROLLBACK_SWITCH_LABEL,
 } from "./carrierLib";
 
 interface Props {
   account: CarrierAccount;
   statusPending: boolean;
   onToggle: (account: CarrierAccount, next: boolean) => void;
+  /** Yashirin rollback so'rovi ketmoqda — tugma o'chiq (`loading`). */
+  rollbackPending: boolean;
+  onToggleRollback: (account: CarrierAccount, next: boolean) => void;
   onEdit: (account: CarrierAccount) => void;
   onDelete: (account: CarrierAccount) => void;
 }
 
 const BLOCKED_REASON_ID = "carrier-reactivate-blocked";
+const ROLLBACK_HELP_ID = "carrier-rollback-help";
 
 /**
- * SOZLAMALAR — holat (kill switch), bog'langan kuryer, IP cheklovi va
- * o'chirish. Har o'zgarish tasdiq oynasi orqali (`useCarrierActions`).
+ * SOZLAMALAR — holat (kill switch), yashirin rollback ruxsati, bog'langan
+ * kuryer, IP cheklovi va o'chirish. Har o'zgarish tasdiq oynasi orqali
+ * (`useCarrierActions`).
  */
 export const CarrierSettingsTab = ({
   account,
   statusPending,
   onToggle,
+  rollbackPending,
+  onToggleRollback,
   onEdit,
   onDelete,
 }: Props) => {
   const navigate = useNavigate();
   const on = account.is_active;
+  const rollbackOn = isRollbackEnabled(account);
   const blocked = isCourierBlocked(account);
   const rules = ipRules(account);
   /**
@@ -146,6 +156,40 @@ export const CarrierSettingsTab = ({
             Foydalanuvchilar bo'limida kuryerni blokdan chiqaring.
           </p>
         )}
+      </CarrierCard>
+
+      {/*
+        ═══════ ROLLBACK (YASHIRIN) ═══════
+        Sukut o'chiq. Kompaniyaga hujjatlarda ko'rsatilmaydi — shu sabab
+        holat kartasidan alohida, ichki belgisi bilan.
+      */}
+      <CarrierCard
+        title={
+          <CardTitle
+            icon={<Undo2 className="h-4 w-4" />}
+            extra={<Tag className="!me-0">ichki</Tag>}
+          >
+            {ROLLBACK_SWITCH_LABEL}
+          </CardTitle>
+        }
+        extra={
+          <span className="flex items-center gap-2">
+            <Switch
+              checked={rollbackOn}
+              aria-label={ROLLBACK_SWITCH_LABEL}
+              aria-describedby={ROLLBACK_HELP_ID}
+              loading={rollbackPending}
+              onChange={(next) => onToggleRollback(account, next)}
+            />
+            <span className="text-sm">{rollbackOn ? "Yoqilgan" : "O'chiq"}</span>
+          </span>
+        }
+      >
+        <p id={ROLLBACK_HELP_ID} className="text-sm text-gray-500 dark:text-gray-400">
+          O'chiq bo'lsa kompaniya yuborgan rollback rad etiladi; xato natijani
+          BeePost operatori tuzatadi. Bu imkoniyat kompaniyaga hujjatlarda
+          ko'rsatilmaydi.
+        </p>
       </CarrierCard>
 
       {/* ═══════ BOG'LANGAN KURYER ═══════ */}

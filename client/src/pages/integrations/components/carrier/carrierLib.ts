@@ -43,6 +43,16 @@ export const accountState = (a: CarrierAccount): CarrierAccountState => {
   return "active";
 };
 
+/**
+ * Yashirin rollback yoqilganmi. Faqat aniq `true` — eski server maydonni
+ * bermasa (yoki `null`) o'chiq deb ko'rsatiladi: server ham shunday qaraydi.
+ */
+export const isRollbackEnabled = (a: Pick<CarrierAccount, "rollback_enabled">): boolean =>
+  a.rollback_enabled === true;
+
+/** Sozlamalardagi yashirin rollback tugmasi yorlig'i (aria-label ham). */
+export const ROLLBACK_SWITCH_LABEL = "Rollback (natijani bekor qilish)";
+
 export const ipRules = (a: Pick<CarrierAccount, "ip_allowlist">): string[] =>
   a.ip_allowlist ?? [];
 
@@ -262,6 +272,11 @@ export const activityDiff = (
           changes.length ? ` (${changes.join("; ")})` : ""
         }`,
       );
+      continue;
+    }
+    if (key === "rollback_enabled") {
+      const label = (v: unknown) => (v === true ? "yoqilgan" : "o'chiq");
+      parts.push(`rollback: ${label(before[key])} → ${label(after[key])}`);
       continue;
     }
     parts.push(`${key}: ${plain(before[key])} → ${plain(after[key])}`);

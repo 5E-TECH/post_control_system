@@ -45,6 +45,14 @@ export interface CarrierAccount {
   /** `null` — cheklov yo'q. Server kanonik shaklda saqlaydi. */
   ip_allowlist: string[] | null;
   is_active: boolean;
+  /**
+   * YASHIRIN (faqat admin ko'radi): kompaniya yuborgan rollback qabul
+   * qilinadimi. Sukut `false` — rollback noma'lum status kabi 400 oladi,
+   * xato natijani BeePost operatori tuzatadi. Kompaniyaga hujjatlarda
+   * ko'rsatilmaydi. Eski server bermasa — o'chiq deb qaraladi
+   * (`isRollbackEnabled`).
+   */
+  rollback_enabled: boolean;
   /** `null` — kompaniya hali birorta muvaffaqiyatli so'rov yubormagan. */
   last_used_at: number | null;
   created_at: number;
@@ -73,6 +81,11 @@ export interface UpdateCarrierAccountDto {
   name?: string;
   /** Bo'sh massiv — IP cheklovi olib tashlanadi. */
   ip_allowlist?: string[];
+  /**
+   * Yashirin rollback'ni yoqish/o'chirish — faqat PATCH (yaratishda server
+   * bu maydonni rad etadi, yangi akkaunt doim `false`).
+   */
+  rollback_enabled?: boolean;
 }
 
 export interface CarrierDeleteResult {
