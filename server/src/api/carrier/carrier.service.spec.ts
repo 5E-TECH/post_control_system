@@ -13,8 +13,10 @@ import {
   CarrierService,
   NOT_YOURS_MESSAGE,
   assertCarrierProofFile,
+  assertCarrierStatusAllowed,
 } from './carrier.service';
 import {
+  CARRIER_STATUS_INVALID_MESSAGE,
   CancelReason,
   CarrierOrderStatus,
   CarrierOrderStatusRequestDto,
@@ -36,7 +38,15 @@ import {
  */
 
 const COURIER = '11111111-1111-4111-8111-111111111111';
-const CARRIER = { id: 'acc-1', name: 'BTS Express', courier_user_id: COURIER };
+const CARRIER = {
+  id: 'acc-1',
+  name: 'BTS Express',
+  courier_user_id: COURIER,
+  // Sukut: yashirin rollback O'CHIQ (yangi akkaunt kabi).
+  rollback_enabled: false,
+};
+/** Admin rollback'ni yoqqan ayni akkaunt — mavjud rollback testlari shu bilan. */
+const CARRIER_RB = { ...CARRIER, rollback_enabled: true };
 const ORDER_ID = '3f6c2a9e-8b1d-4c7e-9a2f-1d5b8e7c4a90';
 const ACTOR = carrierActor(COURIER);
 
@@ -632,7 +642,7 @@ describe('CarrierService.updateStatus — amallar', () => {
   it("rollback → rollbackOrderToWaiting(actor, id, {target_status:'waiting'})", async () => {
     const { service, orderService } = setup([order({ status: 'sold' })]);
     const res: any = await service.updateStatus(
-      CARRIER,
+      CARRIER_RB,
       ORDER_ID,
       statusDto({ status: CarrierOrderStatus.ROLLBACK }),
       'k1',
@@ -657,7 +667,7 @@ describe('CarrierService.updateStatus — amallar', () => {
       const { service, orderService } = setup([order({ status })]);
       const error = await caught(
         service.updateStatus(
-          CARRIER,
+          CARRIER_RB,
           ORDER_ID,
           statusDto({ status: CarrierOrderStatus.ROLLBACK }),
           'k1',
@@ -674,7 +684,7 @@ describe('CarrierService.updateStatus — amallar', () => {
     ]);
     const error = await caught(
       service.updateStatus(
-        CARRIER,
+        CARRIER_RB,
         ORDER_ID,
         statusDto({ status: CarrierOrderStatus.ROLLBACK }),
         'k1',
@@ -694,7 +704,7 @@ describe('CarrierService.updateStatus — amallar', () => {
       env.children = [{ id: 'child-1', parent_order_id: ORDER_ID, ...child }];
       const error = await caught(
         service.updateStatus(
-          CARRIER,
+          CARRIER_RB,
           ORDER_ID,
           statusDto({ status: CarrierOrderStatus.ROLLBACK }),
           'k1',
@@ -714,12 +724,126 @@ describe('CarrierService.updateStatus — amallar', () => {
       },
     ];
     await ok.service.updateStatus(
-      CARRIER,
+      CARRIER_RB,
       ORDER_ID,
       statusDto({ status: CarrierOrderStatus.ROLLBACK }),
       'k1',
     );
     expect(ok.orderService.rollbackOrderToWaiting).toHaveBeenCalled();
+  });
+});
+
+describe('CarrierService.updateStatus — yashirin rollback (akkaunt bo‘yicha, sukut o‘chiq)', () => {
+  const rollback = () => statusDto({ status: CarrierOrderStatus.ROLLBACK });
+
+  /** Hech narsaga tegilmagan: egalik o'qilmagan, kalit yo'q, PCS chaqirilmagan. */
+  const expectUntouched = (s: ReturnType<typeof setup>) => {
+    expect(s.env.qbs).toHaveLength(0);
+    expect(s.keys).toHaveLength(0);
+    for (const fn of Object.values(s.orderService)) {
+      expect(fn).not.toHaveBeenCalled();
+    }
+    expect(s.activityLog.log).not.toHaveBeenCalled();
+  };
+
+  it('⭐ o‘chiq akkaunt: 400, noma’lum status xabari (faqat ochiq qiymatlar), code yo‘q — hech narsaga tegilmaydi', async () => {
+    const s = setup([order({ status: 'sold' })]);
+    const error = await caught(
+      s.service.updateStatus(CARRIER, ORDER_ID, rollback(), 'k1'),
+    );
+    expect(error).toBeInstanceOf(BadRequestException);
+    expect(error.getStatus()).toBe(400);
+    expect(error.message).toBe(CARRIER_STATUS_INVALID_MESSAGE);
+    expect(error.message).toBe(
+      'status must be one of the following values: sold, partly_sold, cancelled',
+    );
+    expect(codeOf(error)).toBeUndefined();
+    expectUntouched(s);
+  });
+
+  it('fail-closed: bayroq yo‘q / true emas → o‘chiq', async () => {
+    for (const carrier of [
+      { id: 'acc-1', name: 'BTS', courier_user_id: COURIER },
+      { ...CARRIER, rollback_enabled: 'true' },
+      { ...CARRIER, rollback_enabled: 1 },
+      null,
+    ]) {
+      const s = setup([order({ status: 'sold' })]);
+      const error = await caught(
+        s.service.updateStatus(carrier as never, ORDER_ID, rollback(), 'k1'),
+      );
+      expect(error.message).toBe(CARRIER_STATUS_INVALID_MESSAGE);
+      expectUntouched(s);
+    }
+  });
+
+  it('begona buyurtma va isbot fayli bilan ham — AYNI 400 (404 yoki "proof kerak emas" EMAS)', async () => {
+    const foreign = setup([order({ status: 'sold', owned: false })]);
+    expect(
+      (
+        await caught(
+          foreign.service.updateStatus(CARRIER, ORDER_ID, rollback(), 'k1'),
+        )
+      ).message,
+    ).toBe(CARRIER_STATUS_INVALID_MESSAGE);
+    expectUntouched(foreign);
+
+    const withProof = setup([order({ status: 'sold' })]);
+    expect(
+      (
+        await caught(
+          withProof.service.updateStatus(CARRIER, ORDER_ID, rollback(), 'k1', {
+            mimetype: 'image/png',
+            size: 1,
+          }),
+        )
+      ).message,
+    ).toBe(CARRIER_STATUS_INVALID_MESSAGE);
+    expectUntouched(withProof);
+  });
+
+  it('assertCarrierStatusAllowed: faqat rollback va faqat bayroqsiz akkaunt', () => {
+    for (const status of ['sold', 'partly_sold', 'cancelled', 'sould']) {
+      expect(() => assertCarrierStatusAllowed(CARRIER, status)).not.toThrow();
+    }
+    expect(() => assertCarrierStatusAllowed(CARRIER, 'rollback')).toThrow(
+      CARRIER_STATUS_INVALID_MESSAGE,
+    );
+    expect(() =>
+      assertCarrierStatusAllowed(CARRIER_RB, 'rollback'),
+    ).not.toThrow();
+  });
+
+  it('yoqilgan akkaunt: rollback avvalgidek ishlaydi; o‘chirilgach keyingi so‘rov — 400', async () => {
+    const s = setup([order({ status: 'sold' })]);
+    const res: any = await s.service.updateStatus(
+      CARRIER_RB,
+      ORDER_ID,
+      rollback(),
+      'rb-1',
+    );
+    expect(res.data.order.status).toBe('waiting');
+    expect(s.orderService.rollbackOrderToWaiting).toHaveBeenCalledTimes(1);
+
+    // Admin o'chirdi — keyingi so'rov (guard yangi principal beradi) rad.
+    s.env.orders.get(ORDER_ID)!.status = 'sold';
+    const error = await caught(
+      s.service.updateStatus(CARRIER, ORDER_ID, rollback(), 'rb-2'),
+    );
+    expect(error.message).toBe(CARRIER_STATUS_INVALID_MESSAGE);
+    expect(s.orderService.rollbackOrderToWaiting).toHaveBeenCalledTimes(1);
+    expect(s.keys).toHaveLength(1);
+  });
+
+  it('bayroq boshqa statuslarga ta’sir qilmaydi (o‘chiq akkaunt sotadi)', async () => {
+    const s = setup();
+    const res: any = await s.service.updateStatus(
+      CARRIER,
+      ORDER_ID,
+      statusDto({ status: CarrierOrderStatus.SOLD }),
+      'k-sold',
+    );
+    expect(res.data.order.status).toBe('sold');
   });
 });
 
@@ -1200,15 +1324,15 @@ describe('CarrierService.updateStatus — idempotentlik va eski kalit', () => {
 
   it('sold → rollback → ESKI kalit bilan sold → 409 STALE (ikkinchi sotuv bajarilmaydi)', async () => {
     const { service, orderService } = setup();
-    await service.updateStatus(CARRIER, ORDER_ID, sold(), 'sell-key');
+    await service.updateStatus(CARRIER_RB, ORDER_ID, sold(), 'sell-key');
     await service.updateStatus(
-      CARRIER,
+      CARRIER_RB,
       ORDER_ID,
       statusDto({ status: CarrierOrderStatus.ROLLBACK }),
       'rollback-key',
     );
     const error = await caught(
-      service.updateStatus(CARRIER, ORDER_ID, sold(), 'sell-key'),
+      service.updateStatus(CARRIER_RB, ORDER_ID, sold(), 'sell-key'),
     );
     expect(error.getStatus()).toBe(409);
     expect(codeOf(error)).toBe('CARRIER_IDEMPOTENCY_KEY_STALE');
@@ -1353,10 +1477,10 @@ describe('CarrierService.updateStatus — crash oynasi (qayta egallangan kalit)'
   it('rollback commit bo‘ldi (endi waiting) → ayni kalit: 200, "Rollback mumkin emas" EMAS', async () => {
     const { service, orderService, keys } = setup([order({ status: 'sold' })]);
     const rollback = () => statusDto({ status: CarrierOrderStatus.ROLLBACK });
-    await service.updateStatus(CARRIER, ORDER_ID, rollback(), 'rb');
+    await service.updateStatus(CARRIER_RB, ORDER_ID, rollback(), 'rb');
     crashBeforeComplete(keys[0]);
     const res: any = await service.updateStatus(
-      CARRIER,
+      CARRIER_RB,
       ORDER_ID,
       rollback(),
       'rb',

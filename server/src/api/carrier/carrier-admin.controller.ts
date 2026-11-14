@@ -79,7 +79,7 @@ export class CarrierAdminController {
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @ApiOperation({
     summary:
-      "Nom va IP ro'yxatini yangilash. Kuryer va kalit bu yerda o'zgarmaydi.",
+      "Nom, IP ro'yxati va rollback ruxsatini (rollback_enabled, ichki) yangilash. Kuryer va kalit bu yerda o'zgarmaydi.",
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   async update(

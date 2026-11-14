@@ -74,13 +74,17 @@ const CARRIER_PATH_PREFIX = '/carrier/';
  * farqlar — `CARRIER_API.md` (Ilova A — BeePost profili). Matn
  * `CARRIER_API.md` bilan zid bo'lmasligi kerak: misollar, kalit prefiksi va
  * qoidalar o'sha hujjatdan olingan.
+ *
+ * ⚠️ Yashirin `rollback` (akkaunt bo'yicha, sukut o'chiq) bu matnda ham
+ * aytilmaydi — `carrier-public-docs-hidden.spec.ts` qulflaydi. Qayta
+ * ochish ro'yxati: `docs/integrations/15-carrier-api.md` §12.
  */
 export const CARRIER_SWAGGER_GUIDE = `BeePost posilkalarini yetkazadigan tashqi kompaniya uchun API. Elchi Pochta Carrier API bilan **bir xil kontrakt**: yo'llar, maydonlar, javob shakllari va xato \`code\` lari bir xil — farq baza manzili, kalit va "BeePost profili" (\`CARRIER_API.md\`, Ilova A). BeePost'da siz **bitta kurier akkaunti** sifatida ishlaysiz: BeePost xodimi pochtani sizga jo'natadi, siz posilka QR'ini skanerlaysiz va yetkazish natijasini yuborasiz. Pul sizning kurier kassangizga yoziladi.
 
 ## Ish tartibi (qisqa)
 
 1. \`POST /carrier/scan\` — posilka sizga o'tadi (\`waiting\`).
-2. **\`POST /carrier/orders/{id}/status\`** — natija: \`sold\` / \`partly_sold\` / \`cancelled\` (xato bo'lsa — \`rollback\`).
+2. **\`POST /carrier/orders/{id}/status\`** — natija: \`sold\` / \`partly_sold\` / \`cancelled\`.
 3. \`POST /carrier/returns\` — bekor qilinganlarni qaytarish.
 4. \`GET /carrier/cashbox\` — kassa va naqd topshirish.
 
@@ -120,7 +124,8 @@ curl -X POST https://<beepost-domain>/api/v1/carrier/orders/3f6c1a2e-8b4d-4c7a-9
 | \`sold\` | To'liq sotildi | — |
 | \`partly_sold\` | Qisman sotildi | \`total_price\` (mijoz olgan tovarlar qiymati, butun so'm), \`items: [{order_item_id, quantity}]\` — buyurtmaning har bir qatori |
 | \`cancelled\` | Mijoz olmadi | \`reason\`: \`CUSTOMER_NO_ANSWER\`, \`CUSTOMER_REFUSED\`, \`WRONG_ADDRESS\`, \`DEFECTIVE_PRODUCT\`, \`PRICE_DISPUTE\`, \`OTHER\` (+ \`comment\`) |
-| \`rollback\` | Xato yuborilgan sold/cancelled ni qaytarish | — (holat aynan sold yoki cancelled bo'lsa) |
+
+Natijani xato yuborgan bo'lsangiz — BeePost operatoriga murojaat qiling, u tuzatadi.
 
 **3) Bekor qilinganlarni qaytarish** — \`cancelled\` posilkalar (qisman sotuvning sotilmagan qismi ham) sizda qoladi: \`POST /carrier/returns\` \`{"order_ids":["3f6c1a2e-8b4d-4c7a-9e21-5d0b7f3a9c10"]}\` → qaytarish pochtasi (\`post_id\`); posilkalarni BeePost'ga topshirasiz. Qaytarilgan posilka \`/carrier/orders\` ro'yxatidan chiqadi.
 
@@ -129,7 +134,7 @@ curl -X POST https://<beepost-domain>/api/v1/carrier/orders/3f6c1a2e-8b4d-4c7a-9
 ## 3. Muhim qoidalar
 
 - Faqat **sizga biriktirilgan** buyurtmalar ko'rinadi; boshqasiga \`404\`. Barcha id'lar — UUID satr; UUID bo'lmagan id — \`400\`.
-- \`Idempotency-Key\`: har **yangi** urinish — yangi kalit; javob kelmasa — **ayni kalit** bilan qayta yuboring (amal ikki marta bajarilmaydi). Rollback'dan keyingi qayta sotuv — yangi kalit (eskisi bilan \`409 CARRIER_IDEMPOTENCY_KEY_STALE\`).
+- \`Idempotency-Key\`: har **yangi** urinish — yangi kalit; javob kelmasa — **ayni kalit** bilan qayta yuboring (amal ikki marta bajarilmaydi). Buyurtma holati o'shandan beri o'zgargan bo'lsa, eski kalit bilan amal bajarilmaydi — \`409 CARRIER_IDEMPOTENCY_KEY_STALE\`; yangi natija — yangi kalit.
 - Limit: akkaunt uchun daqiqada 120 so'rov, barcha endpoint birgalikda (\`429\`, \`Retry-After\`). Ro'yxatni bittalab emas, sahifalab oling.
 - Xato javobi: \`{ statusCode, message, code?, trace_id }\` (\`trace_id\` \`X-Trace-Id\` sarlavhasida ham). Qarorni matnga emas, \`statusCode\`/\`code\` ga qarab qiling. \`trace_id\` ni saqlang — muammo bo'lsa BeePost'ga yuboring.
 - \`409\`, \`429\`, \`5xx\`, \`503\`, \`504\` — biroz kutib, **ayni** \`Idempotency-Key\` bilan qayta urining (\`CARRIER_IDEMPOTENCY_KEY_STALE\` — yangi kalit; 10 daqiqadan uzoq takrorlansa — BeePost'ga). Boshqa \`4xx\` — so'rovni tuzating.
@@ -137,7 +142,7 @@ curl -X POST https://<beepost-domain>/api/v1/carrier/orders/3f6c1a2e-8b4d-4c7a-9
 
 ## 4. Pul
 
-Sotuvda kassangizga **(mijozdan olingan naqd − yetkazish haqingiz)** yoziladi — bu BeePost'ga topshiriladigan summa. Naqdni topshirganingizda BeePost xodimi qabul qiladi va kassada chiqim paydo bo'ladi. Bekor qilishda pul harakati yo'q. Kassa yozuvi holat bilan **bir vaqtda** paydo bo'ladi. Rollback naqd topshirilgandan keyin ham ishlaydi — balans manfiy bo'lishi mumkin. Yo'nalish — \`type\` (income/expense), \`amount\` doim musbat.`;
+Sotuvda kassangizga **(mijozdan olingan naqd − yetkazish haqingiz)** yoziladi — bu BeePost'ga topshiriladigan summa. Naqdni topshirganingizda BeePost xodimi qabul qiladi va kassada chiqim paydo bo'ladi. Bekor qilishda pul harakati yo'q. Kassa yozuvi holat bilan **bir vaqtda** paydo bo'ladi. BeePost operatori xato natijani tuzatsa, sotuv teskari yoziladi (\`correction\`) — naqd topshirilgandan keyin ham, ya'ni balans manfiy bo'lishi mumkin. Yo'nalish — \`type\` (income/expense), \`amount\` doim musbat.`;
 
 export type CarrierSwaggerSetupResult =
   | 'mounted'

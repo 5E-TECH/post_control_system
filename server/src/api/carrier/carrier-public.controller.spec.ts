@@ -42,6 +42,7 @@ const CARRIER = {
   id: '0d1e2f3a-4b5c-4d6e-8f9a-0b1c2d3e4f5a',
   name: 'BTS Express',
   courier_user_id: '11111111-1111-4111-8111-111111111111',
+  rollback_enabled: false,
 };
 const ORDER_ID = '3f6c2a9e-8b1d-4c7e-9a2f-1d5b8e7c4a90';
 

@@ -41,6 +41,7 @@ import { isOldItemRequired, toCarrierOrderView } from './carrier-order-view';
 import { toCarrierCashboxView } from './carrier-cashbox-view';
 import {
   CARRIER_ORDER_LIST_STATUSES,
+  CARRIER_STATUS_INVALID_MESSAGE,
   CARRIER_UUID_RE,
   CancelReason,
   CarrierCashboxQueryDto,
@@ -154,6 +155,24 @@ export type CarrierProofFile = {
   size?: number | null;
   buffer?: Buffer | null;
 };
+
+/**
+ * Yashirin `rollback` faqat `rollback_enabled` akkauntga. Aks holda —
+ * noma'lum status qiymati bilan AYNI javob (400, `code` siz,
+ * `CARRIER_STATUS_INVALID_MESSAGE`): kompaniya imkoniyat borligini
+ * bilmasin. Fail-closed: bayroq aniq `true` emas — o'chiq.
+ */
+export function assertCarrierStatusAllowed(
+  carrier: Pick<CarrierPrincipal, 'rollback_enabled'> | null | undefined,
+  status: unknown,
+): void {
+  if (
+    status === CarrierOrderStatus.ROLLBACK &&
+    carrier?.rollback_enabled !== true
+  ) {
+    throw new BadRequestException(CARRIER_STATUS_INVALID_MESSAGE);
+  }
+}
 
 export function assertCarrierProofFile(
   status: CarrierOrderStatus,
@@ -691,6 +710,12 @@ export class CarrierService {
    *     allaqachon shu amal natijasida bo'lsa pre-checksiz 200.
    *
    * `orderId` va `idempotencyKey` controller'da tekshirilgan (UUID, ≤255).
+   *
+   * ⚠️ Yashirin `rollback` — eng BIRINCHI tekshiruv (egalik, isbot fayli,
+   * idempotentlik daftaridan OLDIN): akkauntga ruxsat bo'lmasa noma'lum
+   * status qiymati bilan AYNI 400 (`assertCarrierStatusAllowed`). HTTP
+   * yo'lida bu holat bu yergacha yetmaydi (`CarrierRollbackGateInterceptor`),
+   * bu — boshqa yo'l bilan kelgan chaqiruv uchun zaxira devor.
    */
   async updateStatus(
     carrier: CarrierPrincipal,
@@ -699,6 +724,7 @@ export class CarrierService {
     idempotencyKey: string,
     proof?: CarrierProofFile | null,
   ) {
+    assertCarrierStatusAllowed(carrier, dto?.status);
     const courierId = carrier.courier_user_id;
     // Egalik — kalit ochilishidan OLDIN: begona buyurtmaga daftar yozuvi
     // ham qolmasin.

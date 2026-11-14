@@ -3,7 +3,7 @@ import 'reflect-metadata';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import {
-  CarrierOrderStatus,
+  CARRIER_PUBLIC_ORDER_STATUSES,
   CarrierOrderStatusRequestDto,
   CarrierPartlySoldItemDto,
   CarrierReturnRequestDto,
@@ -74,9 +74,9 @@ describe('CARRIER_API.md ↔ carrier DTO va ko‘rinishlar', () => {
     expect(item).toEqual(dtoFields(CarrierPartlySoldItemDto));
   });
 
-  it('§5.2 statuslar jadvali = CarrierOrderStatus qiymatlari', () => {
+  it('§5.2 statuslar jadvali = OCHIQ statuslar (yashirin rollback yo‘q)', () => {
     const tables = sectionTables('### 5.2 Holatni yuborish');
-    expect(tables[2]).toEqual(Object.values(CarrierOrderStatus).sort());
+    expect(tables[2]).toEqual([...CARRIER_PUBLIC_ORDER_STATUSES].sort());
   });
 
   it('§4 buyurtma obyekti jadvali = toCarrierOrderView kalitlari', () => {

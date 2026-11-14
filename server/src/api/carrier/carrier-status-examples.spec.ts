@@ -46,7 +46,7 @@ import {
  * sozlamasi) → `CarrierExceptionFilter` → controller (id, `Idempotency-Key`
  * — Swagger'dagi misol kalit bilan) → HAQIQIY `CarrierService` kontrakt
  * shartlari (`OTHER` → izoh, butun `total_price`, `partly_sold` da har bir
- * qator, "faqat waiting", rollback "faqat sold/cancelled"). Chegaradagi
+ * qator, "faqat waiting"). Chegaradagi
  * narsalar soxta: baza (buyurtma xotirada), PCS `OrderService` amallari,
  * idempotency daftari va kalit guard'i.
  *
@@ -57,7 +57,7 @@ import {
 const STATUS_PATH = '/carrier/orders/{id}/status';
 
 const EXPECTED_SUMMARY =
-  'Buyurtma holatini yuborish: sotildi (sold), qisman (partly_sold), bekor (cancelled), rollback';
+  'Buyurtma holatini yuborish: sotildi (sold), qisman (partly_sold), bekor (cancelled)';
 const EXPECTED_DESCRIPTION_START =
   'Kuryeringiz posilkani topshirganda yoki topshira olmaganda shu so‘rovni yuboring — ' +
   'bizda buyurtma holati darhol o‘zgaradi. ';
@@ -67,13 +67,14 @@ const EXPECTED_EXAMPLES: Array<[string, string]> = [
   ['partly_sold', 'Qisman sotildi (har bir qator + sotilgan dona)'],
   ['cancelled', 'Bekor qilindi (mijoz rad etdi)'],
   ['cancelled_other', 'Bekor qilindi (boshqa sabab — izoh majburiy)'],
-  ['rollback', 'Xato natijani bekor qilish (rollback)'],
 ];
 
 const CARRIER = {
   id: '0d1e2f3a-4b5c-4d6e-8f9a-0b1c2d3e4f5a',
   name: 'BTS Express',
   courier_user_id: '11111111-2222-4333-8444-555555555555',
+  // Sukut: yashirin rollback o'chiq — Swagger misollari usiz ishlashi shart.
+  rollback_enabled: false,
 };
 const ORDER_ID = '3f6c2a9e-8b1d-4c7e-9a2f-1d5b8e7c4a90';
 
@@ -103,7 +104,6 @@ const PCS_ACTION: Record<string, string> = {
   sold: 'sellOrder',
   partly_sold: 'partlySold',
   cancelled: 'cancelOrder',
-  rollback: 'rollbackOrderToWaiting',
 };
 
 type Body = Record<string, unknown>;
@@ -111,14 +111,13 @@ type FakeOrder = Record<string, unknown> & { id: string; status: string };
 
 /**
  * Misol qaysi holatdagi buyurtmaga yuborilishi — misol mazmunidan:
- * rollback — xato `sold` qilingan buyurtma; `old_item_collected: true` —
- * eski tovarni olish shart bo'lgan almashtirish buyurtmasi; qolgani —
- * kompaniya qo'lidagi `waiting` buyurtma.
+ * `old_item_collected: true` — eski tovarni olish shart bo'lgan
+ * almashtirish buyurtmasi; qolgani — kompaniya qo'lidagi `waiting` buyurtma.
  */
 function orderFor(body: Body): FakeOrder {
   return {
     id: ORDER_ID,
-    status: body.status === 'rollback' ? 'sold' : 'waiting',
+    status: 'waiting',
     parent_order_id: null,
     replacement_of_order_id:
       body.old_item_collected === true
@@ -442,7 +441,16 @@ describe('POST /carrier/orders/{id}/status — Swagger sarlavhasi va misollari',
         { status: 'sold', extraCost: 5000 },
         'extraCost should not exist',
       ],
-      ['noma’lum status', { status: 'delivered' }, 'status must be one of'],
+      [
+        'noma’lum status',
+        { status: 'delivered' },
+        'status must be one of the following values: sold, partly_sold, cancelled',
+      ],
+      [
+        'yashirin rollback — akkauntda o‘chiq (noma’lum status bilan AYNI xabar)',
+        { status: 'rollback' },
+        'status must be one of the following values: sold, partly_sold, cancelled',
+      ],
       [
         'cancelled — reason yo‘q',
         { status: 'cancelled' },

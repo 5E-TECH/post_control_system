@@ -73,8 +73,47 @@ describe('CarrierApiKeyGuard', () => {
       id: ACCOUNT_ID,
       name: 'BTS Express',
       courier_user_id: COURIER_ID,
+      rollback_enabled: false,
     });
     expect(accounts.touchLastUsed).toHaveBeenCalledWith(ACCOUNT_ID);
+  });
+
+  it('⭐ yashirin rollback_enabled — har so‘rovda akkaunt qatoridan (kesh yo‘q), faqat aniq true', async () => {
+    const cases: Array<[unknown, boolean]> = [
+      [true, true],
+      [false, false],
+      [undefined, false],
+      [null, false],
+      ['true', false],
+      [1, false],
+    ];
+    for (const [value, expected] of cases) {
+      const { guard } = setup({
+        account: account({ rollback_enabled: value }),
+        courierActive: true,
+      });
+      const req = request();
+      await expect(guard.canActivate(ctx(req))).resolves.toBe(true);
+      expect(req.carrier.rollback_enabled).toBe(expected);
+    }
+
+    // Admin o'zgartirdi → KEYINGI so'rovdayoq yangi qiymat (validateKey har
+    // so'rovda bazaga boradi).
+    const { guard, accounts } = setup({
+      account: account({ rollback_enabled: false }),
+      courierActive: true,
+    });
+    const first = request();
+    await guard.canActivate(ctx(first));
+    accounts.validateKey.mockResolvedValueOnce({
+      account: account({ rollback_enabled: true }),
+      courierActive: true,
+    });
+    const second = request();
+    await guard.canActivate(ctx(second));
+    expect(first.carrier.rollback_enabled).toBe(false);
+    expect(second.carrier.rollback_enabled).toBe(true);
+    expect(accounts.validateKey).toHaveBeenCalledTimes(2);
   });
 
   it('kalit yo‘q — 401, bazaga bormaydi', async () => {

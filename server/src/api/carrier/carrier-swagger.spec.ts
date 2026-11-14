@@ -81,6 +81,7 @@ async function buildApp(
           id: '0d1e2f3a-4b5c-4d6e-8f9a-0b1c2d3e4f5a',
           name: 'BTS',
           courier_user_id: '11111111-2222-4333-8444-555555555555',
+          rollback_enabled: false,
         };
         return true;
       },

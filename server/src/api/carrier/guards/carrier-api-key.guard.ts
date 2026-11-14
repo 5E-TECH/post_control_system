@@ -164,6 +164,8 @@ export class CarrierApiKeyGuard implements CanActivate {
       id: account.id,
       name: account.name,
       courier_user_id: account.courier_user_id,
+      // Fail-closed: faqat aniq `true` (ustun yo'q / null — o'chiq).
+      rollback_enabled: account.rollback_enabled === true,
     };
     this.accounts.touchLastUsed(account.id);
     return true;

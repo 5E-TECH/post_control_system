@@ -2,9 +2,10 @@
 import 'reflect-metadata';
 import * as fs from 'fs';
 import * as path from 'path';
-import { getMetadataArgsStorage } from 'typeorm';
+import { QueryRunner, getMetadataArgsStorage } from 'typeorm';
 import { CarrierAccountEntity } from 'src/core/entity/carrier-account.entity';
 import { CarrierIdempotencyKeyEntity } from 'src/core/entity/carrier-idempotency-key.entity';
+import { CarrierRollbackToggle1751100001000 } from 'src/migrations/1751100001000-CarrierRollbackToggle';
 
 /**
  * CARRIER SXEMASI — entity va `1751100000000-CarrierApi` migratsiyasi
@@ -75,5 +76,55 @@ describe('Carrier sxemasi — entity va migratsiya nomlari', () => {
     expect(MIGRATION).toMatch(
       /"UQ_CARRIER_ACCOUNT_COURIER"\s+ON "carrier_account" \("courier_user_id"\)\s+WHERE "is_deleted" = false/,
     );
+  });
+});
+
+describe('1751100001000-CarrierRollbackToggle — yashirin rollback ustuni', () => {
+  const MIGRATIONS_DIR = path.resolve(__dirname, '../../migrations');
+  const FILE = '1751100001000-CarrierRollbackToggle.ts';
+
+  /** `QueryRunner.query` ni yozib boradigan soxta — SQL matni bo'yicha tekshiriladi. */
+  const recorder = () => {
+    const sql: string[] = [];
+    const runner = {
+      query: jest.fn((text: string) => {
+        sql.push(text.replace(/\s+/g, ' ').trim());
+        return Promise.resolve([]);
+      }),
+    };
+    return { sql, runner: runner as unknown as QueryRunner };
+  };
+
+  it('⭐ up: NOT NULL DEFAULT false — mavjud qatorlar ham o‘chiq; idempotent', async () => {
+    const { sql, runner } = recorder();
+    await new CarrierRollbackToggle1751100001000().up(runner);
+    expect(sql).toEqual([
+      'ALTER TABLE "carrier_account" ADD COLUMN IF NOT EXISTS "rollback_enabled" boolean NOT NULL DEFAULT false',
+    ]);
+  });
+
+  it('down: ustun olib tashlanadi (IF EXISTS)', async () => {
+    const { sql, runner } = recorder();
+    await new CarrierRollbackToggle1751100001000().down(runner);
+    expect(sql).toEqual([
+      'ALTER TABLE "carrier_account" DROP COLUMN IF EXISTS "rollback_enabled"',
+    ]);
+  });
+
+  it('entity ustuni migratsiya bilan bir xil: boolean, sukut false, NOT NULL', () => {
+    const column = storage.columns.find(
+      (c) =>
+        c.target === CarrierAccountEntity &&
+        c.propertyName === 'rollback_enabled',
+    );
+    expect(column?.options).toMatchObject({ type: 'boolean', default: false });
+    expect(column?.options.nullable).not.toBe(true);
+  });
+
+  it('nom va vaqt tamg‘asi: klass nomi = name, jadvalni yaratgan CarrierApi dan KEYIN', () => {
+    const migration = new CarrierRollbackToggle1751100001000();
+    expect(migration.name).toBe('CarrierRollbackToggle1751100001000');
+    expect(fs.existsSync(path.join(MIGRATIONS_DIR, FILE))).toBe(true);
+    expect(Number(FILE.split('-')[0])).toBeGreaterThan(1751100000000);
   });
 });

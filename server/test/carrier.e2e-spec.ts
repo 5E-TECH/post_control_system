@@ -447,6 +447,11 @@ describe('0. Carrier Swagger va akkaunt (admin)', () => {
     expect(strip(live)).toEqual(strip(committed));
   });
 
+  it('⭐ jonli carrier hujjatida yashirin "rollback" so‘zi yo‘q (enum, misol, tavsif)', async () => {
+    const live = (await http.get('/api/v1/carrier-docs-json')).body;
+    expect(JSON.stringify(live)).not.toMatch(/rollback/i);
+  });
+
   it("kuryer bo'lmagan foydalanuvchiga akkaunt ochilmaydi (400)", async () => {
     const res = await asAdmin(http.post('/api/v1/carrier-accounts')).send({
       name: 'Xato',
@@ -468,10 +473,13 @@ describe('0. Carrier Swagger va akkaunt (admin)', () => {
     expect(accountId).toMatch(UUID_RE);
     expect(data.account.api_key_masked).toBe(`bpc_…${carrierKey.slice(-4)}`);
     expect(data.account.courier_user_id).toBe(CARRIER_COURIER_ID);
+    // Yashirin rollback — yangi akkauntda DOIM o'chiq.
+    expect(data.account.rollback_enabled).toBe(false);
 
     const [acc] = await q(`SELECT * FROM carrier_account WHERE id = $1`, [
       accountId,
     ]);
+    expect(acc.rollback_enabled).toBe(false);
     expect(acc.api_key_hash).toBe(
       createHash('sha256').update(carrierKey).digest('hex'),
     );
@@ -495,6 +503,21 @@ describe('0. Carrier Swagger va akkaunt (admin)', () => {
     expect(res.status).toBe(409);
   });
 
+  it('yaratishda rollback_enabled berib bo‘lmaydi — noma’lum maydon (422), akkaunt ochilmaydi', async () => {
+    const res = await asAdmin(http.post('/api/v1/carrier-accounts')).send({
+      name: 'E2E Express 2',
+      courier_id: CARRIER_COURIER_2_ID,
+      rollback_enabled: true,
+    });
+    expect(res.status).toBe(422);
+    expect(JSON.stringify(res.body)).toContain('rollback_enabled');
+    const rows = await q(
+      `SELECT id FROM carrier_account WHERE courier_user_id = $1`,
+      [CARRIER_COURIER_2_ID],
+    );
+    expect(rows).toHaveLength(0);
+  });
+
   it("ikkinchi akkaunt (limit/o'chirish sinovi uchun)", async () => {
     const res = await asAdmin(http.post('/api/v1/carrier-accounts')).send({
       name: 'E2E Express 2',
@@ -516,6 +539,7 @@ describe('0. Carrier Swagger va akkaunt (admin)', () => {
     expect(mine).toMatchObject({
       name: 'E2E Express',
       is_active: true,
+      rollback_enabled: false,
       courier: { id: CARRIER_COURIER_ID, status: 'active' },
     });
   });
@@ -977,6 +1001,210 @@ describe('4. sold va Idempotency-Key', () => {
         r.key_hash === createHash('sha256').update(SOLD_KEY).digest('hex'),
     );
     expect(own?.state).toBe('completed');
+  });
+});
+
+// ═══════════════════ 4b. YASHIRIN ROLLBACK (rollback_enabled) ═══════════════════
+
+/**
+ * Ega qarori (2026-11-14): rollback akkaunt bo'yicha, SUKUT O'CHIQ va
+ * kompaniyaga aytilmaydi. O'chiq akkaunt `rollback` uchun noma'lum status
+ * javobining O'ZINI oladi — yon ta'sirsiz. Bo'lim oxirida admin yoqadi:
+ * keyingi bo'limlardagi rollback sinovlari (5, 8, 11, 12, 15) shu holatda.
+ */
+describe('4b. yashirin rollback — akkaunt bo‘yicha, sukut o‘chiq', () => {
+  const PUBLIC_STATUS_MESSAGE =
+    'status must be one of the following values: sold, partly_sold, cancelled';
+
+  const keyRow = async (key: string) =>
+    (
+      await q(`SELECT id FROM carrier_idempotency_key WHERE key_hash = $1`, [
+        createHash('sha256').update(key).digest('hex'),
+      ])
+    )[0];
+
+  const setRollback = (id: string, value: boolean) =>
+    asAdmin(http.patch(`/api/v1/carrier-accounts/${id}`)).send({
+      rollback_enabled: value,
+    });
+
+  /** Kompaniya ko'radigan qism (`trace_id` har safar yangi). */
+  const visible = (res: request.Response) => ({
+    status: res.status,
+    keys: Object.keys(res.body).sort(),
+    statusCode: res.body.statusCode,
+    message: res.body.message,
+    code: res.body.code,
+  });
+
+  async function waitForAccountLog(newValue: Record<string, unknown>) {
+    for (let i = 0; i < 40; i++) {
+      const rows = await q(
+        `SELECT action, old_value, new_value, description FROM activity_logs
+          WHERE entity_type = 'CarrierAccount' AND entity_id = $1 AND action = 'updated'
+          ORDER BY created_at DESC`,
+        [accountId],
+      );
+      const row = rows.find(
+        (r: any) => JSON.stringify(r.new_value) === JSON.stringify(newValue),
+      );
+      if (row) return row;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return undefined;
+  }
+
+  it('sukut: ikkala akkaunt ham o‘chiq (bazada va admin ro‘yxatida)', async () => {
+    const rows = await q(
+      `SELECT id, rollback_enabled FROM carrier_account WHERE id = ANY($1)`,
+      [[accountId, account2Id]],
+    );
+    expect(rows.map((r: any) => r.rollback_enabled)).toEqual([false, false]);
+    const list = await asAdmin(http.get('/api/v1/carrier-accounts'));
+    expectOk(list);
+    for (const id of [accountId, account2Id]) {
+      expect(
+        list.body.data.find((a: any) => a.id === id)?.rollback_enabled,
+      ).toBe(false);
+    }
+  });
+
+  it('⭐ o‘chiq: rollback = noma’lum status (ayni 400, code yo‘q); kalit, buyurtma, kassa, audit — tegilmagan', async () => {
+    const balance = await courierBalance();
+    const historyBefore = await courierHistory(ord.A.id);
+    const unknownKey = newIdemKey();
+    const hiddenKey = newIdemKey();
+
+    const unknown = await setStatus(
+      ord.A.id,
+      { status: 'delivered' },
+      unknownKey,
+    );
+    const hidden = await setStatus(ord.A.id, { status: 'rollback' }, hiddenKey);
+    expectCarrierError(hidden, 400);
+    expect(visible(hidden)).toEqual(visible(unknown));
+    expect(hidden.body.message).toBe(PUBLIC_STATUS_MESSAGE);
+
+    expect(await keyRow(hiddenKey)).toBeUndefined();
+    expect((await orderRow(ord.A.id)).status).toBe('sold');
+    expect(await courierBalance()).toBe(balance);
+    expect(await courierHistory(ord.A.id)).toEqual(historyBefore);
+    expect(
+      await waitForCarrierLog(ord.A.id, 'carrier.rollback'),
+    ).toBeUndefined();
+  });
+
+  it('o‘chiq: boshqa maydon xatosi bilan birga, kalitsiz va multipart+isbot bilan ham — noma’lum status bilan ayni', async () => {
+    const extra = { comment: 'x'.repeat(1001) };
+    expect(
+      visible(
+        await setStatus(
+          ord.A.id,
+          { status: 'rollback', ...extra },
+          newIdemKey(),
+        ),
+      ),
+    ).toEqual(
+      visible(
+        await setStatus(ord.A.id, { status: 'sould', ...extra }, newIdemKey()),
+      ),
+    );
+    expect(
+      visible(await setStatus(ord.A.id, { status: 'rollback' }, null)),
+    ).toEqual(visible(await setStatus(ord.A.id, { status: 'sould' }, null)));
+
+    const proof = {
+      buffer: PNG_1PX,
+      filename: 'p.png',
+      contentType: 'image/png',
+    };
+    const mpHidden = await multipartStatus(
+      ord.A.id,
+      [['status', 'rollback']],
+      newIdemKey(),
+      proof,
+    );
+    const mpUnknown = await multipartStatus(
+      ord.A.id,
+      [['status', 'sould']],
+      newIdemKey(),
+      proof,
+    );
+    expect(visible(mpHidden)).toEqual(visible(mpUnknown));
+    expect(mpHidden.body.message).toBe(PUBLIC_STATUS_MESSAGE);
+    expect((await orderRow(ord.A.id)).status).toBe('sold');
+  });
+
+  it('⭐ admin PATCH yoqadi — javob va ro‘yxatda true, tarixda eski → yangi', async () => {
+    const res = await setRollback(accountId, true);
+    expectOk(res);
+    expect(res.body.data).toMatchObject({
+      id: accountId,
+      rollback_enabled: true,
+    });
+    const [row] = await q(
+      `SELECT rollback_enabled FROM carrier_account WHERE id = $1`,
+      [accountId],
+    );
+    expect(row.rollback_enabled).toBe(true);
+
+    const log = await waitForAccountLog({ rollback_enabled: true });
+    expect(log).toMatchObject({
+      action: 'updated',
+      old_value: { rollback_enabled: false },
+      new_value: { rollback_enabled: true },
+    });
+    expect(log.description).toContain('rollback yoqildi');
+
+    // Ikkinchi akkauntga ta'sir yo'q.
+    const [other] = await q(
+      `SELECT rollback_enabled FROM carrier_account WHERE id = $1`,
+      [account2Id],
+    );
+    expect(other.rollback_enabled).toBe(false);
+  });
+
+  it('⭐ darhol kuchga kiradi: yoqilgach rollback kontrakt qoidasiga yetadi; o‘chirilgach yana noma’lum status', async () => {
+    // Yoqilgan: `waiting` buyurtmada kontrakt rad etishi (gate o'tkazdi).
+    const on = await setStatus(ord.C.id, { status: 'rollback' }, newIdemKey());
+    expectCarrierError(on, 400);
+    expect(on.body.message).toContain('Rollback mumkin emas');
+    expect((await orderRow(ord.C.id)).status).toBe('waiting');
+
+    expectOk(await setRollback(accountId, false));
+    const offKey = newIdemKey();
+    const off = await setStatus(ord.C.id, { status: 'rollback' }, offKey);
+    expect(off.status).toBe(400);
+    expect(off.body.message).toBe(PUBLIC_STATUS_MESSAGE);
+    expect(await keyRow(offKey)).toBeUndefined();
+    const log = await waitForAccountLog({ rollback_enabled: false });
+    expect(log?.old_value).toEqual({ rollback_enabled: true });
+
+    // Keyingi bo'limlar (5, 8, 11, 12, 15) rollback'ni yoqilgan holatda sinaydi.
+    expectOk(await setRollback(accountId, true));
+  });
+
+  it('typo xabari yoqilgan akkauntga ham faqat ochiq qiymatlarni sanaydi', async () => {
+    const res = await setStatus(ord.A.id, { status: 'sould' }, newIdemKey());
+    expectCarrierError(res, 400);
+    expect(res.body.message).toBe(PUBLIC_STATUS_MESSAGE);
+    expect(JSON.stringify(res.body)).not.toMatch(/rollback/i);
+  });
+
+  it('PATCH: boolean bo‘lmagan qiymat — 422; maydonsiz — 400', async () => {
+    const bad = await asAdmin(
+      http.patch(`/api/v1/carrier-accounts/${accountId}`),
+    ).send({ rollback_enabled: 'true' });
+    expect(bad.status).toBe(422);
+    const empty = await asAdmin(
+      http.patch(`/api/v1/carrier-accounts/${accountId}`),
+    ).send({});
+    expect(empty.status).toBe(400);
+    const [row] = await q(
+      `SELECT rollback_enabled FROM carrier_account WHERE id = $1`,
+      [accountId],
+    );
+    expect(row.rollback_enabled).toBe(true);
   });
 });
 
@@ -2384,5 +2612,15 @@ describe('18. Admin boshqaruvi', () => {
     expect(post.courier_id).toBe(CARRIER_COURIER_2_ID);
     expect(Number((await orderRow(ord.T.id)).courier_tariff)).toBe(0);
     expect((await orderRow(ord.T2.id)).courier_tariff).toBeNull();
+
+    // `reassignCourier` har buyurtma logini KUTMASDAN yozadi (PCS naqshi).
+    // Bu — oxirgi sinov: yozuvlar tugamasdan `afterAll` ilovani yopsa,
+    // commit "Connection terminated" bilan yiqiladi va jest "Cannot log after
+    // tests are done" deb 1 qaytaradi (sinovlar yashil bo'lsa ham).
+    for (const name of ['T', 'T2']) {
+      expect(
+        await waitForCarrierLog(ord[name].id, 'courier_changed'),
+      ).toBeDefined();
+    }
   });
 });

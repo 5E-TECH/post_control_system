@@ -104,8 +104,34 @@ export enum CarrierOrderStatus {
   SOLD = 'sold',
   PARTLY_SOLD = 'partly_sold',
   CANCELLED = 'cancelled',
+  /**
+   * ⚠️ YASHIRIN qiymat — faqat `carrier_account.rollback_enabled = true`
+   * akkauntga ishlaydi (sukut o'chiq). Kompaniyaga ko'rinadigan hech
+   * qayerda (Swagger enum/misol/tavsif, xato matni, `CARRIER_API.md`)
+   * aytilmaydi: `CARRIER_PUBLIC_ORDER_STATUSES`, `CarrierRollbackGateInterceptor`.
+   */
   ROLLBACK = 'rollback',
 }
+
+/**
+ * Kompaniyaga OCHIQ statuslar — Swagger enum'i, `CARRIER_API.md` §5.2
+ * jadvali va validatsiya xabari FAQAT shulardan. `rollback` bu yerda
+ * ataylab yo'q (yuqoriga qarang).
+ */
+export const CARRIER_PUBLIC_ORDER_STATUSES: readonly CarrierOrderStatus[] = [
+  CarrierOrderStatus.SOLD,
+  CarrierOrderStatus.PARTLY_SOLD,
+  CarrierOrderStatus.CANCELLED,
+];
+
+/**
+ * Noto'g'ri `status` uchun YAGONA xabar — class-validator `@IsEnum`
+ * sukut matni shaklida (`status must be one of the following values: …`),
+ * lekin faqat ochiq qiymatlar bilan. Bir xil matn uch joyda chiqadi:
+ * noma'lum qiymat (`sould`), o'chiq akkauntdagi `rollback` (gate) va
+ * servisdagi zaxira tekshiruv — kompaniya ularni farqlay olmaydi.
+ */
+export const CARRIER_STATUS_INVALID_MESSAGE = `status must be one of the following values: ${CARRIER_PUBLIC_ORDER_STATUSES.join(', ')}`;
 
 /**
  * Bekor qilish sababi — Elchi `CancelReason` bilan AYNAN bir xil qiymatlar
@@ -158,14 +184,20 @@ export class CarrierPartlySoldItemDto {
 
 export class CarrierOrderStatusRequestDto {
   @ApiProperty({
-    enum: CarrierOrderStatus,
+    enum: CARRIER_PUBLIC_ORDER_STATUSES,
     example: CarrierOrderStatus.SOLD,
     description:
       '`sold` — to‘liq sotildi; `partly_sold` — qisman (items + total_price majburiy); ' +
-      '`cancelled` — bekor (reason majburiy); `rollback` — xato belgilangan sotuv/bekorni ' +
-      'qaytarish.',
+      '`cancelled` — bekor (reason majburiy).',
   })
-  @IsEnum(CarrierOrderStatus)
+  /**
+   * Validatsiya HAMMA qiymatni (yashirin `rollback` ham) qabul qiladi —
+   * akkaunt bo'yicha qaror `CarrierRollbackGateInterceptor` da (pipe'dan
+   * OLDIN). Xabar esa doim faqat ochiq qiymatlarni sanaydi.
+   */
+  @IsIn(Object.values(CarrierOrderStatus), {
+    message: CARRIER_STATUS_INVALID_MESSAGE,
+  })
   status!: CarrierOrderStatus;
 
   @ApiPropertyOptional({ example: 'Mijoz qabul qildi', maxLength: 1000 })
@@ -331,10 +363,8 @@ export const CARRIER_ORDER_STATUS_EXAMPLES: Record<
       comment: 'Mijoz boshqa shaharga ko‘chib ketgan',
     },
   },
-  rollback: {
-    summary: 'Xato natijani bekor qilish (rollback)',
-    value: { status: CarrierOrderStatus.ROLLBACK },
-  },
+  // ⚠️ `rollback` misoli ATAYLAB yo'q — imkoniyat yashirin
+  // (`CarrierOrderStatus.ROLLBACK`). Qayta ochish: 15-carrier-api.md §12.
 };
 
 /**
@@ -740,7 +770,8 @@ export class CarrierCashboxEntryDto {
   @ApiProperty({
     example: 'sell',
     description:
-      'Manba: sell — sotuv, correction — tuzatish (rollback), courier_payment — BeePost’ga ' +
+      'Manba: sell — sotuv, correction — tuzatish (BeePost operatori natijani tuzatganda), ' +
+      'courier_payment — BeePost’ga ' +
       'topshirilgan naqd, extra_cost, courier_penalty — kechikish shtrafi/bonusi. ' +
       'Ro‘yxat OCHIQ — yangi qiymat paydo bo‘lishi mumkin.',
   })

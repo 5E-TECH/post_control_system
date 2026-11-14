@@ -71,6 +71,21 @@ export class CarrierAccountEntity extends BaseEntity {
   @Column({ type: 'boolean', default: true })
   is_active: boolean;
 
+  /**
+   * YASHIRIN SOZLAMA — kompaniya yuborgan `status: "rollback"` qabul
+   * qilinadimi. SUKUT `false` (yangi akkaunt ham, migratsiyadan keyingi
+   * eski qatorlar ham): yangi kompaniyaga ishonch hosil bo'lguncha xato
+   * natijani BeePost operatori tuzatadi. O'chiq bo'lsa `rollback` noma'lum
+   * status qiymati kabi 400 oladi (`CarrierRollbackGateInterceptor`).
+   *
+   * ⚠️ Kompaniyaga ko'rinadigan hech qayerda (Swagger, `CARRIER_API.md`,
+   * statik OpenAPI) bu imkoniyat aytilmaydi — yoqish tartibi va hujjatni
+   * qayta ochish ro'yxati: `docs/integrations/15-carrier-api.md` §12.
+   * Migratsiya: `1751100001000-CarrierRollbackToggle`.
+   */
+  @Column({ type: 'boolean', default: false })
+  rollback_enabled: boolean;
+
   @Column({ type: 'boolean', default: false })
   is_deleted: boolean;
 

@@ -1,6 +1,6 @@
 # BeePost — Carrier API (tashqi yetkazuvchi)
 
-**Dasturchilar uchun qo'llanma** · Versiya 1 (BeePost nashri) · Oxirgi yangilanish: 2026-11-10
+**Dasturchilar uchun qo'llanma** · Versiya 1 (BeePost nashri) · Oxirgi yangilanish: 2026-11-14
 
 > **Elchi Pochta Carrier API bilan bir xil kontrakt.** Yo'llar (baza
 > manzilidan keyingi qism), so'rov maydonlari, javob maydonlari va shakllari,
@@ -44,7 +44,7 @@ marta, ulanishda qilinadi. Keyingi oqim:
      (waiting) holatiga o'tadi.
 
 3. Yetkazish natijasini yuborasiz                     POST /carrier/orders/:id/status
-   sold | partly_sold | cancelled | rollback
+   sold | partly_sold | cancelled
 
 4. Bekor qilingan posilkalarni qaytarasiz             POST /carrier/returns
 
@@ -60,7 +60,7 @@ marta, ulanishda qilinadi. Keyingi oqim:
 - Sotilgan buyurtma summasi sizning **kurier kassangizga** yoziladi.
   Naqdni BeePost'ga topshirganingizda kassadan ayiriladi (§7).
 - Statuslar **bizning nomlarimizda** yuboriladi (§5.2). Sizdagi ichki
-  statuslarni shu to'rttasiga o'zingiz moslaysiz.
+  statuslarni shu uchtasiga o'zingiz moslaysiz.
 - Viloyat va tuman **nomi emas, SOATO kodi** bilan keladi (§4).
 - Barcha id'lar (buyurtma, qator, mahsulot, hudud, pochta) — **UUID satr**.
   Ularni shaffof satr deb saqlang, son sifatida o'qimang.
@@ -263,7 +263,7 @@ Javob:
 
 | Maydon | Tur | Majburiy | Izoh |
 |---|---|---|---|
-| `status` | string | ✅ | `sold` · `partly_sold` · `cancelled` · `rollback` |
+| `status` | string | ✅ | `sold` · `partly_sold` · `cancelled` |
 | `comment` | string | — | Izoh (≤1000 belgi). `reason: OTHER` bo'lsa majburiy |
 | `reason` | string | `cancelled` da ✅ | `CUSTOMER_NO_ANSWER` · `CUSTOMER_REFUSED` · `WRONG_ADDRESS` · `DEFECTIVE_PRODUCT` · `PRICE_DISPUTE` · `OTHER` |
 | `total_price` | number | `partly_sold` da ✅ | Mijoz **olgan** tovarlarning to'liq qiymati, so'm (butun son) — oldindan onlayn to'langan qism (`paid_online_amount`) ham shu ichida. Buyurtma summasidan oshmaydi. Siz yig'adigan naqd = `max(total_price − paid_online_amount, 0)` (BeePost'da `= total_price`) |
@@ -285,7 +285,11 @@ Javob:
 | `sold` | Buyurtma to'liq sotildi. Summa kassangizga yoziladi (§7). Javobdagi holat `sold`, ba'zan darhol `paid`/`partly_paid` | Holat `waiting` |
 | `partly_sold` | Qisman sotildi. Sotilmagan qism alohida `cancelled` buyurtma bo'lib ajraladi (`parent_order_id` bilan) va sizda qoladi — uni §5.5 bilan qaytarasiz | Holat `waiting`. `items` da buyurtmaning **har bir** qatori bo'lishi, kamida bitta qator kamaytirilgan va kamida bitta dona sotilgan bo'lishi kerak. Har qatorda sotilgan dona asl donadan oshmaydi. Buyurtmada tovar qatorlari bo'lishi, u almashtirish buyurtmasi bo'lmasligi va bitta mahsulot ikki qatorda takrorlanmasligi kerak (Ilova A) |
 | `cancelled` | Mijoz olmadi. Pul harakati yo'q. Posilka sizda qoladi — uni §5.5 bilan BeePost markaziga qaytarasiz | Holat `waiting` |
-| `rollback` | Xato yuborilgan `sold` yoki `cancelled` ni bekor qiladi: buyurtma `waiting` ga qaytadi, kassa yozuvi teskari yoziladi | Holat **aynan** `sold` yoki `cancelled` (bekor qilingan posilka hali sizda bo'lishi kerak). `paid` / `partly_paid` — `400`, tuzatishni BeePost operatori qiladi. Topshirilgan naqd rollback'ni to'smaydi (§7). Qisman sotuvdan ajralgan qismni va sotilmagan qismi allaqachon qaytarilgan qisman sotuvni qaytarib bo'lmaydi — `400` (Ilova A) |
+
+Natijani xato yuborgan bo'lsangiz (masalan `cancelled` o'rniga `sold`),
+BeePost operatoriga murojaat qiling — u tuzatadi va buyurtma qayta
+`waiting` ga o'tadi; to'g'ri natijani **yangi** `Idempotency-Key` bilan
+yuborasiz.
 
 Qo'shimcha xarajat (`extraCost`) va sotuvchiga to'g'ridan-to'g'ri to'lov
 (`paidAmount`) **bu versiyada yo'q**. Bunday maydon yuborilsa 400 qaytadi.
@@ -326,8 +330,7 @@ tekshiriladi, lekin **saqlanmaydi**:
 - rasm `jpeg`/`png`/`webp` yoki `pdf` — **≤10 MB**;
 - video `mp4`/`mov`/`webm` — **≤50 MB** (kattasi — `413`);
 - fayl qismi `Content-Type` i shu turlardan biri bo'lishi kerak (HEIC qabul
-  qilinmaydi); boshqa tur yoki hajm — `400`;
-- `rollback` bilan `proof` yuborilsa — `400`.
+  qilinmaydi); boshqa tur yoki hajm — `400`.
 
 Multipart'da boshqa maydonlar matn bo'lib yuboriladi: `items` — bitta
 JSON-massiv satri (`[{"order_item_id":"9b1e4c2a-…","quantity":1}]`) yoki har
@@ -346,9 +349,10 @@ satri, `old_item_collected` — `true`/`false`.
   holatini qaytaradi — "waiting emas" `400` emas. Birinchi urinish hali
   ishlayotgan bo'lsa `409` `IDEMPOTENCY_IN_PROGRESS` (ko'pi bilan 90
   soniya), keyin qayta urining.
-- `rollback` dan keyin qayta `sold`/`cancelled` — **yangi** kalit. Eski
-  kalit bilan yuborilsa amal bajarilmaydi va `409`
-  `CARRIER_IDEMPOTENCY_KEY_STALE` qaytadi.
+- Buyurtma holati o'shandan beri o'zgargan bo'lsa, eski kalit bilan
+  yuborilgan so'rov amalni bajarmaydi va `409`
+  `CARRIER_IDEMPOTENCY_KEY_STALE` qaytadi — yangi natija uchun **yangi**
+  kalit yarating.
 - Ayni kalit boshqa tana bilan yuborilsa **422** qaytadi.
 
 ```http
@@ -409,7 +413,7 @@ va BeePost'ga topshirgan naqdingiz. Pul qoidalari §7 da.
 |---|---|---|
 | `id` | string | Harakat id |
 | `type` | string | Yo'nalish: `income` — kirim, `expense` — chiqim |
-| `source_type` | string | Manba, masalan `sell` — sotuv, `correction` — tuzatish (rollback), `courier_payment` — topshirilgan naqd, `extra_cost`, `courier_penalty` — kechikish shtrafi yoki bonusi. Ro'yxat **ochiq**: yangi qiymat paydo bo'lishi mumkin |
+| `source_type` | string | Manba, masalan `sell` — sotuv, `correction` — tuzatish (BeePost operatori natijani tuzatganda, §7), `courier_payment` — topshirilgan naqd, `extra_cost`, `courier_penalty` — kechikish shtrafi yoki bonusi. Ro'yxat **ochiq**: yangi qiymat paydo bo'lishi mumkin |
 | `amount` | number | Summa, so'm — **doim musbat**; yo'nalish `type` da. `sell` qatori ham `expense` bo'lishi mumkin (summa yetkazish haqidan kam buyurtma, §7) |
 | `balance_after` | number | Shu harakatdan keyingi balans |
 | `order_id` | string \| null | Buyurtma bilan bog'liq qatorda — buyurtma id |
@@ -483,10 +487,11 @@ emas, "boshqa" deb qabul qilsin.
   **chiqim** yoziladi (`courier_payment`) va tarixda ko'rinadi (§5.4).
   BeePost'da topshirilgan naqd alohida sotuvlarga bog'lanmaydi — u faqat
   umumiy balansni kamaytiradi.
-- `rollback` sotuvni teskari yozadi (`correction` qatori). BeePost'da naqd
-  topshirilgandan keyin ham rollback ishlaydi: balans **manfiy** bo'lishi
-  mumkin — bu BeePost sizga qarzdor degani, farq keyingi hisob-kitobda
-  yopiladi.
+- **Xato yuborilgan natija**ni BeePost operatori tuzatadi: buyurtma qayta
+  `waiting` ga o'tadi va sotuv kassada teskari yoziladi (`correction`
+  qatori). Bu naqd topshirilgandan keyin ham bo'lishi mumkin: balans
+  **manfiy** bo'lishi mumkin — bu BeePost sizga qarzdor degani, farq keyingi
+  hisob-kitobda yopiladi.
 
 ---
 
@@ -522,7 +527,7 @@ emas, "boshqa" deb qabul qilsin.
    `GET /carrier/ping` bilan kalit ishlayotganini tekshiring.
 2. Sinov buyurtmasi akkauntingizga jo'natilgach: `scan` → `status: sold`
    → `GET /carrier/cashbox` da kirimni ko'ring.
-3. Sizdagi statuslarni §5.2 dagi to'rtta qiymatga moslang.
+3. Sizdagi statuslarni §5.2 dagi uchta qiymatga moslang.
 4. Har bir holat yuborishda **yangi** `Idempotency-Key` (UUID) yarating;
    qayta urinishda ayni kalitni ishlating.
 5. Bekor qilingan posilkalarni `POST /carrier/returns` bilan qaytaring.
@@ -543,7 +548,6 @@ emas, "boshqa" deb qabul qilsin.
 | `property extraCost should not exist` (400) | v1 da qo'shimcha xarajat yo'q | Maydonni olib tashlang |
 | Almashtirish buyurtmasi (400) | `old_item_collected: true` yuborilmagan | `order.replacement` ga qarang |
 | Qisman sotib bo'lmaydi (400) | Buyurtmada tovar qatorlari yo'q, almashtirish buyurtmasi yoki bitta mahsulot ikki qatorda | `sold` yoki `cancelled` yuboring yoki BeePost operatoriga murojaat qiling |
-| Rollback mumkin emas (400) | `paid`/`partly_paid`, qisman sotuvdan ajralgan qism yoki sotilmagan qismi qaytarilgan qisman sotuv | BeePost operatoriga murojaat qiling |
 | Isbot fayli mos emas (400) / 50 MB dan katta (413) | `proof` turi yoki hajmi qoidaga mos emas | Faylni tuzating yoki yubormang — BeePost'da isbot majburiy emas |
 | `CARRIER_COURIER_INACTIVE` (403) | Bog'langan kurier bloklangan | BeePost operatoriga murojaat qiling |
 | `Carrier akkaunt faol emas` (403) | Akkaunt o'chirilgan | BeePost operatoriga murojaat qiling |
@@ -595,13 +599,11 @@ kalitni tizim bo'yicha sozlaydi; (2) id'larni shaffof satr deb saqlaydi;
 
 | # | Mavzu | Elchi | BeePost | Kodingizga ta'siri |
 |---|---|---|---|---|
-| A15 | Rollback va topshirilgan naqd | Hisob-kitobi yopilgan sotuv (naqd eng eski sotuvlardan yopiladi) — `400` | Per-buyurtma hisob-kitobi **yo'q**: naqd topshirilgandan keyin ham rollback ishlaydi; balans manfiy bo'lishi mumkin (BeePost sizga qarzdor) | Balans manfiy bo'lishini ko'taradigan qiling. `paid`/`partly_paid` → `400` qoidasi bir xil |
-| A16 | Qisman sotuv bilan bog'liq rollback | — | Qisman sotuvdan ajralgan qism (`parent_order_id` bor) — `400`; sotilmagan qismi `cancelled` emas yoki allaqachon qaytarilgan qisman sotuv — `400` | Bunday tuzatishni BeePost operatori qiladi |
 | A17 | `partly_sold` qo'shimcha shartlari | Qator `order_item_id` bo'yicha moslanadi | Qo'shimcha `400`: almashtirish buyurtmasi; bitta `product_id` ikki qatorda; tovar qatorlari yo'q (A11); `total_price` butun so'm emas; `items` da bitta buyurtma qatori ikki marta (masalan `order_item_id` va `product_id` bilan) | Bunday buyurtmani `sold`/`cancelled` qiling yoki operatorga murojaat qiling |
 | A18 | Almashtirishda eski mahsulot | — | Almashtirish buyurtmasi sotilganda eski buyurtma avtomatik **sizning qaytarish pochtangizga** qo'shiladi (`/carrier/orders` da ko'rinmaydi) | Eski mahsulotni keyingi qaytarish bilan BeePost markaziga topshiring |
 | A19 | Isbot (`proof`) | Sotuvchi talab qilsa majburiy (aks holda `400`); fayl saqlanadi | **Talab qilinmaydi**; yuborilsa bir xil qoidalar bilan tekshiriladi (`400`/`413`), lekin **saqlanmaydi** | Yo'q — Elchi kodi o'zgarishsiz ishlaydi |
 | A20 | Kassa yozuvi vaqti | Bir necha soniya kechikadi (navbat) | Holat bilan **bir tranzaksiyada** | Yo'q |
-| A21 | Kassa `source_type` | `sell`, `cancel`, `correction`, `courier_payment`, `extra_cost`, `payment_reversal` | `sell`, `correction` (rollback), `courier_payment`, `extra_cost`, `courier_penalty` (kechikish shtrafi/bonusi; Carrier akkaunt shtrafdan ozod, shuning uchun odatda chiqmaydi). `cancel` va `payment_reversal` yozilmaydi | Ro'yxat ochiq — noma'lum qiymatni "boshqa" deb qabul qiling |
+| A21 | Kassa `source_type` | `sell`, `cancel`, `correction`, `courier_payment`, `extra_cost`, `payment_reversal` | `sell`, `correction` (operator tuzatishi, §7), `courier_payment`, `extra_cost`, `courier_penalty` (kechikish shtrafi/bonusi; Carrier akkaunt shtrafdan ozod, shuning uchun odatda chiqmaydi). `cancel` va `payment_reversal` yozilmaydi | Ro'yxat ochiq — noma'lum qiymatni "boshqa" deb qabul qiling |
 | A22 | 504 | Ichki xizmat timeout'i | Faqat proksi timeout'i | Yo'q — ayni `Idempotency-Key` bilan qayta urinish qoidasi bir xil |
 | A23 | `/carrier/*` dan tashqaridagi xato | — | Mavjud bo'lmagan yo'l, buzilgan JSON, 64 MB dan katta tana — BeePost'ning umumiy xato shakli (`code`/`trace_id` siz) bo'lishi mumkin | Qarorni `statusCode` ga qarab qiling |
 | A24 | `X-Trace-Id` javob sarlavhasi | Hujjatlanmagan | `/carrier/*` xato javobida tanadagi `trace_id` bilan bir xil qiymat | Tanadagi `trace_id` ga tayaning — u ikkala tizimda bor |

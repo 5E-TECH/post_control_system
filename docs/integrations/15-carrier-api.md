@@ -7,6 +7,9 @@
 > BeePost nashri, Ilova A — profil farqlari) · Statik spec: [`../carrier-openapi.json`](../carrier-openapi.json)
 > Tayanch: Elchi-Backend `feat/carrier-api` @ `affbd7b4` — `docs/public/CARRIER_API.md`,
 > `apps/api-gateway/src/carrier-*.ts`, `apps/integration-service/src/carrier/`.
+> **2026-11-14:** `rollback` endi **yashirin** va akkaunt bo'yicha yoqiladi
+> (`carrier_account.rollback_enabled`, sukut **o'chiq**) — §12. Kompaniyaga
+> ko'rinadigan materialda (Swagger, `CARRIER_API.md`, statik spec) aytilmaydi.
 
 ---
 
@@ -28,7 +31,7 @@ LDG/Elchi webhooklaridagi `elchiActor` naqshi, `order.service.ts:7843-7849`):
 | `sold` | `OrderService.sellOrder` |
 | `partly_sold` | `OrderService.partlySold` |
 | `cancelled` | `OrderService.cancelOrder` |
-| `rollback` | `OrderService.rollbackOrderToWaiting` (`target_status: 'waiting'`) |
+| `rollback` (**yashirin**, faqat `rollback_enabled` akkauntda — §12) | `OrderService.rollbackOrderToWaiting` (`target_status: 'waiting'`) |
 | `POST /carrier/returns` | `PostService.createCanceledPost` |
 
 **Yangi pul mantiqi YO'Q.** Kassa, tarif, shtraf, investor ulushi — oddiy
@@ -54,7 +57,7 @@ ochiq `GET order/qr-code/:token` ni yopish (alohida vazifa).
 | D2 | Baza manzili global prefiks bilan: `https://<beepost-domain>/api/v1` → `/api/v1/carrier/*` | nginx faqat `/api/` ni backendga uzatadi; prefiksdan istisno qilish yangi nginx/SPA to'qnashuvi xavfini beradi |
 | D3 | Kalit prefiksi `bpc_` (`CARRIER_KEY_PREFIX`) | Elchi `elc_` dan ajralib tursin — operator va loglarda qaysi tizim kaliti ekani ko'rinadi |
 | Q2 | Shtrafdan ozodlik — avtomatik, `external_provider='carrier'` orqali | Mavjud PCS xulqi: har qanday `external_provider` kechikish shtrafini o'chiradi (`courier-penalty.service.ts:138`) |
-| Q4 | Naqd topshirilgandan keyin ham rollback ruxsat | PCS'da per-buyurtma kuryer hisob-kitobi yo'q; FIFO bu fazada qilinmaydi. Ilova A15 da hujjatlangan |
+| Q4 | Naqd topshirilgandan keyin ham rollback ruxsat | PCS'da per-buyurtma kuryer hisob-kitobi yo'q; FIFO bu fazada qilinmaydi. Ilova A15 da hujjatlangan edi — 2026-11-14 dan rollback yashirin, A15 ochiq hujjatdan olib tashlangan (§12) |
 | Q5 | Bekor sababi: `cancelOrder` ga `comment = "[<REASON>] <comment>"` + activity-log `metadata.reason`. Yangi ustun yo'q | Hisobot uchun ustun keyin kerak bo'lsa — alohida migratsiya |
 | Q6 | `proof` qabul qilinadi va Elchi qoidalari bilan tekshiriladi (MIME, rasm/pdf ≤10 MB, video ≤50 MB), keyin **tashlanadi** (saqlanmaydi). Multer memory storage, 50 MB qat'iy chegara | PCS'da isbot faqat qo'shimcha xarajat yoki yashirin narx tushirishda kerak; v1 ikkalasini ham taqiqlaydi. Elchi uchun yozilgan kod buzilmasin |
 | Q7 | Alohida Swagger `/api/v1/carrier-docs` (JSON `/api/v1/carrier-docs-json`). Dev'da ochiq; production'da faqat `CARRIER_DOCS_ENABLED` ∈ {true,1,yes} **va** `CARRIER_DOCS_PASSWORD` bo'lsa, HTTP Basic Auth ortida (qo'lda yozilgan middleware, `timingSafeEqual`, yangi npm paket yo'q). Statik `docs/carrier-openapi.json` ham commit qilinadi | Tashqi dasturchiga ichki API xaritasi kerak emas; asosiy Swagger production'da o'chiq (`app.service.ts:216-221`) |
@@ -75,6 +78,7 @@ server/src/
 │   ├── carrier-account.entity.ts           carrier_account (kalit xeshi, IP ro'yxati, kuryer)
 │   └── carrier-idempotency-key.entity.ts   carrier_idempotency_key (Idempotency-Key daftari)
 ├── migrations/1751100000000-CarrierApi.ts  ikki jadval, IF NOT EXISTS, nomlangan PK/FK/UQ/IDX
+├── migrations/1751100001000-CarrierRollbackToggle.ts  carrier_account.rollback_enabled (NOT NULL DEFAULT false)
 └── api/carrier/
     ├── carrier.module.ts                   controllerlar tartibi: Admin, keyin Public
     ├── carrier-error-codes.ts              CARRIER_*/IDEMPOTENCY_* kodlari (Elchi bilan aynan), bpc_, carrierActor
@@ -86,6 +90,7 @@ server/src/
     ├── carrier-order-view.ts               toCarrierOrderView (Elchi allowlist'i)
     ├── carrier-cashbox-view.ts             toCarrierCashboxView (PCS manba turlari bilan)
     ├── carrier-swagger.ts                  alohida OpenAPI hujjati + Basic Auth
+    ├── carrier-rollback-gate.interceptor.ts yashirin rollback darvozasi (§12)
     ├── dto/                                Elchi DTO nomlari va maydonlari aynan
     ├── guards/                             CarrierIpThrottlerGuard (kalitdan oldin), CarrierApiKeyGuard, CarrierThrottlerGuard
     ├── filters/carrier-exception.filter.ts {statusCode, message, code?, trace_id}
@@ -132,7 +137,7 @@ CarrierApiKeyGuard
   4. akkaunt is_active=false               → 403
   5. IP ro'yxatda yo'q                     → 403 (aniqlangan IP xabarda) — kuryer holatidan OLDIN
   6. kuryer faol emas / 'carrier' emas     → 403 CARRIER_COURIER_INACTIVE
-  7. request.carrier = {id, name, courier_user_id}; last_used_at (≤1/daq)
+  7. request.carrier = {id, name, courier_user_id, rollback_enabled}; last_used_at (≤1/daq)
   │
   ▼
 CarrierThrottlerGuard   bitta akkaunt = bitta savat (barcha handler), 120/60 s
@@ -140,6 +145,10 @@ CarrierThrottlerGuard   bitta akkaunt = bitta savat (barcha handler), 120/60 s
   ▼
 FileInterceptor('proof') memory, 50 MB → oshsa 413 (Nest multer transform)
   │
+  ▼
+CarrierRollbackGateInterceptor   faqat holat endpointi: rollback_enabled=false bo'lsa
+  │                              `status:"rollback"` tanadan olinadi → pipe uni noma'lum
+  │                              qiymat kabi rad etadi (§12)
   ▼
 global ValidationPipe   whitelist + forbidNonWhitelisted → 422 …
   │                                          … CarrierExceptionFilter uni 400 qiladi
@@ -163,7 +172,7 @@ alohida filtr.
 |---|---|---|
 | `GET /carrier/ping` | — | — |
 | `POST /carrier/scan` | `normalizeQrToken`; egalik filtri bilan qidiruv (`qr_code_token = :t` VA egalik). Bir nechta mos qator (token noyob emas, `order.entity.ts:47-50`) → yakuniy bo'lmagan holat, keyin eng yangisi | Holat `on the road` → `receiveOrderForCourierById`. Poyga bo'lsa qayta o'qish: endi `waiting` va sizniki → `received:false`. Boshqa holat → `received:false` |
-| `POST /carrier/orders/:id/status` | UUID (400); `Idempotency-Key` (≤255, bo'sh emas, aks holda 400 `CARRIER_IDEMPOTENCY_KEY_REQUIRED`); egalik (404); `sold`/`partly_sold`/`cancelled` → holat `waiting`; `rollback` → aynan `sold`/`cancelled`; proof qoidalari | §5 bo'yicha idempotent bajarish |
+| `POST /carrier/orders/:id/status` | UUID (400); `Idempotency-Key` (≤255, bo'sh emas, aks holda 400 `CARRIER_IDEMPOTENCY_KEY_REQUIRED`); egalik (404); `sold`/`partly_sold`/`cancelled` → holat `waiting`; `rollback` — faqat `rollback_enabled` akkauntda (aks holda egalikdan ham OLDIN noma'lum status 400, §12), keyin aynan `sold`/`cancelled`; proof qoidalari | §5 bo'yicha idempotent bajarish |
 | `GET /carrier/orders` | Elchi holatlarining to'liq ro'yxati qabul qilinadi; `from`/`to` Toshkent kuni (`toUzbekistanTimestamp`), kalendarda bor kun bo'lishi shart (`2026-02-31` → 400; Elchi jimgina keyingi oyga suradi — Ilova A25); `limit` ∈ {10,25,50,100} | Alohida QueryBuilder (`allCouriersOrders` ishlatilmaydi — u `IN (...)` ro'yxati quradi va qaytarilganlarni chiqarmaydi) |
 | `GET /carrier/cashbox` | Oyna: sukut 30 kun, eng ko'pi 92 kun | Kuryerning `FOR_COURIER` kassasi + oynadagi `cashbox_history` (`myCashbox` emas — u "bugun" ni oladi va xodim ma'lumotini qo'shadi) |
 | `POST /carrier/returns` | 1–50 UUID; **kompaniya bo'yicha navbat** (`carrier_returns:<kuryer>` advisory lock, R16); allaqachon shu kuryerning CANCELED pochtasida → o'sha `post_id` (idempotent); sizniki emas → 404 (butun so'rov); `cancelled` emas → 400 | Qolganlari → `createCanceledPost` (u qayta yuborilgan id'ga 400 berardi, `post.service.ts:1765-1771`) |
@@ -327,8 +336,9 @@ Elchi topshirilgan naqdni eng eski sotuvlarga bog'laydi va "yopilgan" sotuvni
 rollback qilmaydi. PCS'da kuryer tomonida per-buyurtma hisob-kitob ustuni
 yo'q, kuryer rollback'i faqat holatga qaraydi (`order.service.ts:4899-4906`).
 Natija: naqd topshirilgandan keyingi rollback kuryer kassasini **manfiyga**
-tushirishi mumkin (BeePost provayderga qarzdor). Q4 bo'yicha qabul qilingan va
-`CARRIER_API.md` Ilova A15 da hujjatlangan. Parity kerak bo'lsa — alohida faza
+tushirishi mumkin (BeePost provayderga qarzdor). Q4 bo'yicha qabul qilingan.
+`CARRIER_API.md` da endi faqat "operator tuzatishi" sifatida (§7) — rollback
+yashirin (§12), Ilova A15 olib tashlangan. Parity kerak bo'lsa — alohida faza
 (kuryer settlement ustuni + `paymentsFromCourier` da FIFO; ~5–7 kun, pul
 yadrosi va deploy invariantlariga tegadi).
 
@@ -442,7 +452,10 @@ o'zbekcha `it` sarlavhalari):
 `carrier-wiring.spec.ts`, `carrier-di.spec.ts` (haqiqiy `CarrierModule` DI
 grafi + HTTP guard → filtr zanjiri, aylanma import yo'qligi),
 `carrier-swagger.spec.ts` (`/api/v1/carrier-docs` ulanish qoidalari va Basic
-auth), `carrier-openapi-drift.spec.ts`, `carrier-api-docs-contract.spec.ts`
+auth), `carrier-rollback-toggle.spec.ts` (yashirin rollback: HTTP orqali
+noma'lum status bilan aynan bir xil javob, yon ta'sirsizlik, admin DTO),
+`carrier-public-docs-hidden.spec.ts` (ochiq materialda "rollback" yo'qligi),
+`carrier-openapi-drift.spec.ts`, `carrier-api-docs-contract.spec.ts`
 (`CARRIER_API.md` jadvallari ↔ DTO/ko'rinishlar), `carrier-schema.spec.ts`
 (entity ↔ migratsiya konstruksiya nomlari; hammasi `src/api/carrier/` ostida) va
 `src/api/post/post-carrier-receive.spec.ts`.
@@ -516,6 +529,104 @@ kalitlariga qarshi tekshiradi.
 | T1 | Pochta carrier'dan **ichki** kuryerga o'tkazilsa, carrier'ning muzlatilgan hudud tarifi buyurtmalarda qoladi va ichki kuryerga o'sha stavka to'lanadi | Ichki kuryerlar orasidagi o'tkazishdagi mavjud xulq bilan bir xil (u ham tarifga tegmaydi). Tuzatish kerak bo'lsa — barcha `reassignCourier` uchun yagona qoida (alohida vazifa) |
 | T2 | `sendPost` (va unga teng carrier `reassign`) super kuryerga jo'natishda marketplace ko'p qutili buyurtmaning `courier_tariff = 0` ini hudud tarifiga almashtiradi — har quti uchun haq to'lanadi | PCS'dagi mavjud xulq (carrier'dan oldin ham). Tuzatish `sendPost` da — alohida vazifa, carrier spec "sendPost bilan aynan bir xil" talab qilgani uchun bu yerda o'zgartirilmadi |
 | P1 | PCS `createCanceledPost` parallel takrorda pochta hisoblagichlarini ikki marta oshiradi (ichki kuryer ikki marta bossa) | Carrier yo'li navbat bilan yopilgan (R16); PCS'ning o'zida — qulfdan keyin buyurtmalarni `FOR UPDATE` + holat bilan qayta tanlash (alohida vazifa) |
+
+---
+
+## 12. Yashirin rollback (`rollback_enabled`) — ICHKI
+
+> ⚠️ Bu bo'lim faqat jamoa uchun. Kompaniyaga beriladigan hech qayerda
+> (Swagger, `CARRIER_API.md`, `docs/carrier-openapi.json`, PDF) bu imkoniyat
+> aytilmaydi — `carrier-public-docs-hidden.spec.ts` (bloklovchi CI qadami)
+> "rollback" so'zi ochiq materialga qaytib kirsa yiqiladi.
+
+**Qaror (ega, 2026-11-14).** Kompaniya bilan endi ishlay boshlayapmiz.
+Ishonch hosil bo'lguncha kompaniya o'zi yuborgan `sold`/`cancelled` ni
+bekor qila olmaydi — xato natijani BeePost operatori tuzatadi. Keyinchalik
+ehtiyoj bo'lsa admin akkaunt uchun bitta tugma bilan yoqadi. Elchi bilan
+**umumiy kontrakt** — Elchi'da ham xuddi shunday (`PATCH /admin/carriers/:id`).
+
+### 12.1 Nima qiladi
+
+| | `rollback_enabled = false` (SUKUT) | `rollback_enabled = true` |
+|---|---|---|
+| `POST /carrier/orders/:id/status` `{"status":"rollback"}` | **400**, xabar `status must be one of the following values: sold, partly_sold, cancelled`, `code` yo'q — noma'lum qiymat (`"sould"`) bilan **aynan bir xil** javob (boshqa maydon xatolari bilan birlashgan xabar ham). Hech qanday yon ta'sir yo'q: egalik o'qilmaydi, `Idempotency-Key` band qilinmaydi, PCS amali va kassa yozuvi yo'q | Avvalgidek (§3, §6.4): faqat `sold`/`cancelled` → `waiting`, `rollback_correction` kassada |
+| Boshqa statuslar | o'zgarmagan | o'zgarmagan |
+| Har qanday noto'g'ri `status` xabari | faqat `sold, partly_sold, cancelled` | faqat `sold, partly_sold, cancelled` (yoqilgan akkauntga ham rollback sanalmaydi) |
+
+**Qanday.** `CarrierApiKeyGuard` `request.carrier.rollback_enabled` ni
+akkaunt qatoridan o'rnatadi (faqat aniq `true`). `CarrierRollbackGateInterceptor`
+(multer'dan keyin, global ValidationPipe'dan OLDIN) o'chiq akkauntda
+`status: "rollback"` ni tanadan olib tashlaydi — keyin AYNI pipe uni
+`@IsIn(..., { message: CARRIER_STATUS_INVALID_MESSAGE })` bilan noma'lum
+qiymat deb rad etadi. Shu sababli javob tanib bo'lmas darajada bir xil
+(alohida 400 otilsa, birlashgan xabarlar farq qilib rollback "taniladigan"
+qiymat ekani bilinardi). Zaxira devor: `CarrierService.updateStatus` boshida
+`assertCarrierStatusAllowed` (egalik va idempotentlikdan OLDIN).
+
+**Kuchga kirish vaqti: darhol.** `validateKey` har so'rovda bazaga boradi,
+kesh yo'q — admin o'zgartirgandan keyingi **birinchi** so'rovdayoq yangi
+qiymat. Maksimal kechikish 0; faqat o'sha paytda guard'dan o'tib bo'lgan
+so'rov eski qiymat bilan tugaydi.
+
+**Sukut.** Migratsiya `1751100001000-CarrierRollbackToggle`:
+`ADD COLUMN IF NOT EXISTS "rollback_enabled" boolean NOT NULL DEFAULT false` —
+deploydan keyin **barcha** mavjud akkauntlar o'chiq. Yangi akkaunt ham doim
+`false`: `POST /api/v1/carrier-accounts` bu maydonni qabul qilmaydi
+(`forbidNonWhitelisted` — noma'lum maydon, 422).
+
+### 12.2 Qanday yoqiladi / o'chiriladi
+
+- **Admin panel:** Integratsiyalar → Yetkazuvchilar → «Carrier API» →
+  akkauntni tanlang → **Sozlamalar** → «Rollback (natijani bekor qilish)»
+  tugmasi → tasdiq oynasi. Akkauntlar jadvalida yoqilgan akkaunt «Holat»
+  ustunida «rollback yoqilgan» belgisi bilan ko'rinadi.
+- **API (SUPERADMIN, ADMIN):** `PATCH /api/v1/carrier-accounts/:id`
+  `{"rollback_enabled": true}` (yoki `false`; yolg'iz yoki `name` /
+  `ip_allowlist` bilan birga). Faqat boolean — `"true"` satri 422.
+  Javobda va `GET /api/v1/carrier-accounts` da `rollback_enabled`.
+- **Audit:** `activity_logs` — `entity_type = 'CarrierAccount'`,
+  `action = 'updated'`, `old_value: {rollback_enabled: false}` →
+  `new_value: {rollback_enabled: true}`, tavsif «… — rollback yoqildi».
+  Panelda «Faollik» bo'limida ko'rinadi.
+- **O'chiq paytda xato natija:** kompaniya operatorga murojaat qiladi,
+  superadmin buyurtmani odatdagi rollback bilan (`POST
+  /api/v1/order/rollback/:id`, buyurtma sahifasi) `waiting` ga qaytaradi —
+  kassada `rollback_correction` (kompaniyaga `correction` bo'lib ko'rinadi),
+  kompaniya to'g'ri natijani YANGI `Idempotency-Key` bilan yuboradi.
+
+### 12.3 Qayta ochish ro'yxati (kompaniyaga rollback'ni aytish qarori)
+
+Admin biror kompaniyaga rollback'ni yoqsa, **kompaniyaga ayting** — aks
+holda ular bu imkoniyatdan bexabar qoladi (va o'chirilsa, noma'lum status
+400 ni tushunmaydi). Qoidalar: faqat `sold`/`cancelled` → `waiting`;
+`paid`/`partly_paid` — operator; qisman sotuv bolasi va qaytarilgan qismli
+ota — 400; rollback bilan `proof` — 400; rollback'dan keyingi natija — yangi
+`Idempotency-Key`; naqd topshirilgandan keyin ham ishlaydi (balans manfiy
+bo'lishi mumkin).
+
+Ochiq hujjat BARCHA kompaniyalar uchun bitta. Bitta kompaniyaga yoqilsa —
+unga alohida ilova (quyidagi asl matnlar) bering; rollback hamma uchun
+siyosat bo'lsa — ochiq materialni qaytaring:
+
+| # | Joy | Nima qaytariladi |
+|---|---|---|
+| 1 | `server/src/api/carrier/dto/carrier-public.dto.ts` | `CARRIER_PUBLIC_ORDER_STATUSES` ga `ROLLBACK` (Swagger enum va validatsiya xabari shundan); `status` tavsifi; `CARRIER_ORDER_STATUS_EXAMPLES.rollback` misoli; kassa `source_type` tavsifidagi "(rollback)" |
+| 2 | `server/src/api/carrier/carrier-public.controller.ts` | Holat endpointining `summary` (`…, rollback`) va `description` (rollback qoidasi) |
+| 3 | `server/src/api/carrier/carrier-swagger.ts` | `CARRIER_SWAGGER_GUIDE`: "Ish tartibi" 2-qadam, status jadvali qatori, `Idempotency-Key` STALE izohi, "Pul" bo'limi |
+| 4 | `CARRIER_API.md` | §1 oqim va "to'rttasiga", §5.2 maydon jadvali + statuslar jadvali qatori + isbot qoidasi + idempotentlik izohi, §5.4 `source_type`, §7, §8 "to'rtta qiymat", §9 "Rollback mumkin emas (400)", Ilova A15, A16, A21 |
+| 5 | `docs/carrier-openapi.json` | `cd server && npm run docs:carrier-openapi` |
+| 6 | PDF | `CARRIER_API.md` dan qayta yasab yuboring (repoda PDF yo'q) |
+| 7 | Testlar | `carrier-public-docs-hidden.spec.ts` (qayta ko'rib chiqing/o'chiring), `carrier-status-examples.spec.ts` (summary, misollar), `carrier-api-docs-contract.spec.ts` (§5.2 jadvali = ochiq statuslar), `carrier-rollback-toggle.spec.ts` (xabar matni) |
+| 8 | Klient | `client/src/pages/integrations/components/carrier/CarrierKeyTab.tsx` — dasturchi kartasidagi endpoint tavsifi |
+| 9 | Elchi | Umumiy kontrakt — Elchi'dagi ochiq material ham birga |
+
+Asl matnlar: PR #1090 boshi `7f3a11dc` (`git show 7f3a11dc:CARRIER_API.md`,
+`…:server/src/api/carrier/carrier-swagger.ts` va h.k.).
+
+⚠️ Eski nusxa: `CARRIER_API.md` / PDF / Swagger'ning rollback'li nashri
+kompaniyaga allaqachon berilgan bo'lsa, ular imkoniyatni biladi — o'chiq
+akkauntda `rollback` noma'lum status 400 oladi. Bunday holatda kompaniyaga
+yangilangan hujjatni bering.
 
 ---
 

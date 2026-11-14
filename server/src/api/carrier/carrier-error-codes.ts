@@ -60,6 +60,13 @@ export interface CarrierPrincipal {
   id: string;
   name: string;
   courier_user_id: string;
+  /**
+   * YASHIRIN: `status: "rollback"` shu akkauntga ruxsatmi
+   * (`carrier_account.rollback_enabled`, sukut `false`). Guard har so'rovda
+   * bazadan o'qiydi (kesh yo'q) — admin o'zgartirishi keyingi so'rovdayoq
+   * kuchga kiradi.
+   */
+  rollback_enabled: boolean;
 }
 
 /**

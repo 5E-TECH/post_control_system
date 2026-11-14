@@ -225,6 +225,7 @@ Qo'llanadiganlar (prod holatiga qarab):
 | 10 | `OrderMarketNet` | `order.market_net` (ishorali) + qisman indeks; backfill `= to_be_paid` |
 | 11 | `OrderMarketSettled` | `order.market_settled` (ishorali); backfill `= paid_amount` |
 | 12 | `CarrierApi` (`1751100000000`) | `carrier_account` + `carrier_idempotency_key` jadvallari (tashqi yetkazuvchi kalitlari va `Idempotency-Key` daftari) |
+| 13 | `CarrierRollbackToggle` (`1751100001000`) | `carrier_account.rollback_enabled boolean NOT NULL DEFAULT false` — yashirin rollback ruxsati, barcha akkauntlarda **o'chiq** |
 
 `CarrierApi` xavfsizligi: faqat ikkita YANGI jadval yaratadi
 (`CREATE TABLE/INDEX IF NOT EXISTS`); mavjud jadvallarga tegmaydi — yagona
@@ -236,6 +237,17 @@ barcha carrier kalitlari va idempotentlik daftari **yo'qoladi** — faqat
 deploy muvaffaqiyatsiz bo'lsa ishlating. Kuryerlarning tasodifiy paroli
 qaytarilmaydi (ular baribir kira olmaydi — kerak bo'lsa admin parolni
 yangilaydi).
+
+`CarrierRollbackToggle` xavfsizligi: bitta ustun (`ADD COLUMN IF NOT
+EXISTS`, doimiy sukut — PG 11+ jadvalni qayta yozmaydi, qulf qisqa). Pulga
+tegmaydi. ⚠️ XULQ O'ZGARADI: deploydan keyin HECH BIR kompaniya
+`status: "rollback"` yubora olmaydi (noma'lum status kabi 400) — bu ega
+qarori (2026-11-14). Kerak bo'lsa admin akkaunt uchun yoqadi: panel
+«Sozlamalar» → «Rollback (natijani bekor qilish)» yoki
+`PATCH /api/v1/carrier-accounts/:id {"rollback_enabled": true}`. Bu
+imkoniyat kompaniyaga hujjatlarda **ko'rsatilmaydi**; yoqish tartibi va
+hujjatni qayta ochish ro'yxati — `docs/integrations/15-carrier-api.md` §12.
+`down()` ustunni o'chiradi (eski kod rollback'ni hammaga ochiq ishlatadi).
 
 `SoatoDistrictsBackfill` xavfsizligi: faqat qo'shadi, mavjud qatorlarga
 tegmaydi (sha256 barmoq izi bilan tekshirilgan), idempotent, `down()` faqat
@@ -303,6 +315,7 @@ KO'RINMAYDI, lekin bu shartsiz so'rov soxta ogohlantirish beradi.
 | 17 | Prod'da `CARRIER_DOCS_*` berilmagan bo'lsa `https://<domain>/api/v1/carrier-docs` ochilMAYDI; berilgan bo'lsa login/parol so'raydi |
 | 18 | `verify` job'ida `💼 Carrier API testlari (BLOKLOVCHI)` yashil |
 | 19 | Registr chetlab o'tishi yopiq: `curl -i -H 'X-Forwarded-For: 203.0.113.10' -H 'X-Api-Key: <sinov kaliti>' https://<domain>/api/v1/CARRIER/ping` → `404` va JSON'da `trace_id` (`200`/`403` bo'lsa — ilova eski versiyada) |
+| 20 | Yashirin rollback o'chiq: `SELECT count(*) FROM carrier_account WHERE rollback_enabled;` → `0` (admin ataylab yoqmagan bo'lsa). Sinov akkaunti bilan `POST /api/v1/carrier/orders/<id>/status` `{"status":"rollback"}` → `400`, xabar `status must be one of the following values: sold, partly_sold, cancelled`; `https://<domain>/api/v1/carrier-docs-json` da "rollback" so'zi yo'q |
 
 ---
 
