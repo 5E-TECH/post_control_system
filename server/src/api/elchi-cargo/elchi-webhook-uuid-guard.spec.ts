@@ -33,6 +33,13 @@ describe('ElchiWebhookService.applyStatusUpdate — UUID darvozasi', () => {
     });
 
     expect(res.status).toBe('skipped'); // throw EMAS
+    // Jurnal (`error_message` = note) aniq sababni aytadi, «topilmadi» EMAS:
+    expect(res.note).toContain(
+      "external_order_id noto'g'ri format (UUID emas)",
+    );
+    expect(res.note).toContain('order_id=labeltest-XYZ-123');
+    expect(res.note).toContain('shipment_id=1251130');
+    expect(res.message).not.toMatch(/topilmadi/);
     // order_id (non-UUID) bo'yicha HECH QACHON qidirilmadi:
     const orderIdCalls = findOne.mock.calls.filter(
       (c) => c[0]?.where?.order_id !== undefined,
@@ -59,5 +66,34 @@ describe('ElchiWebhookService.applyStatusUpdate — UUID darvozasi', () => {
       (c) => c[0]?.where?.order_id !== undefined,
     );
     expect(orderIdCalls.length).toBe(1);
+  });
+
+  it("to`g`ri UUID, posilka yo'q -> «Posilka topilmadi», format xatosi EMAS", async () => {
+    const svc = buildSvc(jest.fn().mockResolvedValue(null));
+
+    const res = await svc.applyStatusUpdate(CFG, {
+      event: 'shipment.status_changed',
+      external_order_id: 'f6788cbb-4543-48d0-b56a-a5bd540e18c3',
+      status: 'cancelled',
+      shipment_id: '999',
+    });
+
+    expect(res.status).toBe('skipped');
+    expect(res.message).toMatch(/Posilka topilmadi/);
+    expect(res.note).not.toMatch(/noto'g'ri format/);
+  });
+
+  it("external_order_id bo'sh -> «Posilka topilmadi», format xatosi EMAS", async () => {
+    const svc = buildSvc(jest.fn().mockResolvedValue(null));
+
+    const res = await svc.applyStatusUpdate(CFG, {
+      event: 'shipment.status_changed',
+      status: 'cancelled',
+      shipment_id: '999',
+    });
+
+    expect(res.status).toBe('skipped');
+    expect(res.message).toMatch(/Posilka topilmadi/);
+    expect(res.note).not.toMatch(/noto'g'ri format/);
   });
 });
