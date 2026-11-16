@@ -77,6 +77,13 @@ const CARRIER_PATH_PREFIX = '/carrier/';
  */
 export const CARRIER_SWAGGER_GUIDE = `BeePost posilkalarini yetkazadigan tashqi kompaniya uchun API. Elchi Pochta Carrier API bilan **bir xil kontrakt**: yo'llar, maydonlar, javob shakllari va xato \`code\` lari bir xil — farq baza manzili, kalit va "BeePost profili" (\`CARRIER_API.md\`, Ilova A). BeePost'da siz **bitta kurier akkaunti** sifatida ishlaysiz: BeePost xodimi pochtani sizga jo'natadi, siz posilka QR'ini skanerlaysiz va yetkazish natijasini yuborasiz. Pul sizning kurier kassangizga yoziladi.
 
+## Ish tartibi (qisqa)
+
+1. \`POST /carrier/scan\` — posilka sizga o'tadi (\`waiting\`).
+2. **\`POST /carrier/orders/{id}/status\`** — natija: \`sold\` / \`partly_sold\` / \`cancelled\` (xato bo'lsa — \`rollback\`).
+3. \`POST /carrier/returns\` — bekor qilinganlarni qaytarish.
+4. \`GET /carrier/cashbox\` — kassa va naqd topshirish.
+
 ## 1. Kirish
 
 Baza manzili: \`https://<beepost-domain>/api/v1\` (aniq domenni BeePost operatori beradi). Har so'rovda \`X-Api-Key\` sarlavhasi (kalit \`bpc_\` bilan boshlanadi, uni BeePost operatori beradi). Kalit faqat bir marta ko'rsatiladi — xavfsiz saqlang.
@@ -195,13 +202,20 @@ export function filterCarrierDocument(full: OpenAPIObject): OpenAPIObject {
   };
 }
 
-type MediaTypes = Record<string, { schema?: Record<string, unknown> }>;
+type MediaTypes = Record<
+  string,
+  { schema?: Record<string, unknown>; examples?: unknown }
+>;
 
 /**
  * JSON va multipart so'rov tanasini AJRATADI (Elchi `splitMultipartProofBodies`).
  * `@ApiBody` bitta sxema beradi: `allOf: [DTO, { proof: binary }]` — u
  * `application/json` ga ham tushib, kod generatorlari JSON modelida `File`
  * maydonini yasardi. Endi JSON — faqat DTO, multipart — DTO + `proof`.
+ *
+ * `@ApiBody` dagi nomli misollar (`examples`) ham har ikki turga tushadi —
+ * ular FAQAT JSON'da qoladi: Swagger UI multipart formasida misolni
+ * (`items` massivi, fayl) to'g'ri ko'rsatmaydi. Multipart sxemasi o'zgarmaydi.
  */
 export function splitMultipartProofBodies(doc: OpenAPIObject): OpenAPIObject {
   for (const pathItem of Object.values(doc.paths ?? {})) {
@@ -216,6 +230,9 @@ export function splitMultipartProofBodies(doc: OpenAPIObject): OpenAPIObject {
       const base = allOf.find((part) => typeof part.$ref === 'string');
       if (!base) continue;
       content['application/json'] = { ...json, schema: { ...base } };
+      const multipart = { ...content['multipart/form-data'] };
+      delete multipart.examples;
+      content['multipart/form-data'] = multipart;
     }
   }
   return doc;
