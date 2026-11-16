@@ -157,8 +157,15 @@ export interface PenaltyCourier {
 export interface PenaltyRule {
   id: string;
   scope_type: "global" | "courier" | "region";
+  /** Viloyat nishoni yoki ESKI bitta kuryer qoidasi. */
   scope_id: string | null;
+  /** Bitta nishonli qoida uchun nom (eski maydon). */
   scope_name: string | null;
+  /** `courier` qamrovida KO'P nishon — bitta qoida, bir nechta kuryer. */
+  scope_ids?: string[] | null;
+  /** Nishon nomlari; o'chirilgan kuryer uchun `null` element qoladi. */
+  scope_names?: Array<string | null>;
+  scope_count?: number;
   event: "late_mark" | "early_mark" | "damage";
   threshold_days: number;
   calc: "per_day" | "once";
@@ -197,8 +204,20 @@ export const useCourierPenaltyAdmin = () => {
       refetchInterval: 5 * 60_000,
     });
 
+  /**
+   * ⚠️ `from`/`to` MILLISEKUNDDA. Server `@IsInt()` kutadi va sekund
+   * yuborilsa xato bermay, jimgina BO'SH natija qaytaradi — shuning
+   * uchun sanani faqat `dayStartMs`/`dayEndMs` orqali uzating.
+   */
   const getEntries = (
-    params: { courierId?: string; kind?: string; page?: number; limit?: number } = {},
+    params: {
+      courierId?: string;
+      kind?: string;
+      page?: number;
+      limit?: number;
+      from?: number;
+      to?: number;
+    } = {},
   ) =>
     useQuery<{ total: number; page: number; limit: number; items: PenaltyEntry[] }>({
       queryKey: [courierPenaltyKey, "entries", params],

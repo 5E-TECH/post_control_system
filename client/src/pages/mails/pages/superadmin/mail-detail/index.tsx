@@ -93,6 +93,7 @@ import {
   ELCHI_PROVIDER,
   type ElchiGatePreview,
 } from "../../../../../shared/api/hooks/useElchiDispatch";
+import CarrierApiChip from "../../../../../shared/components/carrier-api-chip";
 
 const MailDetail = () => {
   const dispatch = useDispatch();
@@ -1610,7 +1611,15 @@ const MailDetail = () => {
                         <User className={`w-4 h-4 ${selectedCourierId === courier.id ? "text-white" : "text-amber-600 dark:text-amber-400"}`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm truncate">{courier.name}</p>
+                        <p className="font-semibold text-sm flex items-center gap-2 min-w-0">
+                          <span className="truncate">{courier.name}</span>
+                          {/*
+                            Tashqi yetkazuvchi (Carrier API) kuryeri — ELCHI belgisi
+                            naqshida. Begona tarifli pochtani server rad etadi
+                            (`prepareCarrierReassign`), xabari `handleApiError` da.
+                          */}
+                          <CarrierApiChip provider={courier.external_provider} />
+                        </p>
                         <p className={`text-xs ${selectedCourierId === courier.id ? "text-white/70" : "text-gray-500"}`}>{courier.phone_number}</p>
                       </div>
                     </div>

@@ -1,6 +1,34 @@
 import { config } from 'dotenv';
 config();
 
+/**
+ * Musbat butun son env qiymati; bo'sh — sukut, xato — sukut + BIR MARTA
+ * ogohlantirish.
+ *
+ * ⚠️ `Number()` emas: `Number('')` 0 beradi (Carrier API'da limit 0 = HAMMA
+ * so'rov 429), `Number('abc')` NaN esa throttler ichida 500 berardi. Config
+ * modul yuklanganda bir marta hisoblanadi, shuning uchun ogohlantirish ham
+ * bir marta chiqadi (Nest logger hali yo'q — `console.warn`).
+ */
+export function positiveIntEnv(name: string, fallback: number): number {
+  const raw = String(process.env[name] ?? '').trim();
+  if (!raw) return fallback;
+  if (/^\d{1,9}$/.test(raw) && Number(raw) >= 1) return Number(raw);
+  console.warn(
+    `[config] ${name}="${raw}" musbat butun son emas — sukut ${fallback} ishlatiladi`,
+  );
+  return fallback;
+}
+
+/** `true` / `1` / `yes` (katta-kichik harf farqsiz) — yoqilgan; qolgani o'chiq. */
+export function flagEnv(name: string): boolean {
+  return ['true', '1', 'yes'].includes(
+    String(process.env[name] ?? '')
+      .trim()
+      .toLowerCase(),
+  );
+}
+
 export default {
   PORT: Number(process.env.PORT),
   PORT_PRINT: Number(process.env.PORT_PRINT),
@@ -77,4 +105,30 @@ export default {
   // aylantirish uchun (ai_usage_log + AI dashboard). Kurs o'zgarsa .env'дан
   // yangilanadi; eski yozuvlar o'z kursini saqlaydi (audit uchun qatorда yoziladi).
   AI_USD_UZS_RATE: Number(process.env.AI_USD_UZS_RATE || 12800),
+
+  // ─── CARRIER API (tashqi yetkazuvchi, `/api/v1/carrier/*`) ───
+  /**
+   * Rate limit: BITTA carrier akkaunti uchun barcha endpointlar birgalikda
+   * (kontrakt CARRIER_API.md §2 — daqiqasiga 120). Elchi bilan bir xil sukut.
+   */
+  CARRIER_THROTTLE_LIMIT: positiveIntEnv('CARRIER_THROTTLE_LIMIT', 120),
+  CARRIER_THROTTLE_TTL_MS: positiveIntEnv('CARRIER_THROTTLE_TTL_MS', 60_000),
+  /**
+   * Autentifikatsiyadan OLDINGI limit: bitta IP'dan barcha `/carrier/*`
+   * so'rovlari (kalitsiz / noto'g'ri kalit ham), oyna — `CARRIER_THROTTLE_TTL_MS`.
+   * Akkaunt limitidan (120) ancha katta: bitta IP ortida bir nechta akkaunt
+   * bo'lishi mumkin. Vazifasi — kalit taxmin qiluvchi oqim bazaga va
+   * WARN log'ga cheksiz yuk bermasin.
+   */
+  CARRIER_IP_THROTTLE_LIMIT: positiveIntEnv('CARRIER_IP_THROTTLE_LIMIT', 600),
+  /**
+   * Alohida Swagger (`/api/v1/carrier-docs`). Production'dan tashqarida doim
+   * ochiq; production'da FAQAT `CARRIER_DOCS_ENABLED` yoqilgan VA parol
+   * berilgan bo'lsa — HTTP Basic auth ortida. Parolsiz yoqilgan bayroq
+   * hujjatni ochmaydi (yopiq qoladi).
+   */
+  CARRIER_DOCS_ENABLED: flagEnv('CARRIER_DOCS_ENABLED'),
+  CARRIER_DOCS_USER:
+    String(process.env.CARRIER_DOCS_USER ?? '').trim() || 'carrier',
+  CARRIER_DOCS_PASSWORD: String(process.env.CARRIER_DOCS_PASSWORD || ''),
 };

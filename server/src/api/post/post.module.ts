@@ -31,5 +31,12 @@ import { MarketplaceModule } from '../marketplace/marketplace.module';
   ],
   controllers: [PostController],
   providers: [PostService],
+  /**
+   * Carrier API (`CarrierModule`) kuryer skanini va qaytarish pochtasini
+   * shu servis orqali bajaradi — xuddi ilovadagi kuryer kabi
+   * (`receiveOrderForCourierById`, `createCanceledPost`). Aylanma import
+   * yo'q: `PostModule` `CarrierModule` ni import qilmaydi.
+   */
+  exports: [PostService],
 })
 export class PostModule {}

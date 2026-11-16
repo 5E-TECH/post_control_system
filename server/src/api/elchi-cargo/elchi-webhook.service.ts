@@ -365,10 +365,21 @@ export class ElchiWebhookService {
     }
 
     if (!shipment) {
+      const ids = `order_id=${orderId || '-'} shipment_id=${remoteId || '-'}`;
+      // UUID bo'lmagan `external_order_id` — jurnalda (`error_message`)
+      // «topilmadi» emas, aniq sabab ko'rinsin (rKbSjqHp).
+      if (orderId && !isUuid) {
+        const reason = "external_order_id noto'g'ri format (UUID emas)";
+        return {
+          status: 'skipped',
+          message: `${reason} — e'tiborsiz`,
+          note: `${reason}: ${ids}`,
+        };
+      }
       return {
         status: 'skipped',
         message: "Posilka topilmadi — e'tiborsiz",
-        note: `order_id=${orderId || '-'} shipment_id=${remoteId || '-'}`,
+        note: ids,
       };
     }
 

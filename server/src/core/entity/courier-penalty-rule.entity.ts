@@ -16,8 +16,26 @@ export class CourierPenaltyRuleEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 10, default: 'global' })
   scope_type: string;
 
+  /**
+   * YAGONA nishon — hozir faqat `region` qamrovi ishlatadi.
+   *
+   * ⚠️ `courier` qamrovi uchun `scope_ids` ustun keladi; bu ustun eski
+   * qoidalar uchun fallback bo'lib qoladi (migratsiya ularni massivga
+   * ko'chirgan, lekin moslik mantig'i ikkalasiga ham qaraydi).
+   */
   @Column({ type: 'uuid', nullable: true })
   scope_id: string | null;
+
+  /**
+   * KO'P NISHON — bitta qoidaga bir nechta kuryer.
+   *
+   * ⚠️ MASSIV, BOG'LIQ JADVAL EMAS: qoidalar kam va `loadRules` har
+   * hisobda hammasini xotiraga yuklaydi, ya'ni bog'liq jadval ikkinchi
+   * so'rov va «yo'q kuryerga ishora» invariantini talab qilardi.
+   * Eskirgan id zararsiz — u hech bir kuryerga mos kelmaydi.
+   */
+  @Column({ type: 'uuid', array: true, nullable: true })
+  scope_ids: string[] | null;
 
   /** `late_mark` | `early_mark` | `damage` */
   @Column({ type: 'varchar', length: 16 })

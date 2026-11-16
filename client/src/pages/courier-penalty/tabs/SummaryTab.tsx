@@ -1,19 +1,70 @@
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
-import { FlaskConical, Info, TrendingDown, TrendingUp, Undo2 } from "lucide-react";
+import { Info, Layers, TrendingDown, TrendingUp, Undo2, Wallet } from "lucide-react";
 import { useCourierPenaltyAdmin } from "../../../shared/api/hooks/useCourierPenalty";
 import { formatSum } from "../../../shared/lib/deadlineTone";
+import { TabError, TabLoading } from "../components/TabState";
 
 /**
- * SOYA YIG'INDISI — «agar yoqilganda qancha bo'lardi».
+ * YIG'INDI — «yoqilsa nima bo'ladi» ekrani.
  *
  * ⚠️ YOQISH QARORINI AYNAN SHU EKRAN HAL QILADI. Shuning uchun u
  * raqamlarni ko'rsatib qo'ya qolmaydi, ularni O'QIYDI ham: `capped_count`
  * yuqori bo'lsa, bitta tekis qoida yetarli emas va kechikish darajalari
- * kerak degan xulosa ochiq yoziladi. Aks holda bu son jadvalda turib,
- * hech kim undan xulosa chiqarmasdi.
+ * kerak degan xulosa ochiq yoziladi.
+ *
+ * ⚠️ IKKI QATLAM BIRINCHI O'RINDA, ARALASH SON PASTDA. Ilgari eng
+ * tepada «Shtraf 122 000» turardi — bu HAQIQIY va SINOV qatlamlarining
+ * yig'indisi edi, pastda esa «Haqiqiy 20 000» yozilardi. Admin ikki sonni
+ * bir-biriga to'g'rilay olmasdi va ikkalasiga ham ishonmay qo'yardi.
+ * Endi birinchi qatorda kassa bilan solishtiriladigan son turadi,
+ * aralash hisob esa ochiq «ikki qatlam birga» yorlig'i bilan pastda.
  */
-const Card = ({
+
+const LayerCard = ({
+  icon,
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  hint: string;
+  tone: "real" | "test";
+}) => (
+  <div
+    className={`rounded-2xl border p-4 ${
+      tone === "real"
+        ? "border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-900/15"
+        : "border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-900/15"
+    }`}
+  >
+    <div
+      className={`mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide ${
+        tone === "real"
+          ? "text-red-700 dark:text-red-300"
+          : "text-amber-700 dark:text-amber-300"
+      }`}
+    >
+      {icon}
+      {label}
+    </div>
+    <div
+      className={`text-3xl font-bold tabular-nums ${
+        tone === "real"
+          ? "text-red-700 dark:text-red-300"
+          : "text-amber-700 dark:text-amber-300"
+      }`}
+    >
+      {value}
+    </div>
+    <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">{hint}</p>
+  </div>
+);
+
+const MiniStat = ({
   icon,
   label,
   value,
@@ -32,14 +83,16 @@ const Card = ({
     good: "text-green-600 dark:text-green-400",
   }[tone];
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-[#2A263D]">
-      <div className="mb-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+    <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-[#2A263D]">
+      <div className="mb-1 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
         {icon}
         {label}
       </div>
-      <div className={`text-2xl font-bold tabular-nums ${palette}`}>{value}</div>
+      <div className={`text-xl font-bold tabular-nums ${palette}`}>{value}</div>
       {sub && (
-        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{sub}</div>
+        <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+          {sub}
+        </div>
       )}
     </div>
   );
@@ -48,14 +101,10 @@ const Card = ({
 const SummaryTab = () => {
   const { t } = useTranslation("penalty");
   const { getSummary } = useCourierPenaltyAdmin();
-  const { data, isLoading } = getSummary();
+  const { data, isLoading, isError, refetch } = getSummary();
 
-  if (isLoading || !data)
-    return <div className="p-6 text-sm text-gray-500">…</div>;
-
-  const since = data.module.shadow_since
-    ? new Date(data.module.shadow_since).toLocaleDateString()
-    : null;
+  if (isError) return <TabError onRetry={() => refetch()} />;
+  if (isLoading || !data) return <TabLoading />;
 
   /**
    * Pol qanchalik tez-tez ishlaganini ulushda ko'rsatamiz — yalang'och
@@ -68,119 +117,78 @@ const SummaryTab = () => {
 
   return (
     <div className="space-y-4">
-      {/* Modul holati */}
+      {/* ─── Qaror uchun ikki son ─── */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <LayerCard
+          tone="real"
+          icon={<Wallet className="h-3.5 w-3.5" />}
+          label={t("summary.layerReal")}
+          value={`${formatSum(data.real.net)} ${t("currency")}`}
+          hint={t("summary.layerRealHint", { count: data.real.count })}
+        />
+        <LayerCard
+          tone="test"
+          icon={<Layers className="h-3.5 w-3.5" />}
+          label={t("summary.layerShadow")}
+          value={`${formatSum(data.shadow.net)} ${t("currency")}`}
+          hint={t("summary.layerShadowHint", { count: data.shadow.count })}
+        />
+      </div>
+
+      {/* ─── Tafsilot: ikki qatlam BIRGA ─── */}
+      <div>
+        <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+          <Layers className="h-3.5 w-3.5" />
+          {t("summary.breakdownTitle")}
+        </p>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <MiniStat
+            icon={<TrendingUp className="h-3.5 w-3.5" />}
+            label={t("summary.penalty")}
+            value={formatSum(data.penalty.sum)}
+            sub={t("summary.entries", { count: data.penalty.count })}
+            tone="bad"
+          />
+          <MiniStat
+            icon={<TrendingDown className="h-3.5 w-3.5" />}
+            label={t("summary.bonus")}
+            value={formatSum(data.bonus.sum)}
+            sub={t("summary.entries", { count: data.bonus.count })}
+            tone="good"
+          />
+          <MiniStat
+            icon={<Undo2 className="h-3.5 w-3.5" />}
+            label={t("summary.waived")}
+            value={formatSum(data.waiver.sum)}
+            sub={t("summary.entries", { count: data.waiver.count })}
+          />
+          <MiniStat
+            icon={<Info className="h-3.5 w-3.5" />}
+            label={t("summary.couriersLabel")}
+            value={String(data.couriers)}
+            sub={t("summary.shadowEntries", { count: data.shadow_count })}
+          />
+        </div>
+      </div>
+
+      {/* ─── Xulosa, nafaqat raqam ─── */}
       <div
-        className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${
-          data.module.active
-            ? "border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/20"
-            : "border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/40"
+        className={`rounded-2xl border px-4 py-3 ${
+          cappedShare > 50
+            ? "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20"
+            : "border-gray-200 bg-white dark:border-gray-800 dark:bg-[#2A263D]"
         }`}
       >
-        <FlaskConical className="mt-0.5 h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
-        <div className="text-sm">
-          <div className="font-semibold text-gray-800 dark:text-white">
-            {data.module.active ? t("summary.live") : t("summary.shadow")}
-          </div>
-          <div className="text-xs text-gray-600 dark:text-gray-400">
-            {data.module.active
-              ? t("summary.liveHint")
-              : t("summary.shadowHint", { since: since ?? "—" })}
-          </div>
+        <div className="text-sm font-semibold text-gray-800 dark:text-white">
+          {t("summary.cappedTitle", {
+            count: data.capped_count,
+            share: cappedShare,
+          })}
+        </div>
+        <div className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
+          {cappedShare > 50 ? t("summary.cappedHigh") : t("summary.cappedLow")}
         </div>
       </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card
-          icon={<TrendingUp className="h-3.5 w-3.5" />}
-          label={t("summary.penalty")}
-          value={`${formatSum(data.penalty.sum)}`}
-          sub={t("summary.entries", { count: data.penalty.count })}
-          tone="bad"
-        />
-        <Card
-          icon={<TrendingDown className="h-3.5 w-3.5" />}
-          label={t("summary.bonus")}
-          value={`${formatSum(data.bonus.sum)}`}
-          sub={t("summary.entries", { count: data.bonus.count })}
-          tone="good"
-        />
-        <Card
-          icon={<Undo2 className="h-3.5 w-3.5" />}
-          label={t("summary.waived")}
-          value={`${formatSum(data.waiver.sum)}`}
-          sub={t("summary.entries", { count: data.waiver.count })}
-        />
-        <Card
-          icon={<Info className="h-3.5 w-3.5" />}
-          label={t("summary.net")}
-          value={`${formatSum(data.real.net)}`}
-          sub={t("summary.couriers", { count: data.couriers })}
-          tone="bad"
-        />
-      </div>
-
-      {/*
-        ⚠️ IKKI QATLAM ARALASHTIRILMAYDI.
-
-        `real` — kuryer kassasiga HAQIQATAN yozilgan summa; faqat shu son
-        kassa bilan solishtiriladi (invariant I-CP6).
-        `shadow` — «yoqilganda qancha bo'lardi»; kassada hech qachon aks
-        etmaydi. Ikkisini bitta raqamga qo'shish hech qachon
-        to'g'rilanmaydigan son yasash degani.
-      */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-red-200 bg-red-50/50 p-4 dark:border-red-800 dark:bg-red-900/10">
-          <div className="text-xs font-medium text-red-700 dark:text-red-400">
-            {t("summary.layerReal")}
-          </div>
-          <div className="mt-1 text-xl font-bold tabular-nums text-red-700 dark:text-red-400">
-            {formatSum(data.real.net)} {t("currency")}
-          </div>
-          <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-            {t("summary.layerRealHint", { count: data.real.count })}
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-800/30">
-          <div className="text-xs font-medium text-gray-600 dark:text-gray-300">
-            {t("summary.layerShadow")}
-          </div>
-          <div className="mt-1 text-xl font-bold tabular-nums text-gray-700 dark:text-gray-200">
-            {formatSum(data.shadow.net)} {t("currency")}
-          </div>
-          <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-            {t("summary.layerShadowHint", { count: data.shadow.count })}
-          </div>
-        </div>
-      </div>
-
-      {/*
-        ⚠️ XULOSA, RAQAM EMAS. `capped_count` — modulning eng muhim
-        signali: ko'pchilik tarif chegarasiga ursa, bitta tekis qoida
-        yetarli emas. Buni jadvalga qo'yib qo'ysak, hech kim undan
-        xulosa chiqarmasdi.
-      */}
-      {data.penalty.count > 0 && (
-        <div
-          className={`rounded-xl border px-4 py-3 text-sm ${
-            cappedShare >= 50
-              ? "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20"
-              : "border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-800/30"
-          }`}
-        >
-          <div className="font-medium text-gray-800 dark:text-white">
-            {t("summary.cappedTitle", {
-              count: data.capped_count,
-              share: cappedShare,
-            })}
-          </div>
-          <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-            {cappedShare >= 50
-              ? t("summary.cappedHigh")
-              : t("summary.cappedLow")}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

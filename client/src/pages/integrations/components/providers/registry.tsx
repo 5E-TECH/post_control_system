@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import { Truck, Send } from "lucide-react";
+import { Truck, Send, Cable } from "lucide-react";
 import { LdgCargoTab } from "../LdgCargoTab";
 import { ElchiCargoTab } from "../elchi/ElchiCargoTab";
+import { CarrierCargoTab } from "../carrier/CarrierCargoTab";
 
 export interface DeliveryProvider {
   /** `users.external_provider` dagi qiymat bilan BIR XIL bo'lishi shart. */
@@ -41,5 +42,17 @@ export const DELIVERY_PROVIDERS: DeliveryProvider[] = [
     icon: <Send className="w-4 h-4" />,
     desc: "Pilot — hudud bo'yicha darvoza",
     panel: <ElchiCargoTab />,
+  },
+  /**
+   * Carrier API — teskari yo'nalish: bu yerda BeePost tashqi kompaniyaga
+   * ulanmaydi, kompaniya BeePost'ga `X-Api-Key` bilan ulanadi va bitta
+   * kuryer bo'lib ishlaydi (server: `src/api/carrier`, `CARRIER_API.md`).
+   */
+  {
+    slug: "carrier",
+    label: "Carrier API",
+    icon: <Cable className="w-4 h-4" />,
+    desc: "Tashqi kompaniya — API kalit",
+    panel: <CarrierCargoTab />,
   },
 ];

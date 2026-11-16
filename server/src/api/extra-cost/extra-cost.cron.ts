@@ -7,6 +7,7 @@ import { ExtraCostProofEntity } from 'src/core/entity/extra-cost-proof.entity';
 import { ExtraCostStatus } from 'src/common/enums';
 import { ExtraCostProofService } from './extra-cost-proof.service';
 import { ExtraCostDecisionService } from './extra-cost-decision.service';
+import { ExtraCostTelegramService } from './extra-cost-telegram.service';
 import {
   ProofTranscodeService,
   TRANSCODE,
@@ -15,21 +16,30 @@ import {
 import { JwtPayload } from 'src/common/utils/types/user.type';
 
 /**
- * Market javob bermasa — so'rov admin navbatiga chiqadi (pul HARAKAT
- * QILMAYDI, faqat belgi qo'yiladi).
+ * Market javob bermasa — «muddati o'tgan» belgisi qo'yiladi VA oxirgi
+ * eslatma yuboriladi (pul HARAKAT QILMAYDI).
+ *
+ * ⚠️ AVVAL 7 KUN EDI va asoslanishi shunday yozilgan edi: «oraliqda
+ * ODAM (admin) qaror qilishi uchun vaqt beriladi». Tekshirilganda
+ * ma'lum bo'ldiki, bunday ADMIN EKRANI UMUMAN YO'Q — qo'shimcha
+ * xarajat sahifalari faqat `market` va `courier` rollariga ochiq,
+ * `escalated_at` esa faqat MARKETNING o'z «muddati o'tgan» tabida
+ * ko'rinadi. Ya'ni o'rtadagi hafta hech kim qaramaydigan bo'sh vaqt
+ * edi va kuryer shuncha kutardi.
  */
-const ESCALATE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+const ESCALATE_AFTER_MS = 2 * 24 * 60 * 60 * 1000;
 
 /**
- * Eskalatsiyadan keyin ham hech kim tegmasa — oxirgi zaxira sifatida
- * avtomatik tasdiqlanadi (jami 14 kun).
+ * Eslatmadan keyin ham javob bo'lmasa — avtomatik tasdiq (jami 3 kun).
  *
- * ⚠️ NEGA 7-KUNDA EMAS. Jim avto-tasdiq kuryerga "baribir o'tib ketadi"
- * strategiyasini beradi va butun nazoratning ma'nosini yo'qotadi. Lekin
- * cheksiz muzlatish ham kuryerni pulsiz qoldiradi — shuning uchun oraliqda
- * ODAM (admin) qaror qilishi uchun 7 kun beriladi.
+ * ⚠️ NEGA 3-KUNNING O'ZIDA EMAS. Market so'rov yaratilganda BITTA
+ * Telegram xabari oladi va boshqa hech narsa kelmaydi. Muddat qisqargach
+ * o'tkazib yuborilgan bitta xabar = pul jimgina o'tib ketishi bo'lardi.
+ * Shuning uchun 2-kuni ESLATMA yuboriladi (tugmalari bilan) va faqat
+ * undan keyin avtomatik tasdiq. Shunda market 3 kun va IKKI xabar
+ * oladi — e'tibor bermasa bu haqiqatan uning aybi.
  */
-const BACKSTOP_AFTER_ESCALATION_MS = 7 * 24 * 60 * 60 * 1000;
+const BACKSTOP_AFTER_ESCALATION_MS = 1 * 24 * 60 * 60 * 1000;
 
 /**
  * QO'SHIMCHA XARAJAT — rejali ishlar.
@@ -40,9 +50,10 @@ const BACKSTOP_AFTER_ESCALATION_MS = 7 * 24 * 60 * 60 * 1000;
  *                     diskda, DB'da `request_id IS NULL` bo'lib qolaveradi.
  *   ISBOT MUDDATI   — 24 soatda biriktirilmagan so'rov bekor bo'ladi
  *                     (SOTUVGA tegmaydi).
- *   ESKALATSIYA     — market 7 kun javob bermadi → admin navbatiga
+ *   ESLATMA         — market 2 kun javob bermadi → oxirgi Telegram
+ *                     eslatmasi + «muddati o'tgan» belgisi
  *                     (pul HARAKAT QILMAYDI).
- *   ZAXIRA TASDIQ   — jami 14 kun javobsiz → avtomatik tasdiq
+ *   ZAXIRA TASDIQ   — jami 3 kun javobsiz → avtomatik tasdiq
  *                     (BU YERDA PUL HARAKAT QILADI, har biri ovozli
  *                     loglanadi).
  */
@@ -64,6 +75,7 @@ export class ExtraCostCron {
   constructor(
     private readonly proofService: ExtraCostProofService,
     private readonly decisions: ExtraCostDecisionService,
+    private readonly telegram: ExtraCostTelegramService,
     private readonly transcode: ProofTranscodeService,
     @InjectRepository(ExtraCostRequestEntity)
     private readonly requestRepo: Repository<ExtraCostRequestEntity>,
@@ -215,11 +227,11 @@ export class ExtraCostCron {
   }
 
   /**
-   * ESKALATSIYA — market 7 kun javob bermadi.
+   * ESLATMA — market 2 kun javob bermadi.
    *
-   * ⚠️ STATUS O'ZGARMAYDI va PUL HARAKAT QILMAYDI. Faqat `escalated_at`
-   * qo'yiladi, ya'ni so'rov admin arbitraj navbatida ko'rinadi. Bu ataylab:
-   * avtomatik qaror qabul qilish o'rniga ODAM ko'rib chiqadi.
+   * ⚠️ STATUS O'ZGARMAYDI va PUL HARAKAT QILMAYDI. Ikki ish bajariladi:
+   * marketga OXIRGI ESLATMA yuboriladi (tugmalari bilan) va «muddati
+   * o'tgan» belgisi qo'yiladi. Ertaga javob bo'lmasa — avtomatik tasdiq.
    */
   @Cron('0 0 3 * * *', { timeZone: 'Asia/Tashkent' })
   async escalateStale(): Promise<void> {
@@ -227,19 +239,52 @@ export class ExtraCostCron {
     this.escalating = true;
     try {
       const cutoff = Date.now() - ESCALATE_AFTER_MS;
-      const res = await this.requestRepo
+
+      /**
+       * ⚠️ AVVAL OLAMIZ, KEYIN BELGILAYMIZ.
+       *
+       * Oldin bu bitta ommaviy `UPDATE` edi — qaysi so'rovlar
+       * belgilangani noma'lum qolardi. Endi eslatma yuborish kerak,
+       * ya'ni qatorlarning O'ZI kerak.
+       */
+      const stale = await this.requestRepo
+        .createQueryBuilder('r')
+        .where('r.status = :s', { s: ExtraCostStatus.PENDING })
+        .andWhere('r.escalated_at IS NULL')
+        .andWhere('r.created_at < :cutoff', { cutoff })
+        .limit(200)
+        .getMany();
+
+      if (!stale.length) return;
+
+      const now = Date.now();
+      await this.requestRepo
         .createQueryBuilder()
         .update(ExtraCostRequestEntity)
-        .set({ escalated_at: Date.now(), updated_at: Date.now() })
-        .where('status = :s', { s: ExtraCostStatus.PENDING })
-        .andWhere('escalated_at IS NULL')
-        .andWhere('created_at < :cutoff', { cutoff })
+        .set({ escalated_at: now, updated_at: now })
+        .whereInIds(stale.map((r) => r.id))
         .execute();
-      if (res.affected) {
-        this.logger.warn(
-          `Market 7 kun javob bermadi — admin navbatiga chiqarildi: ${res.affected} ta so'rov`,
-        );
+
+      this.logger.warn(
+        `Market 2 kun javob bermadi — oxirgi eslatma yuborilmoqda: ${stale.length} ta so'rov`,
+      );
+
+      /**
+       * ⚠️ ESLATMA — bu bosqichning ASOSIY ishi, belgi emas.
+       *
+       * Market so'rov yaratilganda bitta xabar oladi, boshqa hech narsa
+       * kelmaydi. Muddat 3 kun bo'lgach, bitta o'tkazib yuborilgan
+       * xabar pulning jimgina o'tishiga olib kelardi.
+       *
+       * Ketma-ket yuboriladi: Telegram tezlik chegarasi bor va bitta
+       * marketning bloklagani qolganlarini to'xtatmasligi kerak
+       * (`sendReminder` xato tashlamaydi).
+       */
+      let sent = 0;
+      for (const req of stale) {
+        if (await this.telegram.sendReminder(req)) sent += 1;
       }
+      this.logger.log(`Eslatma yuborildi: ${sent}/${stale.length}`);
     } catch (e) {
       this.logger.error(
         `Eskalatsiya CRON xatosi: ${e instanceof Error ? e.message : String(e)}`,
@@ -250,7 +295,7 @@ export class ExtraCostCron {
   }
 
   /**
-   * ZAXIRA TASDIQ — eskalatsiyadan keyin ham 7 kun hech kim tegmadi.
+   * ZAXIRA TASDIQ — eslatmadan keyin ham 1 kun javob bo'lmadi (jami 3 kun).
    *
    * ⚠️ BU YERDA PUL HARAKAT QILADI. Shuning uchun:
    *   - har bir so'rov `decisions.approve()` orqali o'tadi, ya'ni AYNI
@@ -279,7 +324,7 @@ export class ExtraCostCron {
       if (!stale.length) return;
 
       this.logger.warn(
-        `ZAXIRA TASDIQ: ${stale.length} ta so'rov 14 kundan beri javobsiz — avtomatik tasdiqlanmoqda`,
+        `ZAXIRA TASDIQ: ${stale.length} ta so'rov 3 kundan beri javobsiz — avtomatik tasdiqlanmoqda`,
       );
 
       for (const req of stale) {
@@ -290,7 +335,7 @@ export class ExtraCostCron {
           await this.decisions.approve(req.id, actor, { autoBackstop: true });
           this.logger.warn(
             `Zaxira tasdiq: #${req.order_number} — ${req.amount} so'm ` +
-              `(market ${req.market_id} 14 kun javob bermadi)`,
+              `(market ${req.market_id} 3 kun javob bermadi)`,
           );
         } catch (e) {
           // Bitta so'rov o'tmasa qolganlari to'xtamasin (kuryer o'chirilgan,

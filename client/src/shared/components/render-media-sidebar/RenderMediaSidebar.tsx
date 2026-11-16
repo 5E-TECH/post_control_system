@@ -14,6 +14,7 @@ import {
   MapPin,
   Zap,
   PackageCheck,
+  Gavel,
 } from "lucide-react";
 import { buildAdminPath } from "../../const";
 import { useExtraCost } from "../../api/hooks/useExtraCost";
@@ -112,6 +113,19 @@ const Navbar = ({ role }: { role: string }) => {
             >
               <CreditCard className="w-6 h-6" />
             </NavLink>
+            {/*
+              ⚠️ Shtraflar mobil navigatsiyada YO'Q edi. 650px dan tor
+              ekranda desktop menyusi yashiriladi va faqat shu panel
+              qoladi — ya'ni telefonda bo'limga UI orqali umuman yetib
+              bo'lmasdi, faqat URL ni qo'lda yozib. Desktop menyusidagi
+              o'rni ham AYNI shu yer: To'lovlardan keyin.
+            */}
+            <NavLink
+              to={buildAdminPath("courier-penalty")}
+              className={({ isActive }) => getNavItemClass(isActive)}
+            >
+              <Gavel className="w-6 h-6" />
+            </NavLink>
             <NavLink
               to={buildAdminPath("m-balance")}
               className={({ isActive }) => getNavItemClass(isActive)}
@@ -154,6 +168,19 @@ const Navbar = ({ role }: { role: string }) => {
               className={({ isActive }) => getNavItemClass(isActive)}
             >
               <CreditCard className="w-6 h-6" />
+            </NavLink>
+            {/*
+              ⚠️ Shtraflar mobil navigatsiyada YO'Q edi. 650px dan tor
+              ekranda desktop menyusi yashiriladi va faqat shu panel
+              qoladi — ya'ni telefonda bo'limga UI orqali umuman yetib
+              bo'lmasdi, faqat URL ni qo'lda yozib. Desktop menyusidagi
+              o'rni ham AYNI shu yer: To'lovlardan keyin.
+            */}
+            <NavLink
+              to={buildAdminPath("courier-penalty")}
+              className={({ isActive }) => getNavItemClass(isActive)}
+            >
+              <Gavel className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("m-balance")}

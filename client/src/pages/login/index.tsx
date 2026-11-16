@@ -17,13 +17,9 @@ import * as yup from "yup";
 
 import { useNetworkState, usePrevious } from "@uidotdev/usehooks";
 import { useTranslation } from "react-i18next";
-import { buildAdminPath } from "../../shared/const/index";
+import { buildAdminPath, MESSAGE_CONFIG } from "../../shared/const/index";
 
-message.config({
-  maxCount: 5,
-  duration: 3,
-  top: 70,
-});
+message.config(MESSAGE_CONFIG);
 
 const Login: FC = () => {
   const { t } = useTranslation("login");

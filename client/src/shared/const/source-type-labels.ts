@@ -19,7 +19,7 @@
  * ekranda `investor_payout` / `investor_allocate` deb inglizcha
  * chiqardi.
  *
- * ⚠️ Bu ro'yxat `cashbox_history_source_type_enum` ning BARCHA 15
+ * ⚠️ Bu ro'yxat `cashbox_history_source_type_enum` ning BARCHA 16
  * qiymatini qamrab olishi SHART. Backend tomonidagi nusxa:
  * `server/src/api/cash-box/cash-box.service.ts` (Excel eksporti uchun) —
  * ikkisi bir xil so'zlarni ishlatadi.
@@ -42,6 +42,16 @@ export const SOURCE_TYPE_LABELS: Record<string, string> = {
   manual_expense: "Qo'lda chiqim",
   salary: 'Maosh',
   bills: "To'lovlar",
+
+  // ── Kuryer shtrafi ───────────────────────────────────────────────
+  /**
+   * ⚠️ Migratsiya `1751000002000` enumga 16-chi qiymatni qo'shgan, bu
+   * lug'at esa 15 ta bo'lib qolgan edi — natijada kuryer o'z kassa
+   * tarixida xom `courier_penalty` so'zini ko'rardi. Alohida kassa
+   * yozuvi dizaynining butun maqsadi «kuryer nega kam olganini BILSIN»
+   * edi, ya'ni yorliqsiz u maqsad bajarilmasdi.
+   */
+  courier_penalty: 'Kechikish shtrafi',
 
   // ── Investor ─────────────────────────────────────────────────────
   investor_payout: "Investorga to'lov",

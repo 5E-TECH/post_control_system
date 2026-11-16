@@ -2,6 +2,7 @@
 import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../shared/api";
+import { ROLE_LABEL } from "../../shared/const/role-labels";
 import { DatePicker, Pagination, Drawer, Tooltip } from "antd";
 import dayjs from "dayjs";
 import {
@@ -205,17 +206,6 @@ const ENTITY_LABEL: Record<string, string> = {
   product: "Mahsulot",
   integration: "Integratsiya",
   ldg_config: "LDG sozlamasi",
-};
-
-const ROLE_LABEL: Record<string, string> = {
-  superadmin: "Super Admin",
-  admin: "Admin",
-  registrator: "Registrator",
-  courier: "Kuryer",
-  market: "Market",
-  operator: "Operator",
-  logist: "Logist",
-  customer: "Mijoz",
 };
 
 const ROLE_BADGE: Record<string, string> = {

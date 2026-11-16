@@ -8,6 +8,8 @@ import {
 } from "../../../shared/api/hooks/useCourierPenalty";
 import { formatSum } from "../../../shared/lib/deadlineTone";
 import { useApiNotification } from "../../../shared/hooks/useApiNotification";
+import { dayEndMs, dayStartMs, formatDate } from "../lib/penaltyFormat";
+import { TabError } from "../components/TabState";
 
 /**
  * SHTRAF DAFTARI + BEKOR QILISH.
@@ -25,14 +27,37 @@ const LedgerTab = () => {
   const [target, setTarget] = useState<PenaltyEntry | null>(null);
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
+  const [courierId, setCourierId] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
 
-  const { getEntries, getWaiverReasons, waive } = useCourierPenaltyAdmin();
-  const { data, isLoading } = getEntries({
+  const { getEntries, getWaiverReasons, getCouriers, waive } =
+    useCourierPenaltyAdmin();
+  /**
+   * ⚠️ BO'SH SATR YUBORILMAYDI. Server global `forbidNonWhitelisted` va
+   * `@IsUUID()` ostida ishlaydi: `?courierId=` (bo'sh satr) 422 qaytaradi
+   * va butun jadval bo'shab qolardi. Shuning uchun har filtr faqat
+   * to'ldirilgan bo'lsa qo'shiladi.
+   */
+  const { data, isLoading, isError, refetch } = getEntries({
     page,
     limit: 25,
     ...(kind ? { kind } : {}),
+    ...(courierId ? { courierId } : {}),
+    ...(from ? { from: dayStartMs(from) } : {}),
+    ...(to ? { to: dayEndMs(to) } : {}),
   });
   const { data: reasons } = getWaiverReasons();
+  const { data: couriers } = getCouriers();
+
+  const resetFilters = () => {
+    setKind("");
+    setCourierId("");
+    setFrom("");
+    setTo("");
+    setPage(1);
+  };
+  const filtered = !!(kind || courierId || from || to);
 
   const close = () => {
     setTarget(null);
@@ -90,6 +115,77 @@ const LedgerTab = () => {
         ))}
       </div>
 
+      {/*
+        ⚠️ KURYER VA SANA FILTRI. Daftar faqat turga qarab filtrlanardi,
+        ya'ni «shu kuryerga qancha yozilgan» yoki «o'tgan hafta nima
+        bo'ldi» degan eng ko'p so'raladigan ikki savolga ekran javob
+        bera olmasdi — yozuvlar ko'paygach ro'yxat umuman o'qilmas edi.
+      */}
+      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 dark:border-gray-800 dark:bg-[#2A263D]">
+        <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-400">
+          {t("courier")}
+          <select
+            value={courierId}
+            onChange={(e) => {
+              setCourierId(e.target.value);
+              setPage(1);
+            }}
+            className="h-9 min-w-[10rem] rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-[#231F35] dark:text-gray-200"
+          >
+            <option value="">{t("ledger.all")}</option>
+            {couriers?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-400">
+          {t("ledger.from")}
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => {
+              setFrom(e.target.value);
+              setPage(1);
+            }}
+            className="h-9 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-[#231F35] dark:text-gray-200"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-400">
+          {t("ledger.to")}
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => {
+              setTo(e.target.value);
+              setPage(1);
+            }}
+            className="h-9 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-[#231F35] dark:text-gray-200"
+          />
+        </label>
+
+        {filtered && (
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="h-9 rounded-lg border border-gray-300 px-3 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            {t("ledger.reset")}
+          </button>
+        )}
+
+        {typeof data?.total === "number" && (
+          <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
+            {t("ledger.found", { count: data.total })}
+          </span>
+        )}
+      </div>
+
+      {isError && <TabError onRetry={() => refetch()} />}
+
       <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
         <table className="w-full min-w-[760px] text-sm">
           <thead className="bg-gray-50 text-xs text-gray-500 dark:bg-[#231F35] dark:text-gray-400">
@@ -111,7 +207,7 @@ const LedgerTab = () => {
                 </td>
               </tr>
             )}
-            {!isLoading && !data?.items?.length && (
+            {!isLoading && !isError && !data?.items?.length && (
               <tr>
                 <td colSpan={7} className="px-3 py-6 text-center text-gray-400">
                   {t("ledger.empty")}
@@ -121,7 +217,7 @@ const LedgerTab = () => {
             {data?.items?.map((e) => (
               <tr key={e.id}>
                 <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
-                  {new Date(e.created_at).toLocaleDateString()}
+                  {formatDate(e.created_at)}
                 </td>
                 <td className="px-3 py-2 font-medium text-gray-800 dark:text-white">
                   #{e.order_number ?? "—"}
@@ -149,6 +245,12 @@ const LedgerTab = () => {
                     <div className="text-[11px] text-gray-400">{e.note}</div>
                   )}
                 </td>
+                {/*
+                  ⚠️ ISHORANING O'ZI YETARLI EMAS. «+20 000» ni admin
+                  «kuryer yutdi» deb o'qishi mumkin — aslida plyus
+                  kuryerning QARZI oshgani. Shuning uchun raqam ostida
+                  yo'nalish so'zi turadi.
+                */}
                 <td
                   className={`px-3 py-2 text-right font-semibold tabular-nums ${
                     e.amount > 0
@@ -158,6 +260,9 @@ const LedgerTab = () => {
                 >
                   {e.amount > 0 ? "+" : ""}
                   {formatSum(e.amount)}
+                  <div className="text-[10px] font-normal text-gray-400">
+                    {e.amount > 0 ? t("ledger.debtUp") : t("ledger.debtDown")}
+                  </div>
                 </td>
                 <td className="px-3 py-2 text-right">
                   {/*

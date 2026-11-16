@@ -11,6 +11,11 @@ import helmet from 'helmet';
 import { MyLogger } from 'src/logger/logger.service';
 import { AppModule } from './app.module';
 import { assertProofStorageConfigured } from './extra-cost/proof-storage.const';
+import { CarrierModule } from './carrier/carrier.module';
+import {
+  CARRIER_API_KEY_SCHEME,
+  setupCarrierSwagger,
+} from './carrier/carrier-swagger';
 
 export default class Application {
   public static async main(): Promise<void> {
@@ -210,6 +215,12 @@ export default class Application {
       .setDescription('API for post delivery management')
       .setVersion('1.0.0')
       .addBearerAuth()
+      // Carrier API (`/carrier/*`) `@ApiSecurity('carrier-api-key')` shu
+      // sxemaga ishora qiladi — ichki hujjatda ham "Authorize" ishlasin.
+      .addApiKey(
+        { type: 'apiKey', name: 'X-Api-Key', in: 'header' },
+        CARRIER_API_KEY_SCHEME,
+      )
       .build();
 
     // Swagger faqat production'dan tashqarida ochiladi. Productionда API
@@ -218,6 +229,23 @@ export default class Application {
       const documentFactory = () =>
         SwaggerModule.createDocument(app, config_swagger);
       SwaggerModule.setup(api, app, documentFactory());
+    }
+
+    // 💼 Carrier API uchun ALOHIDA Swagger (`/api/v1/carrier-docs`) — tashqi
+    // yetkazuvchi faqat o'z kontraktini ko'radi. Production'da faqat
+    // `CARRIER_DOCS_ENABLED` + `CARRIER_DOCS_PASSWORD` bilan, Basic auth
+    // ortida. O'z try/catch'ida: hujjat xatosi API'ning o'zini to'xtatmasin.
+    try {
+      const carrierDocs = setupCarrierSwagger(app, {
+        include: [CarrierModule],
+      });
+      myLogger.log(`Carrier API Swagger: ${carrierDocs}`, 'Bootstrap');
+    } catch (e) {
+      myLogger.error(
+        `Carrier API Swagger ulanmadi: ${e instanceof Error ? e.message : String(e)}`,
+        e instanceof Error ? e.stack : undefined,
+        'Bootstrap',
+      );
     }
 
     // Start

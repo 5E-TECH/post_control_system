@@ -395,6 +395,36 @@ const CourierExtraCostRequests = () => {
                       )}
                     </div>
 
+                    {/*
+                      QANDAY TASDIQLANGANI — kuryer buni BILISHI kerak.
+
+                      ⚠️ Avval izoh FAQAT `rejected` da ko'rsatilardi.
+                      Ya'ni market javob bermagani uchun avtomatik
+                      tasdiqlangan xarajat kuryerga oddiy «tasdiqlandi»
+                      bo'lib ko'rinardi — u market ko'rib tasdiqladi deb
+                      o'ylardi va nega ikki hafta kutganini bilmasdi.
+                    */}
+                    {r.status === "approved" &&
+                      r.decision_mode === "auto_backstop" && (
+                        <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                          <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span>
+                            {r.review_note ||
+                              "Market javob bermadi — avtomatik tasdiqlandi"}
+                          </span>
+                        </div>
+                      )}
+
+                    {r.status === "approved" &&
+                      r.decision_mode === "admin_override" && (
+                        <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs text-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
+                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span>
+                            {r.review_note || "Admin tomonidan tasdiqlandi"}
+                          </span>
+                        </div>
+                      )}
+
                     {/* Rad etish sababi — kuryer buni BILISHI kerak */}
                     {r.status === "rejected" && r.review_note && (
                       <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs text-red-700 dark:bg-red-900/20 dark:text-red-300">

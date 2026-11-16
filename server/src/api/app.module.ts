@@ -32,6 +32,7 @@ import { MarketplaceModule } from './marketplace/marketplace.module';
 import { InvestorModule } from './investor/investor.module';
 import { AiFinanceModule } from './ai-finance/ai-finance.module';
 import { AiUsageModule } from './ai-usage/ai-usage.module';
+import { CarrierModule } from './carrier/carrier.module';
 
 @Module({
   imports: [
@@ -95,6 +96,8 @@ import { AiUsageModule } from './ai-usage/ai-usage.module';
     InvestorModule,
     AiFinanceModule,
     AiUsageModule,
+    // Tashqi yetkazuvchi (Carrier API, `/api/v1/carrier/*`) — Elchi bilan bir xil kontrakt.
+    CarrierModule,
   ],
   providers: [OrderGateaway],
 })

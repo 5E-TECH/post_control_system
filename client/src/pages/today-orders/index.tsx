@@ -38,7 +38,7 @@ import {
 import { message, Modal } from "antd";
 import {
   transliterateLatin,
-  isAcceptableScanChar,
+  scanCharFromKeyEvent,
 } from "../../shared/helpers/transliterateLatin";
 
 // API base URL - VITE_BASE_URL dan olinadi
@@ -435,7 +435,8 @@ const ExternalOrdersTab = () => {
   // Scanner listener - klaviaturadan tez kiritilgan ma'lumotni ushlab oladi
   // RU klaviatura layout'i va Caps Lock muammosi bilan ishlaydi:
   //   - Cyrillic harflar qabul qilinadi va Latin'ga transliteratsiya qilinadi
-  //   - Caps Lock holati sahifa yuqorisida banner bilan ko'rsatiladi
+  //   - Caps Lock yoqiq bo'lsa harf registri jismoniy tugmadan tiklanadi,
+  //     holat sahifa yuqorisida banner bilan ham ko'rsatiladi
   useEffect(() => {
     if (!isReady || !selectedIntegration) return;
 
@@ -464,9 +465,11 @@ const ExternalOrdersTab = () => {
         return;
       }
 
-      // Latin yoki Cyrillic harf, yoki raqam — qabul qilamiz
-      if (e.key.length === 1 && isAcceptableScanChar(e.key)) {
-        buffer += e.key;
+      // Ko'rinadigan belgi (tinish belgilari ham — `_`/`-` QR'ning bir qismi)
+      // yoki Cyrillic harf; Caps Lock yoqiq bo'lsa harf registri tiklanadi
+      const ch = scanCharFromKeyEvent(e);
+      if (ch !== null) {
+        buffer += ch;
         setScannerBuffer(transliterateLatin(buffer));
 
         // 1500ms ichida keyingi tugma bosilmasa - bufferni tozalash
@@ -1187,8 +1190,8 @@ const ExternalOrdersTab = () => {
                     <div className="mt-3 mx-auto max-w-md px-4 py-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 flex items-center justify-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
                       <AlertCircle className="w-4 h-4 flex-shrink-0" />
                       <span>
-                        Caps Lock yoqiq — QR kodlari noto'g'ri o'qilishi mumkin.
-                        Iltimos, o'chiring va qaytadan urinib ko'ring.
+                        Caps Lock yoqiq — skaner harflari avtomatik to'g'rilanadi.
+                        QR topilmasa, Caps Lock'ni o'chirib qayta skanerlang.
                       </span>
                     </div>
                   )}

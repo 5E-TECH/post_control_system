@@ -70,7 +70,15 @@ describe('kechikkan belgilash — shtraf ulanishi', () => {
    */
   it('chaqiruvlar tranzaksiya managerini uzatadi', () => {
     const calls = src.split(CALL).slice(1);
-    expect(calls).toHaveLength(3);
+    /**
+     * TO'RTTA chaqiruv: `sellOrder`, `cancelOrder`, `partlySold` va
+     * `rollbackOrderToWaiting` ning TERMINAL nishoni (`cancelled` /
+     * `cancelled_sent`). To'rtinchisi 2026-10-15 da qo'shildi: terminal
+     * nishonga rollback ham BELGILASH, lekin u shtraf moduliga ulanmagan
+     * edi va «1-kuni sotildi → 30 kun → cancelled ga rollback» qochish
+     * yo'lini ochib turgandi.
+     */
+    expect(calls).toHaveLength(4);
     for (const after of calls) {
       expect(after.slice(0, 40)).toContain('queryRunner.manager');
     }
@@ -120,6 +128,52 @@ describe("belgilash yo'llari ro'yxati — yangisi jim qo'shilmasin", () => {
   it('sold_at / cancelled_at yozuv joylari soni o\'zgarmagan', () => {
     const sites = src.match(/\b(sold_at|cancelled_at): /g) ?? [];
     expect(sites).toHaveLength(EXPECTED_WRITE_SITES);
+  });
+
+  /**
+   * ⚠️ IKKINCHI SHAKL — `order.cancelled_at = Date.now()`.
+   *
+   * Yuqoridagi regex faqat OBYEKT MAYDONI shaklini (`cancelled_at: `)
+   * ko'radi. `rollbackOrderToWaiting` esa belgilashni TOPSHIRIQ shaklida
+   * yozadi (`order.cancelled_at = Date.now()`) va aynan shu sababli
+   * darvozadan JIM o'tib ketgan edi: terminal nishonga (`cancelled`,
+   * `cancelled_sent`) rollback qilish BELGILASH bo'lsa-da, shtraf
+   * moduliga ulanmagan edi va kuryer «1-kuni sotildi → 30 kun ushlab
+   * turish → cancelled ga rollback» bilan shtrafdan qutulardi.
+   *
+   * Endi bu shakl ham sanaladi. Yangi joy qo'shilsa test yiqiladi va
+   * uni shtrafga ulash kerakmi degan savol ochiq qo'yiladi.
+   */
+  const EXPECTED_ASSIGN_SITES = 5;
+
+  it('order.sold_at / order.cancelled_at TOPSHIRIQ joylari soni o\'zgarmagan', () => {
+    const sites = src.match(/\border\.(sold_at|cancelled_at)\s*=\s*/g) ?? [];
+    expect(sites).toHaveLength(EXPECTED_ASSIGN_SITES);
+  });
+
+  /**
+   * Terminal nishonga rollback — BELGILASH, shuning uchun qayd etilishi
+   * SHART. Bu qator olib tashlansa qochish yo'li qayta ochiladi.
+   */
+  it('terminal nishonga rollback shtrafni QAYD ETADI', () => {
+    const body = methodBody(src, 'rollbackOrderToWaiting');
+    expect(body).toContain('RollbackTarget.CANCELLED');
+    expect(body).toContain('this.courierPenalty.recordForOrder(');
+    // Teskari qaytarish ham joyida qolsin (WAITING shoxi).
+    expect(body).toContain('this.courierPenalty.reverseForOrder(');
+  });
+
+  /**
+   * ⚠️ KAFOLAT-SWAP ISTISNOSI. Almashtirilayotgan ESKI buyurtma SOTILGAN
+   * holatda qoladi — kuryer uni O'Z VAQTIDA yopgan. Oylar o'tib o'sha
+   * sotuv bekor qilinsa, langar hamon dastlabki jo'natish bo'lgani uchun
+   * to'liq tarif shtrafi yozilardi. Bayroqni kuryer o'zi qo'ya olmaydi
+   * (faqat almashtirish buyurtmasi yaratilganda qo'yiladi), shuning uchun
+   * bu qochish yo'li emas.
+   */
+  it('almashtirilayotgan ESKI buyurtma terminal rollbackda jazolanmaydi', () => {
+    const body = methodBody(src, 'rollbackOrderToWaiting');
+    expect(body).toContain('!order.is_replacement_return');
   });
 
   /**

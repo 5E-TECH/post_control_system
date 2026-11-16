@@ -209,7 +209,7 @@ export class ExtraCostRequestEntity extends BaseEntity {
 
   // ======================= MUDDAT VA KUZATUV =======================
 
-  /** Market 7 kun javob bermadi → admin navbatiga tushdi. Status O'ZGARMAYDI. */
+  /** Market 2 kun javob bermadi → oxirgi eslatma yuborildi. Status O'ZGARMAYDI. */
   @Column({
     type: 'bigint',
     nullable: true,

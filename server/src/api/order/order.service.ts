@@ -11,6 +11,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { RollbackOrderDto, RollbackTarget } from './dto/rollback-order.dto';
 import { computeMarketSettlement } from './utils/market-settlement.util';
+import { computeSellCashboxLegs } from './utils/sell-cashbox-legs.util';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrderEntity } from 'src/core/entity/order.entity';
@@ -3028,101 +3029,50 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           : [],
       );
 
-      let to_be_paid = 0;
-      let courier_to_be_paid = 0;
-
       const price = Number(order.total_price);
 
-      // === CASE 1: 0 so'mlik ===
-      if (price === 0) {
-        await updateCashbox(
-          marketCashbox,
-          Operation_type.EXPENSE,
-          marketTarif,
-          order.id,
-          Source_type.SELL,
-          '0 so‘mlik mahsulot sotuvi',
-          courier.id,
-        );
-        await updateCashbox(
-          courierCashbox,
-          Operation_type.EXPENSE,
-          courierTarif,
-          order.id,
-          Source_type.SELL,
-          '0 so‘mlik mahsulot sotuvi',
-          courier.id,
-        );
-      }
-      // === CASE 2: total_price < courierTarif ===
-      else if (price < courierTarif) {
-        await updateCashbox(
-          marketCashbox,
-          Operation_type.EXPENSE,
-          marketTarif - price,
-          order.id,
-          Source_type.SELL,
-          `${price} so'mlik mahsulot sotuvi`,
-          courier.id,
-        );
-        await updateCashbox(
-          courierCashbox,
-          Operation_type.EXPENSE,
-          courierTarif - price,
-          order.id,
-          Source_type.SELL,
-          `${price} so'mlik mahsulot sotuvi`,
-          courier.id,
-        );
-      }
-      // === CASE 3: total_price < marketTarif ===
-      else if (price < marketTarif) {
-        courier_to_be_paid = price - courierTarif;
-        await updateCashbox(
-          marketCashbox,
-          Operation_type.EXPENSE,
-          marketTarif - price,
-          order.id,
-          Source_type.SELL,
-          `${price} so'mlik mahsulot sotuvi`,
-          courier.id,
-        );
-        await updateCashbox(
-          courierCashbox,
-          Operation_type.INCOME,
-          courier_to_be_paid,
-          order.id,
-          Source_type.SELL,
-          `${price} so'mlik mahsulot sotuvi`,
-          courier.id,
-        );
-      }
-      // === CASE 4: Normal case ===
-      else {
-        to_be_paid = price - marketTarif;
-        courier_to_be_paid = price - courierTarif;
+      /**
+       * ⚠️ YO'NALISH `narx − tarif` ISHORASIDAN HOSIL QILINADI.
+       *
+       * Avval to'rt shox yo'nalishni qotirib yozardi va «arzon» shox market
+       * tarifini kuryer tarifidan kichik deb faraz qilardi. Kuryer tarifi
+       * > narx > market tarifi bo'lganda (masalan market tarifi 0) market
+       * oyog'i manfiy `EXPENSE` bo'lib, ishora darvozasi BUTUN sotuvni
+       * yiqitardi. Batafsil: `sell-cashbox-legs.util.ts`.
+       */
+      const legs = computeSellCashboxLegs({
+        price,
+        marketTariff: marketTarif,
+        courierTariff: courierTarif,
+      });
+      const legComment =
+        legs.kind === 'zero'
+          ? '0 so‘mlik mahsulot sotuvi'
+          : legs.kind === 'below_tariff'
+            ? `${price} so'mlik mahsulot sotuvi`
+            : finalComment;
 
-        await updateCashbox(
-          marketCashbox,
-          Operation_type.INCOME,
-          to_be_paid,
-          order.id,
-          Source_type.SELL,
-          finalComment,
-          courier.id,
-        );
-        await updateCashbox(
-          courierCashbox,
-          Operation_type.INCOME,
-          courier_to_be_paid,
-          order.id,
-          Source_type.SELL,
-          finalComment,
-          courier.id,
-        );
-      }
+      // Tartib muhim: MARKET birinchi — `marketCashboxWrite` langari.
+      await updateCashbox(
+        marketCashbox,
+        legs.market.operation,
+        legs.market.amount,
+        order.id,
+        Source_type.SELL,
+        legComment,
+        courier.id,
+      );
+      await updateCashbox(
+        courierCashbox,
+        legs.courier.operation,
+        legs.courier.amount,
+        order.id,
+        Source_type.SELL,
+        legComment,
+        courier.id,
+      );
 
-      const netToBePaid = Math.max(Number(to_be_paid) || 0, 0); // target summa o'zgarmaydi
+      const netToBePaid = legs.to_be_paid; // target summa o'zgarmaydi
       const currentPaid = Math.min(
         Math.max(Number(order.paid_amount) || 0, 0),
         netToBePaid,
@@ -4043,8 +3993,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       // 5️⃣ Common vars
       const price = Number(totalPrice);
-      let to_be_paid = 0;
-      let courier_to_be_paid = 0;
 
       const finalComment = generateComment(
         order.comment || '',
@@ -4175,91 +4123,47 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         }
       }
 
-      // 7️⃣ Cashbox logikasi (o‘zgarmagan)
-      if (price === 0) {
-        await updateCashbox(
-          marketCashbox,
-          Operation_type.EXPENSE,
-          marketTarif,
-          order.id,
-          Source_type.SELL,
-          `0 so‘mlik mahsulot qisman sotuvi`,
-          courier.id,
-        );
-        await updateCashbox(
-          courierCashbox,
-          Operation_type.EXPENSE,
-          courierTarif,
-          order.id,
-          Source_type.SELL,
-          `0 so‘mlik mahsulot qisman sotuvi`,
-          courier.id,
-        );
-      } else if (price < courierTarif) {
-        await updateCashbox(
-          marketCashbox,
-          Operation_type.EXPENSE,
-          marketTarif - price,
-          order.id,
-          Source_type.SELL,
-          `${price} so‘mlik mahsulot qisman sotuvi`,
-          courier.id,
-        );
-        await updateCashbox(
-          courierCashbox,
-          Operation_type.EXPENSE,
-          courierTarif - price,
-          order.id,
-          Source_type.SELL,
-          `${price} so‘mlik mahsulot qisman sotuvi`,
-          courier.id,
-        );
-      } else if (price < marketTarif) {
-        courier_to_be_paid = price - courierTarif;
-        await updateCashbox(
-          marketCashbox,
-          Operation_type.EXPENSE,
-          marketTarif - price,
-          order.id,
-          Source_type.SELL,
-          `${price} so‘mlik mahsulot qisman sotuvi`,
-          courier.id,
-        );
-        await updateCashbox(
-          courierCashbox,
-          Operation_type.INCOME,
-          courier_to_be_paid,
-          order.id,
-          Source_type.SELL,
-          `${price} so‘mlik mahsulot qisman sotuvi`,
-          courier.id,
-        );
-      } else {
-        to_be_paid = price - marketTarif;
-        courier_to_be_paid = price - courierTarif;
+      // 7️⃣ Cashbox logikasi — `sellOrder` bilan BIR XIL util.
+      //
+      // ⚠️ Yo'nalish `narx − tarif` ishorasidan hosil qilinadi. Avval bu
+      // yerda `sellOrder` dagi to'rt shoxning aynan nusxasi turardi va
+      // kuryer tarifi > narx > market tarifi bo'lganda market oyog'i manfiy
+      // `EXPENSE` bo'lib, qisman sotuv ham yiqilardi.
+      // Batafsil: `sell-cashbox-legs.util.ts`.
+      const legs = computeSellCashboxLegs({
+        price,
+        marketTariff: marketTarif,
+        courierTariff: courierTarif,
+      });
+      const legComment =
+        legs.kind === 'zero'
+          ? `0 so‘mlik mahsulot qisman sotuvi`
+          : legs.kind === 'below_tariff'
+            ? `${price} so‘mlik mahsulot qisman sotuvi`
+            : finalComment;
 
-        await updateCashbox(
-          marketCashbox,
-          Operation_type.INCOME,
-          to_be_paid,
-          order.id,
-          Source_type.SELL,
-          finalComment,
-          courier.id,
-        );
-        await updateCashbox(
-          courierCashbox,
-          Operation_type.INCOME,
-          courier_to_be_paid,
-          order.id,
-          Source_type.SELL,
-          finalComment,
-          courier.id,
-        );
-      }
+      // Tartib muhim: MARKET birinchi — `marketCashboxWrite` langari.
+      await updateCashbox(
+        marketCashbox,
+        legs.market.operation,
+        legs.market.amount,
+        order.id,
+        Source_type.SELL,
+        legComment,
+        courier.id,
+      );
+      await updateCashbox(
+        courierCashbox,
+        legs.courier.operation,
+        legs.courier.amount,
+        order.id,
+        Source_type.SELL,
+        legComment,
+        courier.id,
+      );
 
       // 8️⃣ Order update
-      const netToBePaid = Math.max(Number(to_be_paid) || 0, 0); // target summa o'zgarmaydi
+      const netToBePaid = legs.to_be_paid; // target summa o'zgarmaydi
       const currentPaid = Math.min(
         Math.max(Number(order.paid_amount) || 0, 0),
         netToBePaid,
@@ -5461,6 +5365,56 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       order.handover_escalated_at = null;
 
       await queryRunner.manager.save(order);
+
+      /**
+       * ⚠️ TERMINAL NISHONDA SHTRAF QAYD ETILADI — QOCHISH YO'LINI YOPADI.
+       *
+       * `CANCELLED` va `CANCELLED_SENT` — buyurtma TERMINAL holatga
+       * o'tadi, ya'ni bu BELGILASH: `cancelled_at` aynan shu yerda
+       * qo'yiladi. Ilgari bu ikki shox shtraf moduliga umuman ulanmagan
+       * edi va yuqoridagi izoh «shtraf QOLISHI kerak» deb taxmin
+       * qilardi — lekin birinchi belgilash MUHLAT ICHIDA bo'lsa daftarda
+       * hech qanday qator yo'q (`recordForOrder` 0 summada null
+       * qaytaradi). Natijada:
+       *
+       *   1-kuni «Sotildi» (muhlat ichida, shtraf yo'q)
+       *   → 30 kun ushlab turiladi
+       *   → `rollback` + `target_status: cancelled`
+       *   → TERMINAL, lekin shtraf 0.
+       *
+       * Ya'ni bu yo'l halol yo'ldan (30-kuni «Bekor» bosish) ARZON edi.
+       * Endi terminal nishon ham odatdagi belgilash kabi qayd etiladi.
+       *
+       * Allaqachon TIRIK shtraf bo'lsa, `UQ_CP_ENTRY_ORDER_REASON` uni
+       * to'sadi va chaqiruv jim o'tadi — ya'ni ikki marta jazo YO'Q,
+       * mavjud shtraf esa yuqoridagi izoh talab qilganidek JOYIDA qoladi.
+       */
+      if (
+        (targetStatus === RollbackTarget.CANCELLED ||
+          targetStatus === RollbackTarget.CANCELLED_SENT) &&
+        /**
+         * ⚠️ ALMASHTIRILAYOTGAN ESKI BUYURTMA ISTISNO.
+         *
+         * Kafolat-swapda eski buyurtma SOTILGAN holatda qoladi va faqat
+         * bayroq oladi (`is_replacement_return`) — ya'ni kuryer uni O'Z
+         * VAQTIDA yopgan, sotuv haqiqatan bo'lgan. Agar oylar o'tib
+         * o'sha sotuv bekor qilinsa, langar hamon DASTLABKI jo'natish
+         * bo'lgani uchun bu yerda to'liq tarif shtrafi yozilardi —
+         * kuryerning aybi bo'lmagan holat uchun.
+         *
+         * Qochish yo'li ochilmaydi: bayroq buyurtmaga faqat ALMASHTIRISH
+         * buyurtmasi yaratilganda qo'yiladi (`order.service.ts` —
+         * `replacedOrder.is_replacement_return = true`), kuryer uni o'zi
+         * qo'ya olmaydi.
+         */
+        !order.is_replacement_return
+      ) {
+        await this.courierPenalty.recordForOrder(queryRunner.manager, {
+          order,
+          markedAt: order.cancelled_at ?? Date.now(),
+          actorId: user.id,
+        });
+      }
 
       // === MARKETPLACE: ortga qaytarish ===
       //
@@ -7410,8 +7364,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         const deliveryPriceNum = Number(deliveryPrice) || 0;
         const finalTotalPrice = productPriceNum + deliveryPriceNum;
 
-        // QR kod token (tashqi QR koddan foydalanish)
-        const qrCodeToken = qrCode || generateCustomToken();
+        // QR kod token (tashqi QR koddan foydalanish). Ichki skan qidiruvlari
+        // (findByQrCode, kuryer skaneri, receiveWithScaner) kirishni
+        // normalizeQrToken bilan KICHIK harfga o'tkazib, aniq tenglik bilan
+        // izlaydi — shuning uchun tokenni ham shu shaklda saqlaymiz. Aks holda
+        // aralash registrli tashqi QR (masalan Butsy `pc_17zVBH...`) hech qachon
+        // topilmaydi.
+        const qrCodeToken = qrCode
+          ? normalizeQrToken(String(qrCode))
+          : generateCustomToken();
 
         // Izoh yaratish
         const orderComment = [
