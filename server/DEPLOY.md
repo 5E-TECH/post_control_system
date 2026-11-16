@@ -271,3 +271,12 @@ Yetti invariantni tekshiradi. Buzilsa **exit 1** va deploy to'xtaydi.
 > `SUM(EXTRA_COST) − SUM(CORRECTION)` net-hisobi bilan quradi. Tasdiqlanmagan
 > xarajat kassaga tushsa, keyingi rollback hech qachon berilmagan pulni
 > «qaytaradi».
+
+## Yiqilgan deploydan keyingi tuzatish pushi (2026-11-17)
+
+Deploy `client` testida yoki undan keyin yiqilsa, prod eski kodda qoladi (backend qurilmaydi,
+migratsiya ishlamaydi, sayt nashr qilinmaydi). Keyingi tuzatish pushi **`server/` katalogiga ham
+tegishi shart**: `deploy.yml` faqat shu pushda o'zgargan kataloglarni quradi, `client`-only push esa
+yangi SPA ni eski backend bilan nashr qilib yuboradi. 2026-11-17 dagi reliz (run #181 — Carrier
+paneli testlari sekin prod serverda 5 s ga sig'madi) aynan shu sabab bu bo'lim bilan birga qayta
+chiqarildi.

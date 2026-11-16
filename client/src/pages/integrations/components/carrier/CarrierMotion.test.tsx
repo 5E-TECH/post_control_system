@@ -1,10 +1,16 @@
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { configure, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import type { CarrierAccount } from "../../../../shared/api/hooks/useCarrierAccounts";
+
+// 2026-11-17 (Dilshod ruxsati bilan): prod deploy serverida (sekin CPU; deploy ichidagi `npm run test`) bu fayl
+// testlari sukut chegaralariga sig'madi — run #181: «Test timed out in 5000ms» va 1 s ichida chiqmagan toast.
+// Faqat shu faylda: test 30 s, findBy*/waitFor 5 s. Testlar mantig'i o'zgarmagan.
+vi.setConfig({ testTimeout: 30_000 });
+configure({ asyncUtilTimeout: 5_000 });
 
 /**
  * ⚠️ HAQIQIY ANIMATSIYA BILAN. rc-motion animatsiyani modul yuklanganda
