@@ -136,6 +136,8 @@ export interface CarrierAccountView {
   api_key_masked: string;
   ip_allowlist: string[] | null;
   is_active: boolean;
+  /** Yashirin rollback ruxsati (sukut `false`) — faqat admin ko'radi. */
+  rollback_enabled: boolean;
   last_used_at: number | null;
   created_at: number;
   updated_at: number;
@@ -150,6 +152,8 @@ export interface CreateCarrierAccountInput {
 export interface UpdateCarrierAccountInput {
   name?: string;
   ip_allowlist?: string[] | null;
+  /** Yashirin rollback'ni yoqish/o'chirish (faqat PATCH; yaratishda yo'q). */
+  rollback_enabled?: boolean;
 }
 
 /**
@@ -158,7 +162,10 @@ export interface UpdateCarrierAccountInput {
  * Elchi `apps/integration-service/src/carrier/carrier-account.service.ts`
  * dan ko'chirilgan, BeePost farqlari bilan:
  *   - bitta baza: kuryer holati `validateKey` ning O'ZIDA (join) tekshiriladi,
- *     kesh yo'q — bloklash darhol kuchga kiradi (Elchi'da ≤30 s);
+ *     kesh yo'q — bloklash darhol kuchga kiradi (Elchi'da ≤30 s). Yashirin
+ *     `rollback_enabled` ham shu qatordan o'qiladi: admin o'zgartirishi
+ *     KEYINGI so'rovdayoq kuchga kiradi (kechikish 0; faqat o'sha paytda
+ *     bajarilayotgan so'rov eski qiymat bilan tugaydi);
  *   - bog'lashda kuryer "TOZA" bo'lishi shart (pochtasiz, kassasi 0,
  *     boshqa provayderga bog'lanmagan, yaqinda hech kim kirmagan) va uning
  *     paroli hech kim bilmaydigan tasodifiy xeshga almashtiriladi — kuryer
@@ -400,6 +407,9 @@ export class CarrierAccountService {
           api_key_last4: apiKey.slice(-4),
           ip_allowlist: ipAllowlist,
           is_active: true,
+          // Yangi kompaniya — rollback DOIM o'chiq (yaratishda berib
+          // bo'lmaydi; keyin admin PATCH bilan yoqadi).
+          rollback_enabled: false,
           is_deleted: false,
           last_used_at: null,
           created_by: admin?.id ?? null,
@@ -429,6 +439,7 @@ export class CarrierAccountService {
         courier_user_id: saved.courier_user_id,
         ip_allowlist: saved.ip_allowlist,
         is_active: saved.is_active,
+        rollback_enabled: saved.rollback_enabled === true,
       },
       description: `Carrier akkaunt yaratildi: ${saved.name} (kuryer: ${courier.name})`,
       user: admin,
@@ -461,28 +472,45 @@ export class CarrierAccountService {
   }
 
   /**
-   * Nom va IP ro'yxati. Kuryer va kalit bu yerda O'ZGARMAYDI: kuryer
-   * almashsa — yangi akkaunt (eski buyurtma va kassa eski kuryerda qoladi);
-   * kalit uchun `rotateKey`.
+   * Nom, IP ro'yxati va yashirin `rollback_enabled`. Kuryer va kalit bu
+   * yerda O'ZGARMAYDI: kuryer almashsa — yangi akkaunt (eski buyurtma va
+   * kassa eski kuryerda qoladi); kalit uchun `rotateKey`.
    *
    * Faqat O'ZGARGAN ustunlar yoziladi (to'liq `save(row)` emas): parallel
    * `status` / `rotate-key` bir-birining yozuvini eski qiymat bilan bosib
    * ketmasin (masalan o'chirilgan akkaunt qayta yoqilib qolmasin).
+   *
+   * `rollback_enabled` — guard uni har so'rovda bazadan o'qiydi (kesh yo'q),
+   * ya'ni o'zgarish kompaniyaning KEYINGI so'rovidayoq kuchga kiradi.
+   * Tarixga boshqa admin o'zgarishlari kabi eski → yangi qiymat bilan
+   * yoziladi (`updated`).
    */
   async update(
     id: string,
     input: UpdateCarrierAccountInput,
     admin: JwtPayload,
   ): Promise<CarrierAccountView> {
-    if (input?.name === undefined && input?.ip_allowlist === undefined) {
+    if (
+      input?.name === undefined &&
+      input?.ip_allowlist === undefined &&
+      input?.rollback_enabled === undefined
+    ) {
       throw new BadRequestException(
-        "O'zgartirish uchun hech qanday maydon berilmadi (name, ip_allowlist)",
+        "O'zgartirish uchun hech qanday maydon berilmadi (name, ip_allowlist, rollback_enabled)",
       );
+    }
+    // DTO ham tekshiradi; servis to'g'ridan-to'g'ri chaqirilsa ham "true"
+    // satri yoki 1 jimgina yoqib yubormasin.
+    if (
+      input.rollback_enabled !== undefined &&
+      typeof input.rollback_enabled !== 'boolean'
+    ) {
+      throw new BadRequestException("rollback_enabled boolean bo'lishi kerak");
     }
     const row = await this.findRowOrFail(id);
 
     const changed: Partial<
-      Pick<CarrierAccountEntity, 'name' | 'ip_allowlist'>
+      Pick<CarrierAccountEntity, 'name' | 'ip_allowlist' | 'rollback_enabled'>
     > = {};
     if (input.name !== undefined) {
       const name = this.cleanName(input.name);
@@ -491,6 +519,13 @@ export class CarrierAccountService {
     if (input.ip_allowlist !== undefined) {
       const list = this.normalizeIpAllowlist(input.ip_allowlist);
       if (!sameList(list, row.ip_allowlist)) changed.ip_allowlist = list;
+    }
+    const rollbackBefore = row.rollback_enabled === true;
+    if (
+      input.rollback_enabled !== undefined &&
+      input.rollback_enabled !== rollbackBefore
+    ) {
+      changed.rollback_enabled = input.rollback_enabled;
     }
     if (!Object.keys(changed).length) {
       return this.toView(row);
@@ -504,13 +539,23 @@ export class CarrierAccountService {
       throw new NotFoundException('Carrier akkaunt topilmadi');
     }
 
+    const oldValue = pick(row, Object.keys(changed));
+    if ('rollback_enabled' in changed) {
+      oldValue.rollback_enabled = rollbackBefore;
+    }
+    const rollbackNote =
+      changed.rollback_enabled === undefined
+        ? ''
+        : changed.rollback_enabled
+          ? ' — rollback yoqildi'
+          : " — rollback o'chirildi";
     await this.activityLog.log({
       entity_type: 'CarrierAccount',
       entity_id: row.id,
       action: 'updated',
-      old_value: pick(row, Object.keys(changed)),
+      old_value: oldValue,
       new_value: changed,
-      description: `Carrier akkaunt yangilandi: ${changed.name ?? row.name}`,
+      description: `Carrier akkaunt yangilandi: ${changed.name ?? row.name}${rollbackNote}`,
       user: admin,
     });
     return this.toView(await this.findRowOrFail(row.id));
@@ -779,6 +824,7 @@ export class CarrierAccountService {
       api_key_masked: maskCarrierApiKey(row.api_key_last4),
       ip_allowlist: row.ip_allowlist ?? null,
       is_active: row.is_active,
+      rollback_enabled: row.rollback_enabled === true,
       last_used_at: row.last_used_at ?? null,
       created_at: row.created_at,
       updated_at: row.updated_at,

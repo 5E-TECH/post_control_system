@@ -73,6 +73,25 @@ export class UpdateCarrierAccountDto {
   @IsString({ each: true })
   @MaxLength(64, { each: true })
   ip_allowlist?: string[];
+
+  /**
+   * ICHKI (faqat BeePost xodimlari). `CreateCarrierAccountDto` da ATAYLAB
+   * yo'q — yangi akkaunt doim `false`, `forbidNonWhitelisted` yaratishda bu
+   * maydonni noma'lum deb rad etadi. Tashqi carrier Swagger'iga tushmaydi
+   * (`filterCarrierDocument` faqat `/carrier/*` ni oladi), asosiy Swagger
+   * esa production'da o'chiq.
+   */
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      'Kompaniya yuborgan rollback (sold/cancelled natijani bekor qilish) qabul qilinadimi. ' +
+      'Sukut false: kompaniyaning rollback so‘rovi noma’lum status kabi 400 oladi, xato ' +
+      'natijani BeePost operatori tuzatadi. Kompaniyaga hujjatlarda ko‘rsatilmaydi. ' +
+      'Yolg‘iz yoki name/ip_allowlist bilan birga yuborish mumkin.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  rollback_enabled?: boolean;
 }
 
 export class SetCarrierActiveDto {

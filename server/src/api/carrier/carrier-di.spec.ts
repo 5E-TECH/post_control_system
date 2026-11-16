@@ -336,6 +336,49 @@ describe('CarrierModule — haqiqiy DI grafi', () => {
       expect(res.status).toBeLessThan(500);
       expect(res.body.trace_id).toBeUndefined();
     });
+
+    it('⭐ HAQIQIY guard + gate: bayroqsiz akkaunt rollback’i noma’lum status kabi 400; yoqilgani servisga yetadi', async () => {
+      const ORDER = '3f6c1a2e-8b4d-4c7a-9e21-5d0b7f3a9c10';
+      const send = (status: string, key: string) =>
+        call(
+          'post',
+          `/api/v1/carrier/orders/${ORDER}/status`,
+          { ...KEY, 'Idempotency-Key': key },
+          { status },
+        );
+      const unknown = await send('delivered', 'k-3');
+      const hidden = await send('rollback', 'k-4');
+      expect(hidden.status).toBe(400);
+      expect(hidden.body.message).toBe(
+        'status must be one of the following values: sold, partly_sold, cancelled',
+      );
+      expect({ ...hidden.body, trace_id: null }).toEqual({
+        ...unknown.body,
+        trace_id: null,
+      });
+
+      // Admin yoqdi — guard keyingi so'rovda bazadan yangi qiymatni oladi:
+      // gate o'tkazadi, servis egalikni tekshiradi (bu stendda buyurtma yo'q).
+      repoFor(CarrierAccountEntity).createQueryBuilder.mockImplementation(() =>
+        keyLookup(() =>
+          Promise.resolve({ ...ACCOUNT, rollback_enabled: true }),
+        ),
+      );
+      const service = moduleRef.get(CarrierService, { strict: false });
+      const spy = jest
+        .spyOn(service, 'updateStatus')
+        .mockResolvedValue('ok' as never);
+      const enabled = await send('rollback', 'k-5');
+      expect(enabled.status).toBe(200);
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({ rollback_enabled: true }),
+        ORDER,
+        expect.objectContaining({ status: 'rollback' }),
+        'k-5',
+        null,
+      );
+      spy.mockRestore();
+    });
   });
 
   it('⭐ jonli hujjat (include: CarrierModule) = statik spec generatori', async () => {

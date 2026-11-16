@@ -4,6 +4,7 @@ import {
   useRemoveCarrierAccount,
   useRotateCarrierKey,
   useSetCarrierStatus,
+  useUpdateCarrierAccount,
   type CarrierAccount,
   type CarrierKeyResult,
 } from "../../../../shared/api/hooks/useCarrierAccounts";
@@ -64,7 +65,8 @@ const UNLOCKED: ModalFuncProps = {
 /**
  * Qaytarib bo'lmaydigan yoki kompaniyani to'xtatadigan amallar — har biri
  * TASDIQ oynasi orqali (kalitni yangilash, to'xtatish, qayta yoqish,
- * o'chirish). Sozlamalar va Kalit bo'limlari umumiy ishlatadi.
+ * o'chirish, yashirin rollback'ni yoqish/o'chirish). Sozlamalar va Kalit
+ * bo'limlari umumiy ishlatadi.
  *
  * ⚠️ `App.useApp()` — statik `Modal.confirm`/`message` emas: statik
  * chaqiruvlar `ConfigProvider` mavzusini olmaydi va qorong'i rejimda oq
@@ -79,6 +81,12 @@ export const useCarrierActions = ({ onKeyIssued, onDeleted }: Options) => {
   const rotateKey = useRotateCarrierKey();
   const setStatus = useSetCarrierStatus();
   const remove = useRemoveCarrierAccount();
+  /**
+   * Rollback tugmasi uchun ALOHIDA mutatsiya nusxasi: tahrirlash oynasining
+   * `useUpdateCarrierAccount` i bilan `isPending` aralashmasin. Javob
+   * (kalitsiz ko'rinish) ro'yxat keshiga darhol yoziladi (hook `onSuccess`).
+   */
+  const updateRollback = useUpdateCarrierAccount();
 
   const confirmRotate = (account: CarrierAccount) => {
     const instance: ConfirmInstance = modal.confirm({
@@ -232,11 +240,78 @@ export const useCarrierActions = ({ onKeyIssued, onDeleted }: Options) => {
     return instance;
   };
 
+  /**
+   * YASHIRIN ROLLBACK — kompaniya yuborgan `status: "rollback"` qabul
+   * qilinadimi (`PATCH carrier-accounts/:id {rollback_enabled}`). Server
+   * kesh qilmaydi: kompaniyaning keyingi so'rovidan kuchga kiradi. Sukut —
+   * o'chiq; imkoniyat kompaniya hujjatlarida yo'q.
+   */
+  const confirmRollback = (account: CarrierAccount, next: boolean) => {
+    const config: ModalFuncProps = next
+      ? {
+          title: `${account.name} uchun rollback'ni yoqasizmi?`,
+          content: (
+            <div className="text-sm">
+              <Bullets
+                items={[
+                  <>
+                    Kompaniya o'zi yuborgan <Code>sold</Code> / <Code>cancelled</Code>{" "}
+                    natijani bekor qila oladi: buyurtma «kutilmoqda»ga qaytadi,
+                    kassa yozuvi teskari yoziladi (naqd topshirilgan bo'lsa ham —
+                    balans manfiy bo'lishi mumkin).
+                  </>,
+                  "Kompaniyaning keyingi so'rovidan kuchga kiradi.",
+                  "Bu imkoniyat kompaniya hujjatlarida yo'q — yoqsangiz, kompaniyaga o'zingiz xabar bering.",
+                ]}
+              />
+            </div>
+          ),
+          okText: "Ha, yoqish",
+        }
+      : {
+          title: `${account.name} uchun rollback'ni o'chirasizmi?`,
+          content: (
+            <div className="text-sm">
+              <Bullets
+                items={[
+                  "Kompaniyaning rollback so'rovi noma'lum status kabi 400 oladi — imkoniyat borligi bilinmaydi.",
+                  "Xato yuborilgan natijani BeePost operatori tuzatadi.",
+                  "Kompaniyaning keyingi so'rovidan kuchga kiradi.",
+                ]}
+              />
+            </div>
+          ),
+          okText: "Ha, o'chirish",
+          okButtonProps: { danger: true },
+        };
+
+    const instance: ConfirmInstance = modal.confirm({
+      ...UNLOCKED,
+      ...config,
+      cancelText: "Bekor qilish",
+      onOk: once(async () => {
+        lockWhilePending(instance);
+        try {
+          await updateRollback.mutateAsync({
+            id: account.id,
+            dto: { rollback_enabled: next },
+          });
+          message.success(next ? "Rollback yoqildi" : "Rollback o'chirildi");
+        } catch (e) {
+          message.error(errText(e, "Rollback sozlamasini o'zgartirib bo'lmadi"));
+        }
+      }),
+    });
+    return instance;
+  };
+
   return {
     confirmRotate,
     confirmStatus,
     confirmDelete,
+    confirmRollback,
     statusPending: setStatus.isPending,
     rotatePending: rotateKey.isPending,
+    rollbackPending: updateRollback.isPending,
   };
 };

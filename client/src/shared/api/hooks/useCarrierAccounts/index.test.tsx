@@ -28,6 +28,7 @@ const view = {
   api_key_masked: "bpc_…c91f",
   ip_allowlist: null,
   is_active: true,
+  rollback_enabled: false,
   last_used_at: null,
   created_at: 1,
   updated_at: 1,

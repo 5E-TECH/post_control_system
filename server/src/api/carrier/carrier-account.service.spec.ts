@@ -606,6 +606,119 @@ describe('CarrierAccountService — ro‘yxat va o‘zgartirish', () => {
   });
 });
 
+describe('CarrierAccountService — yashirin rollback_enabled', () => {
+  it('⭐ yangi akkaunt: rollback DOIM o‘chiq (yozuvda, javobda, tarixda)', async () => {
+    const { service, manager, activityLog } = setup();
+    mockCreateLookups(manager);
+    const res = await service.create(
+      // Tashqaridan kelgan qiymat (DTO uni baribir rad etadi) e'tiborga olinmaydi.
+      { name: 'BTS', courier_id: COURIER_ID, rollback_enabled: true } as any,
+      ADMIN,
+    );
+    const accountCreate = manager.create.mock.calls.find(
+      (c: any[]) => c[0] === CarrierAccountEntity,
+    );
+    expect(accountCreate[1].rollback_enabled).toBe(false);
+    expect(res.account.rollback_enabled).toBe(false);
+    expect(activityLog.log.mock.calls[0][0]).toMatchObject({
+      action: 'created',
+      new_value: { rollback_enabled: false },
+    });
+  });
+
+  it('list va ko‘rinish: bayroq boolean (null/yo‘q → false)', async () => {
+    const { service, accountRepo } = setup();
+    accountRepo.find.mockResolvedValue([
+      account({ rollback_enabled: true }),
+      account({ id: 'b', rollback_enabled: false }),
+      account({ id: 'c', rollback_enabled: null as any }),
+      account({ id: 'd' }),
+    ]);
+    const views = await service.list();
+    expect(views.map((v) => v.rollback_enabled)).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it('⭐ PATCH faqat rollback_enabled: yoziladi, tarixda eski → yangi, javobda yangi qiymat', async () => {
+    const { service, accountRepo, activityLog } = setup();
+    accountRepo.findOne
+      .mockResolvedValueOnce(account({ rollback_enabled: false }))
+      .mockResolvedValueOnce(account({ rollback_enabled: true }));
+    const view = await service.update(
+      ACCOUNT_ID,
+      { rollback_enabled: true },
+      ADMIN,
+    );
+    expect(accountRepo.update).toHaveBeenCalledTimes(1);
+    const [criteria, changes] = accountRepo.update.mock.calls[0];
+    expect(criteria).toEqual({ id: ACCOUNT_ID, is_deleted: false });
+    expect(Object.keys(changes).sort()).toEqual([
+      'rollback_enabled',
+      'updated_at',
+    ]);
+    expect(changes.rollback_enabled).toBe(true);
+    expect(activityLog.log).toHaveBeenCalledWith({
+      entity_type: 'CarrierAccount',
+      entity_id: ACCOUNT_ID,
+      action: 'updated',
+      old_value: { rollback_enabled: false },
+      new_value: { rollback_enabled: true },
+      description: 'Carrier akkaunt yangilandi: BTS Express — rollback yoqildi',
+      user: ADMIN,
+    });
+    expect(view.rollback_enabled).toBe(true);
+  });
+
+  it('o‘chirish ham tarixga yoziladi; nom bilan birga — bitta UPDATE, bitta yozuv', async () => {
+    const { service, accountRepo, activityLog } = setup();
+    accountRepo.findOne.mockResolvedValue(account({ rollback_enabled: true }));
+    await service.update(
+      ACCOUNT_ID,
+      { name: 'BTS Pro', rollback_enabled: false },
+      ADMIN,
+    );
+    expect(accountRepo.update).toHaveBeenCalledTimes(1);
+    expect(accountRepo.update.mock.calls[0][1]).toMatchObject({
+      name: 'BTS Pro',
+      rollback_enabled: false,
+    });
+    expect(activityLog.log).toHaveBeenCalledTimes(1);
+    expect(activityLog.log.mock.calls[0][0]).toMatchObject({
+      old_value: { name: 'BTS Express', rollback_enabled: true },
+      new_value: { name: 'BTS Pro', rollback_enabled: false },
+      description: "Carrier akkaunt yangilandi: BTS Pro — rollback o'chirildi",
+    });
+  });
+
+  it('o‘zgarmagan qiymat — yozuvsiz; boolean bo‘lmagan qiymat — 400, bazaga bormaydi', async () => {
+    const { service, accountRepo, activityLog } = setup();
+    accountRepo.findOne.mockResolvedValue(account({ rollback_enabled: false }));
+    await service.update(ACCOUNT_ID, { rollback_enabled: false }, ADMIN);
+    expect(accountRepo.update).not.toHaveBeenCalled();
+    expect(activityLog.log).not.toHaveBeenCalled();
+
+    accountRepo.findOne.mockClear();
+    for (const value of ['true', 1, null]) {
+      await expect(
+        service.update(ACCOUNT_ID, { rollback_enabled: value } as any, ADMIN),
+      ).rejects.toThrow("rollback_enabled boolean bo'lishi kerak");
+    }
+    expect(accountRepo.findOne).not.toHaveBeenCalled();
+    expect(accountRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('maydonsiz PATCH xabari rollback_enabled ni ham sanaydi', async () => {
+    const { service } = setup();
+    await expect(service.update(ACCOUNT_ID, {}, ADMIN)).rejects.toThrow(
+      'name, ip_allowlist, rollback_enabled',
+    );
+  });
+});
+
 describe('CarrierAccountService — kalit va holat', () => {
   it('⭐ rotateKey: yangi xesh yoziladi (eski darhol o‘ladi), kalit bir marta qaytadi', async () => {
     const { service, accountRepo, activityLog } = setup();

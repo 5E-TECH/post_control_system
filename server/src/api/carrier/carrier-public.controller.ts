@@ -56,6 +56,7 @@ import {
   CarrierThrottlerGuard,
 } from './guards/carrier-throttler.guard';
 import { CarrierExceptionFilter } from './filters/carrier-exception.filter';
+import { CarrierRollbackGateInterceptor } from './carrier-rollback-gate.interceptor';
 import {
   CARRIER_ORDER_STATUS_EXAMPLES,
   CARRIER_UUID_RE,
@@ -249,17 +250,19 @@ export class CarrierPublicController {
     // sinovchi uni takrorlab 422/409 oladi.
     schema: { type: 'string' },
   })
+  // ⚠️ Summary/description'da yashirin `rollback` ATAYLAB yo'q
+  // (`carrier-public-docs-hidden.spec.ts` qulflaydi; qayta ochish —
+  // 15-carrier-api.md §12).
   @ApiOperation({
     summary:
-      'Buyurtma holatini yuborish: sotildi (sold), qisman (partly_sold), bekor (cancelled), rollback',
+      'Buyurtma holatini yuborish: sotildi (sold), qisman (partly_sold), bekor (cancelled)',
     description:
       'Kuryeringiz posilkani topshirganda yoki topshira olmaganda shu so‘rovni yuboring — ' +
       'bizda buyurtma holati darhol o‘zgaradi. ' +
       '`sold`, `partly_sold`, `cancelled` — faqat `waiting` holatida (avval `/carrier/scan`). ' +
       '`partly_sold` da `items` buyurtmaning HAR BIR qatorini va undan sotilgan donani o‘z ichiga ' +
       'oladi; `total_price` — mijoz olgan tovarlar qiymati. ' +
-      '`rollback` — faqat `sold` yoki `cancelled` holatidagi buyurtmani `waiting` ga qaytaradi ' +
-      '(`paid`/`partly_paid` — BeePost operatori). ' +
+      'Xato yuborilgan natijani BeePost operatori tuzatadi. ' +
       'Isbot — `multipart/form-data` bilan `proof` fayli: rasm jpeg/png/webp ' +
       'yoki pdf ≤10 MB, video mp4/mov/webm ≤50 MB. Javobda yangilangan buyurtma ' +
       '(`refreshed: false` — holat qabul qilingan, buyurtmani keyinroq o‘qing).',
@@ -303,7 +306,7 @@ export class CarrierPublicController {
   })
   @ApiConflictResponse({
     description:
-      'Ayni kalit bilan so‘rov hali bajarilmoqda (biroz kutib qayta urining) yoki kalit eski urinishga tegishli (CARRIER_IDEMPOTENCY_KEY_STALE — yangi kalit)',
+      'Ayni kalit bilan so‘rov hali bajarilmoqda (biroz kutib qayta urining) yoki kalit eski urinishga tegishli — buyurtma holati o‘shandan beri o‘zgargan (CARRIER_IDEMPOTENCY_KEY_STALE — yangi kalit)',
     type: CarrierErrorResponseDto,
   })
   @ApiUnprocessableEntityResponse({
@@ -323,6 +326,10 @@ export class CarrierPublicController {
       storage: memoryStorage(),
       limits: { fileSize: CARRIER_PROOF_MULTER_MAX_BYTES, files: 1 },
     }),
+    // ⚠️ multer'dan KEYIN (multipart tanasi shu paytda tayyor), global
+    // ValidationPipe'dan OLDIN: o'chiq akkauntdagi `rollback` noma'lum
+    // status qiymatidek rad etiladi — yon ta'sirsiz.
+    CarrierRollbackGateInterceptor,
   )
   updateStatus(
     @Param('id') rawId: string,

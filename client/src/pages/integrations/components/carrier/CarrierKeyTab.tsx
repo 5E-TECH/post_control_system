@@ -25,7 +25,9 @@ interface Endpoint {
 
 const ENDPOINTS: Endpoint[] = [
   { method: "POST", path: "/carrier/scan", desc: "QR skan → buyurtma ma'lumoti; posilka «kutilmoqda»ga o'tadi" },
-  { method: "POST", path: "/carrier/orders/:id/status", desc: "sold · partly_sold · cancelled · rollback; Idempotency-Key majburiy" },
+  // ⚠️ Kompaniya dasturchisiga beriladigan ro'yxat — yashirin rollback YO'Q
+  // (Sozlamalar → «Rollback», ichki hujjat 15-carrier-api.md §12).
+  { method: "POST", path: "/carrier/orders/:id/status", desc: "sold · partly_sold · cancelled; Idempotency-Key majburiy" },
   { method: "GET", path: "/carrier/orders", desc: "Solishtirish uchun ro'yxat (sahifalab)" },
   { method: "GET", path: "/carrier/cashbox", desc: "Kuryer kassasi balansi va tarixi (ko'pi bilan 92 kun)" },
   { method: "POST", path: "/carrier/returns", desc: "Bekor qilingan posilkalarni qaytarish (1–50 ta)" },

@@ -41,7 +41,12 @@ function run(
   const request = {
     method: 'POST',
     originalUrl: '/api/v1/carrier/orders/abc/status',
-    carrier: { id: 'acc-1', name: 'BTS', courier_user_id: 'c-1' },
+    carrier: {
+      id: 'acc-1',
+      name: 'BTS',
+      courier_user_id: 'c-1',
+      rollback_enabled: false,
+    },
   };
   const host = {
     switchToHttp: () => ({

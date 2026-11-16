@@ -137,6 +137,8 @@ const CarrierPanel = () => {
           account={selected}
           statusPending={actions.statusPending}
           onToggle={actions.confirmStatus}
+          rollbackPending={actions.rollbackPending}
+          onToggleRollback={actions.confirmRollback}
           onEdit={openEdit}
           onDelete={actions.confirmDelete}
         />

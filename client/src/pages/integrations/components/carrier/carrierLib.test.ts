@@ -10,6 +10,7 @@ import {
   editPatch,
   errText,
   ipKind,
+  isRollbackEnabled,
   parseIpLines,
   timeAgo,
   unwrapCourierList,
@@ -23,6 +24,7 @@ const account = (over: Partial<CarrierAccount> = {}): CarrierAccount => ({
   api_key_masked: "bpc_…a1b2",
   ip_allowlist: null,
   is_active: true,
+  rollback_enabled: false,
   last_used_at: null,
   created_at: 1_762_000_000_000,
   updated_at: 1_762_000_000_000,
@@ -147,6 +149,28 @@ describe("carrierLib", () => {
     it("yaratish va kalit yangilashda farq yo'q (eski qiymat yo'q)", () => {
       expect(activityDiff({ old_value: null, new_value: { key_rotated: true } })).toBeNull();
     });
+
+    it("yashirin rollback — o'qiladigan yorliq bilan, nom bilan birga ham", () => {
+      expect(
+        activityDiff({
+          old_value: { rollback_enabled: false },
+          new_value: { rollback_enabled: true },
+        }),
+      ).toBe("rollback: o'chiq → yoqilgan");
+      expect(
+        activityDiff({
+          old_value: { name: "A", rollback_enabled: true },
+          new_value: { name: "B", rollback_enabled: false },
+        }),
+      ).toBe("name: A → B · rollback: yoqilgan → o'chiq");
+    });
+  });
+
+  it("isRollbackEnabled — faqat aniq true (eski server maydonni bermasa — o'chiq)", () => {
+    expect(isRollbackEnabled(account({ rollback_enabled: true }))).toBe(true);
+    expect(isRollbackEnabled(account())).toBe(false);
+    expect(isRollbackEnabled({ rollback_enabled: undefined as unknown as boolean })).toBe(false);
+    expect(isRollbackEnabled({ rollback_enabled: "true" as unknown as boolean })).toBe(false);
   });
 
   it("errText — server matni aynan, bo'lmasa zaxira", () => {

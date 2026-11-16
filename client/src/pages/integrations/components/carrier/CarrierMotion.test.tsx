@@ -42,6 +42,7 @@ const FASTPOST: CarrierAccount = {
   api_key_masked: "bpc_…a1b2",
   ip_allowlist: ["203.0.113.10"],
   is_active: true,
+  rollback_enabled: false,
   last_used_at: null,
   created_at: Date.UTC(2026, 10, 2, 6, 2),
   updated_at: Date.UTC(2026, 10, 10, 4, 15),
