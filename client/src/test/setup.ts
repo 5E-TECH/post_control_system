@@ -1,6 +1,18 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach } from "vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
+
+/**
+ * ⚠️ `findBy*` / `waitFor` KUTISH CHEGARASI — 5 s (sukut 1 s edi).
+ *
+ * Testlar deploy paytida sekin prod serverda ham ishlaydi. 2026-11-17
+ * relizida «Akkaunt o'chirildi …» toast'i Mac'da bir zumda chiqardi, prodda
+ * esa 1 s ichida ulgurmadi va `findByText` yiqildi — kod to'g'ri edi.
+ * O'tadigan testlarni bu sekinlashtirmaydi: kutish shart bajarilishi bilan
+ * tugaydi. Chegara `vitest.config.ts` dagi `testTimeout` dan kichik — aks
+ * holda xato «Unable to find …» o'rniga ma'nosiz «timed out» bo'lardi.
+ */
+configure({ asyncUtilTimeout: 5_000 });
 
 /**
  * Har testdan keyin DOM tozalanadi — aks holda ketma-ket testlarda
