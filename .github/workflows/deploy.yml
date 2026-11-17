@@ -113,17 +113,39 @@ jobs:
           private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
 
       # 4️⃣ Determine changed directories (merge-safe version)
+      #
+      # ⚠️ BAZA — OXIRGI MUVAFFAQIYATLI PROD DEPLOY, «oldingi commit» EMAS.
+      #
+      # Avval o'zgarishlar faqat shu push'ning o'zidan (merge-base yoki
+      # HEAD~1) hisoblanardi. Deploy yiqilsa, keyingi push o'sha yiqilgan
+      # relizning o'zgarishlarini «ko'rmay» qolardi. 2026-11-17 da aynan
+      # shunday bo'lishi mumkin edi: reliz (client + server, 6 migratsiya)
+      # klient testlarida yiqildi; tuzatish faqat client/ ga tegadi →
+      # CHANGED_DIRS='client' → server QURILMAYDI, migratsiya
+      # QO'LLANMAYDI, lekin yangi SPA nashr qilinadi = yangi SPA + eski
+      # API, deploy esa YASHIL.
+      #
+      # Endi baza — shu workflow'ning main'dagi oxirgi YASHIL run'i commit'i,
+      # ya'ni prodda haqiqatan turgan kod. Topilmasa (API xatosi, tarixda
+      # yo'q commit) — eski usulga qaytiladi va bu ochiq yoziladi.
       - name: Determine changed directories
         id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git fetch --deepen=50
-          # For merge commits, compare both parents to get all changed files
-          if git rev-parse HEAD^2 >/dev/null 2>&1; then
-            MERGE_BASE=$(git merge-base HEAD^1 HEAD^2)
-            CHANGED_DIRS=$(git diff --name-only $MERGE_BASE HEAD | awk -F/ '{print $1}' | sort -u | tr '\n' ' ')
+          LAST_OK=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml --branch main --status success --limit 1 --json headSha --jq '.[0].headSha // empty' 2>/dev/null || true)
+          if [ -n "$LAST_OK" ] && git cat-file -e "$LAST_OK^{commit}" 2>/dev/null; then
+            BASE=$LAST_OK
+            echo "🔖 Baza: oxirgi muvaffaqiyatli deploy — $LAST_OK"
+          elif git rev-parse HEAD^2 >/dev/null 2>&1; then
+            BASE=$(git merge-base HEAD^1 HEAD^2)
+            echo "⚠️ Oxirgi muvaffaqiyatli deploy topilmadi — baza merge-base: $BASE"
           else
-            CHANGED_DIRS=$(git diff --name-only HEAD~1 HEAD | awk -F/ '{print $1}' | sort -u | tr '\n' ' ')
+            BASE=HEAD~1
+            echo "⚠️ Oxirgi muvaffaqiyatli deploy topilmadi — baza HEAD~1"
           fi
+          CHANGED_DIRS=$(git diff --name-only "$BASE" HEAD | awk -F/ '{print $1}' | sort -u | tr '\n' ' ')
           echo "changed=$CHANGED_DIRS" >> $GITHUB_OUTPUT
           echo "🧾 Changed directories: $CHANGED_DIRS"
 

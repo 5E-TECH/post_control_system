@@ -280,3 +280,10 @@ tegishi shart**: `deploy.yml` faqat shu pushda o'zgargan kataloglarni quradi, `c
 yangi SPA ni eski backend bilan nashr qilib yuboradi. 2026-11-17 dagi reliz (run #181 — Carrier
 paneli testlari sekin prod serverda 5 s ga sig'madi) aynan shu sabab bu bo'lim bilan birga qayta
 chiqarildi.
+
+> **Yangilanish (fix/deploy-client-test-timeout).** Bu qo'lda bajariladigan qoida endi SHART EMAS:
+> `deploy.yml` o'zgargan kataloglarni shu pushdan emas, main'dagi **oxirgi muvaffaqiyatli deploy**
+> commit'idan hisoblaydi. Yiqilgan relizning `server/` o'zgarishlari keyingi har qanday pushda
+> (faqat-client bo'lsa ham) qayta quriladi va migratsiyadan o'tadi. Oxirgi yashil run topilmasa
+> (GitHub API xatosi), workflow eski usulga qaytadi va logda «⚠️ Oxirgi muvaffaqiyatli deploy
+> topilmadi» yozadi — faqat shu holatda yuqoridagi qoida yana kerak.
