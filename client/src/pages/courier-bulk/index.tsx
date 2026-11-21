@@ -593,21 +593,25 @@ const CourierBulkPage = () => {
       });
       setResult(finalResult);
 
-      // State'ni tozalash:
-      //   - cancel-only: faqat bekor qilinganlar tozalanadi, keep va sell ro'yxatda qoladi
-      //   - full: hammasi tozalanadi (kun yakunlandi)
-      if (type === "full") {
-        setCancelIds(new Set());
+      // State'ni tozalash. ⚠️ Faqat MUVAFFAQIYATLI bekor qilinganlar ro'yxatdan chiqadi — xato berganlari «bekor»
+      // belgisida qoladi. Ilgari `cancelIds` butunlay tozalanardi: xato bergan buyurtma (u hali WAITING) sukut
+      // «sotiladi» ga o'tib, keyingi «Kun yakunlash» da kuryer bekor qilmoqchi bo'lgan posilka SOTILIB ketardi.
+      const failedCancelIds = new Set(
+        finalResult.cancelFailed.map((failure) => failure.id),
+      );
+      const hadFailures =
+        finalResult.cancelFailed.length > 0 ||
+        finalResult.sellFailed.length > 0;
+      setCancelIds(failedCancelIds);
+      if (type === "full" && !hadFailures) {
+        // Kun to'liq yakunlandi — «ertaga» belgilari ham tozalanadi (ertaga ular yana sukut «sotiladi»).
         setKeepIds(new Set());
         try {
           localStorage.removeItem(STORAGE_KEY);
         } catch {}
-      } else {
-        // Faqat muvaffaqiyatli bekor qilinganlarni cancel ro'yxatdan olib tashlash
-        // (xato bo'lganlari qoladi, qayta urinish mumkin)
-        // Eng oson — refetch keyingi load'da WAITING bo'lmaganlar avto chiqib ketadi
-        setCancelIds(new Set());
       }
+      // Xato bo'lsa «ertaga» belgilari QOLADI: kuryer xato berganlarni qayta yuborish uchun yana «Kun yakunlash»
+      // bossa, ertaga qoldirilgan posilkalar sotilib ketmasin. Bajarilganlar refetch bilan ro'yxatdan chiqadi.
       refetch();
     } catch (err: any) {
       setProgress({
